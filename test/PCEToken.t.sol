@@ -5,23 +5,22 @@ import {Test} from "forge-std/Test.sol";
 import {PCEToken} from "../src/PCEToken.sol";
 import {PCECommunityToken} from "../src/PCECommunityToken.sol";
 import {ExchangeAllowMethod} from "../src/lib/Enum.sol";
-import {console} from "forge-std/console.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import {Utils} from "../src/lib/Utils.sol";
 
 contract PCETokenTest is Test {
-    address alice = address(0xABCD);
-    address bob = address(0xDCBA);
+    address constant ALICE = address(0xABCD);
+    address constant BOB = address(0xDCBA);
 
-    address communityToken = 0xffD4505B3452Dc22f8473616d50503bA9E1710Ac;
+    address constant COMMUNITY_TOKEN =
+        0xffD4505B3452Dc22f8473616d50503bA9E1710Ac;
+    uint256 constant INITIAL_AMOUNT = 50000;
+
     PCEToken pceToken;
     PCECommunityToken cToken;
 
-    uint256 initialAmount = 50000;
-
     function setUp() public {
-        vm.label(alice, "alice");
-        vm.label(bob, "bob");
+        vm.label(ALICE, "alice");
+        vm.label(BOB, "bob");
 
         cToken = new PCECommunityToken();
         pceToken = new PCEToken();
@@ -30,188 +29,186 @@ contract PCETokenTest is Test {
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
     }
 
-    function test__votingPower() public {
-        uint256 _balance = pceToken.balanceOf(address(this));
-        uint256 _amount = 10000;
+    function testVotingPower() public {
+        uint256 balance = pceToken.balanceOf(address(this));
+        uint256 amount = 10000;
+
         pceToken.delegate(address(this));
-        assertEq(_balance, pceToken.getVotes(address(this)));
+        assertEq(balance, pceToken.getVotes(address(this)));
 
-        pceToken.transfer(alice, _amount);
-        assertEq(_balance - _amount, pceToken.getVotes(address(this)));
-
+        pceToken.transfer(ALICE, amount);
+        assertEq(balance - amount, pceToken.getVotes(address(this)));
         assertEq(pceToken.numCheckpoints(address(this)), 1);
 
-        vm.prank(alice);
-        pceToken.delegate(alice);
-        assertEq(pceToken.numCheckpoints(alice), 1);
-        assertEq(_amount, pceToken.getVotes(alice));
+        vm.prank(ALICE);
+        pceToken.delegate(ALICE);
+        assertEq(pceToken.numCheckpoints(ALICE), 1);
+        assertEq(amount, pceToken.getVotes(ALICE));
     }
 
-    function test__createToken() public {
-        PCEToken.TokenInfo memory tokenInfo;
-
-        tokenInfo = PCEToken.TokenInfo({
-            name: "CommunityToken", // Name
-            symbol: "CTP", // Symbol
-            amountToExchange: initialAmount, // amountToExchange
-            dilutionFactor: 2e18, // dilutionFactor
-            decreaseIntervalDays: 7, // decreaseIntervalDays
-            afterDecreaseBp: 20, // decreaseBp
-            maxIncreaseOfTotalSupplyBp: 20, // maxIncreaseOfTotalSupplyBp
-            maxIncreaseBp: 2000, // maxIncreaseBp
-            maxUsageBp: 3000, // maxUsageBp
-            changeBp: 3000, // changeBp
-            incomeExchangeAllowMethod: ExchangeAllowMethod.All, // incomeAllowMethod
-            outgoExchangeAllowMethod: ExchangeAllowMethod.All, // outgoAllowMethod
-            incomeTargetTokens: new address[](0), // incomeTargetTokens
-            outgoTargetTokens: new address[](0) // outgoTargetTokens
+    function testCreateToken() public {
+        PCEToken.TokenInfo memory tokenInfo = PCEToken.TokenInfo({
+            name: "CommunityToken",
+            symbol: "CTP",
+            amountToExchange: INITIAL_AMOUNT,
+            dilutionFactor: 2e18,
+            decreaseIntervalDays: 7,
+            afterDecreaseBp: 20,
+            maxIncreaseOfTotalSupplyBp: 20,
+            maxIncreaseBp: 2000,
+            maxUsageBp: 3000,
+            changeBp: 3000,
+            incomeExchangeAllowMethod: ExchangeAllowMethod.All,
+            outgoExchangeAllowMethod: ExchangeAllowMethod.All,
+            incomeTargetTokens: new address[](0),
+            outgoTargetTokens: new address[](0)
         });
 
         pceToken.createToken(tokenInfo);
     }
 
-    function test__moveVotingPower() public {
-        test__createToken();
+    function testMoveVotingPower() public {
+        testCreateToken();
 
         pceToken.delegate(address(this));
         vm.expectRevert("NOT_COMMUNITY_TOKEN");
-        pceToken.moveVotingPower(address(this), bob, 10000);
+        pceToken.moveVotingPower(address(this), BOB, 10000);
 
-        vm.prank(communityToken);
-        pceToken.moveVotingPower(address(this), bob, 10000);
-        assertEq(pceToken.getVotes(bob), 10000);
+        vm.prank(COMMUNITY_TOKEN);
+        pceToken.moveVotingPower(address(this), BOB, 10000);
+        assertEq(pceToken.getVotes(BOB), 10000);
     }
 
-    function test__swapToLocalToken() public {
-        test__createToken();
-        uint256 _amountToSwap = 10000;
+    function testSwapToLocalToken() public {
+        testCreateToken();
+        uint256 amountToSwap = 10000;
         skip(1);
 
-        uint256 _balanceBefore = pceToken.balanceOf(address(this));
-        pceToken.swapToLocalToken(communityToken, _amountToSwap);
-        uint256 _balanceAfter = pceToken.balanceOf(address(this));
+        uint256 balanceBefore = pceToken.balanceOf(address(this));
+        pceToken.swapToLocalToken(COMMUNITY_TOKEN, amountToSwap);
+        uint256 balanceAfter = pceToken.balanceOf(address(this));
 
-        assertEq(_balanceBefore - _balanceAfter, _amountToSwap);
+        assertEq(balanceBefore - balanceAfter, amountToSwap);
 
-        ERC20Upgradeable(communityToken).balanceOf(address(this));
+        ERC20Upgradeable(COMMUNITY_TOKEN).balanceOf(address(this));
 
         vm.expectRevert("Target token not found");
-        pceToken.swapToLocalToken(alice, _amountToSwap);
+        pceToken.swapToLocalToken(ALICE, amountToSwap);
     }
 
-    function test__swapFromLocalToken() public {
-        test__createToken();
-        uint256 _amountToSwap = 20000;
+    function testSwapFromLocalToken() public {
+        testCreateToken();
+        uint256 amountToSwap = 20000;
         skip(1);
 
-        ERC20Upgradeable(communityToken).approve(
+        ERC20Upgradeable(COMMUNITY_TOKEN).approve(
             address(pceToken),
-            _amountToSwap * pceToken.getCurrentFactor()
+            amountToSwap * pceToken.getCurrentFactor()
         );
-        uint256 _balanceBefore = pceToken.balanceOf(address(this));
-        pceToken.swapFromLocalToken(communityToken, _amountToSwap);
-        uint256 _balanceAfter = pceToken.balanceOf(address(this));
+        uint256 balanceBefore = pceToken.balanceOf(address(this));
+        pceToken.swapFromLocalToken(COMMUNITY_TOKEN, amountToSwap);
+        uint256 balanceAfter = pceToken.balanceOf(address(this));
 
-        assertEq(_balanceBefore + _amountToSwap / 2, _balanceAfter);
+        assertEq(balanceBefore + amountToSwap / 2, balanceAfter);
 
-        ERC20Upgradeable(communityToken).balanceOf(address(this));
+        ERC20Upgradeable(COMMUNITY_TOKEN).balanceOf(address(this));
 
         vm.expectRevert("Target token not found");
-        pceToken.swapFromLocalToken(alice, _amountToSwap);
+        pceToken.swapFromLocalToken(ALICE, amountToSwap);
     }
 
-    function test__mint(uint256 _amount) public {
-        vm.assume(_amount < type(uint224).max);
-        uint256 _balanceBefore = pceToken.balanceOf(address(this));
+    function testMint(uint256 amount) public {
+        vm.assume(amount < type(uint224).max);
+        uint256 balanceBefore = pceToken.balanceOf(address(this));
 
-        pceToken.mint(address(this), _amount);
-        uint256 _balanceAfter = pceToken.balanceOf(address(this));
-        assertEq(_balanceBefore + _amount, _balanceAfter);
+        pceToken.mint(address(this), amount);
+        uint256 balanceAfter = pceToken.balanceOf(address(this));
+        assertEq(balanceBefore + amount, balanceAfter);
 
-        vm.prank(alice);
+        vm.prank(ALICE);
         vm.expectRevert("Ownable: caller is not the owner");
         pceToken.mint(address(this), 1);
     }
 
-    function test__setNativeTokenToPceTokenRate(
-        uint160 _nativeTokenToPceTokenRate
+    function testSetNativeTokenToPceTokenRate(
+        uint160 nativeTokenToPceTokenRate
     ) public {
-        pceToken.setNativeTokenToPceTokenRate(_nativeTokenToPceTokenRate);
+        pceToken.setNativeTokenToPceTokenRate(nativeTokenToPceTokenRate);
         assertEq(
-            _nativeTokenToPceTokenRate,
+            nativeTokenToPceTokenRate,
             pceToken.nativeTokenToPceTokenRate()
         );
 
-        vm.prank(alice);
+        vm.prank(ALICE);
         vm.expectRevert("Ownable: caller is not the owner");
-        pceToken.setNativeTokenToPceTokenRate(_nativeTokenToPceTokenRate);
+        pceToken.setNativeTokenToPceTokenRate(nativeTokenToPceTokenRate);
     }
 
-    function test__setMetaTransactionGas(uint256 _metaTransactionGas) public {
-        pceToken.setMetaTransactionGas(_metaTransactionGas);
-        assertEq(_metaTransactionGas, pceToken.metaTransactionGas());
+    function testSetMetaTransactionGas(uint256 metaTransactionGas) public {
+        pceToken.setMetaTransactionGas(metaTransactionGas);
+        assertEq(metaTransactionGas, pceToken.metaTransactionGas());
 
-        vm.prank(alice);
+        vm.prank(ALICE);
         vm.expectRevert("Ownable: caller is not the owner");
-        pceToken.setMetaTransactionGas(_metaTransactionGas);
+        pceToken.setMetaTransactionGas(metaTransactionGas);
     }
 
-    function test__setMetaTransactionPriorityFee(
-        uint256 _metaTransactionPriorityFee
+    function testSetMetaTransactionPriorityFee(
+        uint256 metaTransactionPriorityFee
     ) public {
-        pceToken.setMetaTransactionPriorityFee(_metaTransactionPriorityFee);
+        pceToken.setMetaTransactionPriorityFee(metaTransactionPriorityFee);
         assertEq(
-            _metaTransactionPriorityFee,
+            metaTransactionPriorityFee,
             pceToken.metaTransactionPriorityFee()
         );
 
-        vm.prank(alice);
+        vm.prank(ALICE);
         vm.expectRevert("Ownable: caller is not the owner");
-        pceToken.setMetaTransactionPriorityFee(_metaTransactionPriorityFee);
+        pceToken.setMetaTransactionPriorityFee(metaTransactionPriorityFee);
     }
 
-    function test__setCommunityTokenAddress(
+    function testSetCommunityTokenAddress(
         address communityTokenAddress
     ) public {
-        vm.prank(alice);
+        vm.prank(ALICE);
         vm.expectRevert("Ownable: caller is not the owner");
         pceToken.setCommunityTokenAddress(communityTokenAddress);
     }
 
-    function test__getExchangeRate() public {
-        test__createToken();
+    function testGetExchangeRate() public {
+        testCreateToken();
 
-        (, uint256 exchangeRate, ) = pceToken.localTokens(communityToken);
-        assertEq(exchangeRate, pceToken.getExchangeRate(communityToken));
+        (, uint256 exchangeRate, ) = pceToken.localTokens(COMMUNITY_TOKEN);
+        assertEq(exchangeRate, pceToken.getExchangeRate(COMMUNITY_TOKEN));
 
         vm.expectRevert("Target token not found");
-        pceToken.getExchangeRate(alice);
+        pceToken.getExchangeRate(ALICE);
     }
 
-    function test__getSwapRate() public {
-        test__createToken();
-        uint256 factor = PCECommunityToken(communityToken).getCurrentFactor();
+    function testGetSwapRate() public {
+        testCreateToken();
+        uint256 factor = PCECommunityToken(COMMUNITY_TOKEN).getCurrentFactor();
 
-        (, uint256 exchangeRate, ) = pceToken.localTokens(communityToken);
+        (, uint256 exchangeRate, ) = pceToken.localTokens(COMMUNITY_TOKEN);
 
         assertEq(
             (((exchangeRate << 96) / (pceToken.INITIAL_FACTOR())) * (factor)) /
                 (pceToken.lastModifiedFactor()),
-            pceToken.getSwapRate(communityToken)
+            pceToken.getSwapRate(COMMUNITY_TOKEN)
         );
 
         vm.expectRevert("Target token not found");
-        pceToken.getExchangeRate(alice);
+        pceToken.getSwapRate(ALICE);
     }
 
-    function test__getDepositedPCETokens() public {
-        test__createToken();
+    function testGetDepositedPCETokens() public {
+        testCreateToken();
 
-        uint256 _amount = 10000;
-        pceToken.swapToLocalToken(communityToken, _amount);
+        uint256 amount = 10000;
+        pceToken.swapToLocalToken(COMMUNITY_TOKEN, amount);
         assertEq(
-            pceToken.getDepositedPCETokens(communityToken),
-            initialAmount + _amount
+            pceToken.getDepositedPCETokens(COMMUNITY_TOKEN),
+            INITIAL_AMOUNT + amount
         );
     }
 }

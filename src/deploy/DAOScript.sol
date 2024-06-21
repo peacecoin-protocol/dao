@@ -7,7 +7,7 @@ import "../Governance/Timelock.sol";
 
 contract DAOScript is Script {
     function run() external {
-        address pceToken = 0x09114706E2b7338a09279D4AC984E859B964633c;
+        address pceToken = 0x1A9ed93e12730F7dcdCF5F8cFFEb94c48fe34350;
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
