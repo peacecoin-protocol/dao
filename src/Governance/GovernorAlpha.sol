@@ -366,6 +366,10 @@ contract GovernorAlpha {
         return _castVote(msg.sender, proposalId, support);
     }
 
+    function proposer(uint proposalId) public view returns (address) {
+        return proposals[proposalId].proposer;
+    }
+
     function castVoteBySig(
         uint proposalId,
         bool support,
