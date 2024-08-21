@@ -16,4 +16,5 @@ enum ProposalState {
 interface IGovernance {
     function state(uint proposalId) external view returns (ProposalState);
     function proposer(uint proposalId) external view returns (address);
+    function proposalCount() external view returns (uint256);
 }

@@ -67,18 +67,6 @@ contract PCETokenTest is Test {
         pceToken.createToken(tokenInfo);
     }
 
-    function testMoveVotingPower() public {
-        testCreateToken();
-
-        pceToken.delegate(address(this));
-        vm.expectRevert("NOT_COMMUNITY_TOKEN");
-        pceToken.moveVotingPower(address(this), BOB, 10000);
-
-        vm.prank(COMMUNITY_TOKEN);
-        pceToken.moveVotingPower(address(this), BOB, 10000);
-        assertEq(pceToken.getVotes(BOB), 10000);
-    }
-
     function testSwapToLocalToken() public {
         testCreateToken();
         uint256 amountToSwap = 10000;

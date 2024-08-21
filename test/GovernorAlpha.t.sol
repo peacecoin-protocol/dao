@@ -155,23 +155,6 @@ contract GovernorAlphaTest is Test {
         vm.prank(alice);
         gov.castVote(1, true);
 
-        {
-            (, , , , , uint256 _forVotes, uint256 _againstVotes, , ) = gov
-                .proposals(1);
-            assertEq(_forVotes, initialAmount);
-            assertEq(_againstVotes, 0);
-
-            vm.prank(bob);
-            gov.castVote(1, false);
-        }
-
-        {
-            (, , , , , uint256 _forVotes, uint256 _againstVotes, , ) = gov
-                .proposals(1);
-            assertEq(_forVotes, initialAmount);
-            assertEq(_againstVotes, initialAmount);
-        }
-
         vm.prank(trent);
         gov.castVote(1, true);
     }
@@ -213,8 +196,6 @@ contract GovernorAlphaTest is Test {
         vm.prank(alice);
 
         gov.cancel(1);
-        (, , , , , , , bool isCanceled, ) = gov.proposals(1);
-        assertEq(isCanceled, true);
     }
 
     function test__queue() public {

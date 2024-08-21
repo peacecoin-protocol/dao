@@ -22,7 +22,7 @@ contract TimelockTest is Test {
         pceToken = new PCEToken();
         pceToken.initialize("PEACE COIN", "PCE", address(1));
 
-        timelock = new Timelock(alice, 2 days);
+        timelock = new Timelock(alice, 2 hours);
         gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
 
         pceToken.transfer(address(this), initialAmount);

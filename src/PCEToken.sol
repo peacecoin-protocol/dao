@@ -4,12 +4,13 @@ pragma solidity 0.8.19;
 import {SafeMathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ERC20BurnableUpgradeable, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import {ClonesUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import {PCECommunityToken} from "./PCECommunityToken.sol";
 import {Utils} from "./lib/Utils.sol";
 import {ExchangeAllowMethod} from "./lib/Enum.sol";
-import {VotesUpgradeable} from "./lib/VotesUpgradeable.sol";
 import {IPCEToken} from "./interfaces/IPCEToken.sol";
 import "forge-std/console.sol";
 
@@ -17,7 +18,7 @@ contract PCEToken is
     Initializable,
     OwnableUpgradeable,
     ERC20BurnableUpgradeable,
-    VotesUpgradeable,
+    ERC20VotesUpgradeable,
     IPCEToken
 {
     using SafeMathUpgradeable for uint256;
@@ -87,7 +88,7 @@ contract PCEToken is
         __ERC20Votes_init_unchained();
         __ERC20Permit_init(_name);
         __Ownable_init();
-        _mint(_msgSender(), 10000 * INITIAL_FACTOR);
+        _mint(_msgSender(), 1000000 * INITIAL_FACTOR);
         _communityTokenAddress = communityTokenAddress;
         epochTime = block.timestamp;
         lastDecreaseTime = block.timestamp;
@@ -424,15 +425,6 @@ contract PCEToken is
         }
     }
 
-    function moveVotingPower(
-        address from,
-        address to,
-        uint256 amount
-    ) external override {
-        require(isCommunityToken[msg.sender], "NOT_COMMUNITY_TOKEN");
-        _moveVotingPower(from, to, amount);
-    }
-
     function version() public pure returns (string memory) {
         return "1.0.0";
     }
@@ -440,14 +432,14 @@ contract PCEToken is
     function _mint(
         address account,
         uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
+    ) internal override(ERC20VotesUpgradeable, ERC20Upgradeable) {
         super._mint(account, amount);
     }
 
     function _burn(
         address account,
         uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
+    ) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
         super._burn(account, amount);
     }
 
@@ -455,7 +447,7 @@ contract PCEToken is
         address from,
         address to,
         uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
+    ) internal override(ERC20VotesUpgradeable, ERC20Upgradeable) {
         super._afterTokenTransfer(from, to, amount);
     }
 }

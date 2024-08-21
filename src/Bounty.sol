@@ -29,7 +29,8 @@ contract Bounty is Initializable, OwnableUpgradeable {
     ERC20Upgradeable public bountyToken;
     address public governance;
 
-    mapping(uint256 => BountyInfo) public proposalBounties;
+    mapping(uint256 => uint256) public proposalBounties;
+    mapping(address => uint256) public proposalBountyWithdrawn;
     mapping(address => BountyInfo) public contributorBounties;
     mapping(address => bool) public isContributor;
 
@@ -61,13 +62,13 @@ contract Bounty is Initializable, OwnableUpgradeable {
         require(_amount > 0, "Amount must be greater than 0");
         require(
             IGovernance(governance).state(_proposalId) ==
-                ProposalState.Executed,
+                ProposalState.Executed ||
+                IGovernance(governance).state(_proposalId) ==
+                ProposalState.Succeeded,
             "Invalid proposal state"
         );
 
-        BountyInfo storage bounty = proposalBounties[_proposalId];
-        bounty.bountyAmount += _amount;
-
+        proposalBounties[_proposalId] += _amount;
         bountyToken.transferFrom(msg.sender, address(this), _amount);
 
         emit AddedProposalBounty(msg.sender, _proposalId, _amount);
@@ -77,9 +78,8 @@ contract Bounty is Initializable, OwnableUpgradeable {
         address _contributor,
         uint256 _amount
     ) external {
-        require(_contributor != address(0), "Invalid contributor");
-
         require(_amount > 0, "Amount must be greater than 0");
+        require(_contributor != address(0), "Invalid contributor");
 
         BountyInfo storage bounty = contributorBounties[_contributor];
         bounty.bountyAmount += _amount;
@@ -89,39 +89,52 @@ contract Bounty is Initializable, OwnableUpgradeable {
         emit AddedContributorBounty(msg.sender, _contributor, _amount);
     }
 
-    function claimProposalBounty(uint256 _proposalId) external {
-        address proposer = IGovernance(governance).proposer(_proposalId);
-
-        require(proposer == msg.sender, "Invalid claimer");
-
-        BountyInfo storage bounty = proposalBounties[_proposalId];
-        uint256 claimable = bounty.bountyAmount +
-            bountyAmount -
-            bounty.withdrawn;
+    function claimProposalBounty() external {
+        uint256 claimable = claimableProposalAmount(msg.sender);
 
         require(claimable > 0, "Nothing to withdraw");
 
-        bounty.withdrawn += claimable;
-
+        proposalBountyWithdrawn[msg.sender] += claimable;
         bountyToken.transfer(msg.sender, claimable);
 
         emit ClaimedBounty(msg.sender, claimable);
     }
 
     function claimContributorBounty() external {
-        BountyInfo storage bounty = contributorBounties[msg.sender];
-        uint256 claimable = bounty.bountyAmount +
-            bountyAmount -
-            bounty.withdrawn;
-
+        uint256 claimable = claimableContributorAmount(msg.sender);
         require(claimable > 0, "Nothing to withdraw");
-        require(isContributor[msg.sender], "Invalid contributor");
 
+        BountyInfo storage bounty = contributorBounties[msg.sender];
         bounty.withdrawn += claimable;
-
         bountyToken.transfer(msg.sender, claimable);
 
         emit ClaimedBounty(msg.sender, claimable);
+    }
+
+    function claimableProposalAmount(
+        address _user
+    ) public view returns (uint256) {
+        uint256 _totalBounty;
+        uint256 proposalCount = IGovernance(governance).proposalCount();
+        for (uint256 i = 0; i < proposalCount; i++) {
+            address proposer = IGovernance(governance).proposer(i);
+
+            if (proposer == _user) {
+                _totalBounty += proposalBounties[i] + bountyAmount;
+            }
+        }
+        return _totalBounty - proposalBountyWithdrawn[_user];
+    }
+
+    function claimableContributorAmount(
+        address user
+    ) public view returns (uint256) {
+        uint256 extraAmount = isContributor[user] ? bountyAmount : 0;
+        BountyInfo storage bounty = contributorBounties[msg.sender];
+        uint256 claimable = bounty.bountyAmount +
+            extraAmount -
+            bounty.withdrawn;
+        return claimable;
     }
 
     function recoverERC20(ERC20Upgradeable token) external onlyOwner {

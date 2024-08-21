@@ -6,9 +6,9 @@ import "../Bounty.sol";
 
 contract BountyScript is Script {
     function run() external {
-        address pceToken = 0x09114706E2b7338a09279D4AC984E859B964633c;
-        address governance = 0x58D07b7854CD2eC0cBaf863A33E2816afd4a9719;
-        uint256 _bountyAmount = 100e18;
+        address pceToken = 0xf939595726798393F63Dbe098a54C7948DEF8faF;
+        address governance = 0xb21473F6103f79991546D44C1417362fF7873b90;
+        uint256 _bountyAmount = 10e18;
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);

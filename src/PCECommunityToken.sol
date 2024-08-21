@@ -191,10 +191,6 @@ contract PCECommunityToken is
     ) internal override {
         super._afterTokenTransfer(from, to, amount);
         updateFactorIfNeeded();
-
-        uint256 _pceAmount = IPCEToken(pceAddress).getSwapRate(address(this));
-
-        IPCEToken(pceAddress).moveVotingPower(from, to, _pceAmount);
         emit PCETransfer(from, to, rawBalanceToDisplayBalance(amount), amount);
     }
 

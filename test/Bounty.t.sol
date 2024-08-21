@@ -85,16 +85,15 @@ contract BountyTest is Test {
         vm.prank(alice);
         gov.castVote(1, true);
 
-        (, , , , , uint256 forVotes, uint256 againstVotes, , ) = gov.proposals(
-            1
-        );
+        (, , , , , uint256 forVotes, uint256 againstVotes, , , ) = gov
+            .proposals(1);
         assertEq(forVotes, INITIAL_AMOUNT);
         assertEq(againstVotes, 0);
 
         vm.prank(bob);
         gov.castVote(1, false);
 
-        (, , , , , forVotes, againstVotes, , ) = gov.proposals(1);
+        (, , , , , forVotes, againstVotes, , , ) = gov.proposals(1);
         assertEq(forVotes, INITIAL_AMOUNT);
         assertEq(againstVotes, INITIAL_AMOUNT);
 
@@ -164,18 +163,18 @@ contract BountyTest is Test {
         pceToken.approve(address(bounty), proposalBountyAmount);
         vm.stopPrank();
 
-        (uint256 currentBounty, uint256 withdrawn) = bounty.proposalBounties(
-            id
-        );
-        assertEq(currentBounty, 0);
-        assertEq(withdrawn, 0);
+        uint256 prevBounty = bounty.proposalBounties(id);
+        uint256 prevWithdrawn = bounty.proposalBounties(id);
+        assertEq(prevBounty, 0);
+        assertEq(prevWithdrawn, 0);
 
         vm.prank(alice);
         bounty.addProposalBounty(id, proposalBountyAmount);
 
-        (uint256 _bounty, uint256 _withdrawn) = bounty.proposalBounties(id);
-        assertEq(_bounty, proposalBountyAmount);
-        assertEq(_withdrawn, 0);
+        uint256 currentBounty = bounty.proposalBounties(id);
+        uint256 currentWithdrawn = bounty.proposalBounties(id);
+        assertEq(currentBounty, proposalBountyAmount);
+        assertEq(currentWithdrawn, proposalBountyAmount);
     }
 
     function testClaimProposalBounty() public {
@@ -185,11 +184,11 @@ contract BountyTest is Test {
         uint256 balanceBefore = pceToken.balanceOf(trent);
 
         vm.prank(alice);
-        vm.expectRevert("Invalid claimer");
-        bounty.claimProposalBounty(1);
+        vm.expectRevert("Nothing to withdraw");
+        bounty.claimProposalBounty();
 
         vm.prank(trent);
-        bounty.claimProposalBounty(1);
+        bounty.claimProposalBounty();
 
         uint256 balanceAfter = pceToken.balanceOf(trent);
 
@@ -197,7 +196,7 @@ contract BountyTest is Test {
 
         vm.expectRevert("Nothing to withdraw");
         vm.prank(trent);
-        bounty.claimProposalBounty(1);
+        bounty.claimProposalBounty();
     }
 
     function testClaimContributorBounty() public {
@@ -207,7 +206,7 @@ contract BountyTest is Test {
         uint256 balanceBefore = pceToken.balanceOf(trent);
 
         vm.prank(trent);
-        vm.expectRevert("Invalid contributor");
+        vm.expectRevert("Nothing to withdraw");
         bounty.claimContributorBounty();
 
         testSetContributor();
@@ -227,16 +226,14 @@ contract BountyTest is Test {
     function testAddContributorBounty() public {
         uint256 amount = 1500;
 
+        vm.startPrank(bob);
+        pceToken.approve(address(bounty), amount);
+
         vm.expectRevert("Invalid contributor");
         bounty.addContributorBounty(address(0), amount);
 
         vm.expectRevert("Amount must be greater than 0");
-
         bounty.addContributorBounty(bob, 0);
-
-        vm.startPrank(bob);
-        pceToken.approve(address(bounty), amount);
-        vm.stopPrank();
 
         (uint256 currentBounty, uint256 withdrawn) = bounty.contributorBounties(
             bob
@@ -244,12 +241,12 @@ contract BountyTest is Test {
         assertEq(currentBounty, 0);
         assertEq(withdrawn, 0);
 
-        vm.prank(bob);
         bounty.addContributorBounty(bob, amount);
 
         (uint256 _bounty, uint256 _withdrawn) = bounty.contributorBounties(bob);
 
         assertEq(_bounty, amount);
         assertEq(_withdrawn, 0);
+        vm.stopPrank();
     }
 }
