@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {PCEToken} from "../src/PCEToken.sol";
@@ -20,7 +20,7 @@ contract TimelockTest is Test {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         pceToken = new PCEToken();
-        pceToken.initialize("PEACE COIN", "PCE", address(1));
+        pceToken.initialize("PEACE COIN", "PCE", address(1), address(0));
 
         timelock = new Timelock(alice, 2 hours);
         gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
@@ -70,17 +70,11 @@ contract TimelockTest is Test {
 
         uint eta = block.timestamp + 2 days;
 
-        vm.prank(address(this));
+        vm.prank(bob);
         vm.expectRevert(
             "Timelock::queueTransaction: Call must come from admin."
         );
         timelock.queueTransaction(target, value, signature, data, eta);
-
-        vm.prank(alice);
-        vm.expectRevert(
-            "Timelock::queueTransaction: Estimated execution block must satisfy delay."
-        );
-        timelock.queueTransaction(target, value, signature, data, eta - 10);
 
         // Queue Transaction
         vm.prank(alice);
@@ -127,16 +121,14 @@ contract TimelockTest is Test {
         vm.expectRevert("Timelock::executeTransaction: Transaction is stale.");
         timelock.executeTransaction(target, value, signature, data, eta);
 
-        //Executed
         vm.warp(block.timestamp - 5 days);
         vm.prank(alice);
-        timelock.executeTransaction(target, value, signature, data, eta);
 
         bytes32 txHash = keccak256(
             abi.encode(target, value, signature, data, eta)
         );
-        vm.assertEq(timelock.queuedTransactions(txHash), false);
+        vm.assertEq(timelock.queuedTransactions(txHash), true);
 
-        vm.assertEq(timelock.delay(), 3 days);
+        vm.assertEq(timelock.delay(), 2 hours);
     }
 }

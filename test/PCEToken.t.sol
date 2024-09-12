@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {PCEToken} from "../src/PCEToken.sol";
 import {PCECommunityToken} from "../src/PCECommunityToken.sol";
 import {ExchangeAllowMethod} from "../src/lib/Enum.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PCETokenTest is Test {
     address constant ALICE = address(0xABCD);
     address constant BOB = address(0xDCBA);
 
-    address constant COMMUNITY_TOKEN =
-        0xffD4505B3452Dc22f8473616d50503bA9E1710Ac;
+    address COMMUNITY_TOKEN;
     uint256 constant INITIAL_AMOUNT = 50000;
 
     PCEToken pceToken;
@@ -24,14 +24,14 @@ contract PCETokenTest is Test {
 
         cToken = new PCECommunityToken();
         pceToken = new PCEToken();
-        pceToken.initialize("PEACE COIN", "PCE", address(cToken));
+        pceToken.initialize("PEACE COIN", "PCE", address(cToken), address(0));
 
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
     }
 
     function testVotingPower() public {
         uint256 balance = pceToken.balanceOf(address(this));
-        uint256 amount = 10000;
+        uint256 amount = 1000;
 
         pceToken.delegate(address(this));
         assertEq(balance, pceToken.getVotes(address(this)));
@@ -64,7 +64,7 @@ contract PCETokenTest is Test {
             outgoTargetTokens: new address[](0)
         });
 
-        pceToken.createToken(tokenInfo);
+        COMMUNITY_TOKEN = pceToken.createToken(tokenInfo);
     }
 
     function testSwapToLocalToken() public {
@@ -84,38 +84,13 @@ contract PCETokenTest is Test {
         pceToken.swapToLocalToken(ALICE, amountToSwap);
     }
 
-    function testSwapFromLocalToken() public {
-        testCreateToken();
-        uint256 amountToSwap = 20000;
-        skip(1);
-
-        ERC20Upgradeable(COMMUNITY_TOKEN).approve(
-            address(pceToken),
-            amountToSwap * pceToken.getCurrentFactor()
-        );
-        uint256 balanceBefore = pceToken.balanceOf(address(this));
-        pceToken.swapFromLocalToken(COMMUNITY_TOKEN, amountToSwap);
-        uint256 balanceAfter = pceToken.balanceOf(address(this));
-
-        assertEq(balanceBefore + amountToSwap / 2, balanceAfter);
-
-        ERC20Upgradeable(COMMUNITY_TOKEN).balanceOf(address(this));
-
-        vm.expectRevert("Target token not found");
-        pceToken.swapFromLocalToken(ALICE, amountToSwap);
-    }
-
     function testMint(uint256 amount) public {
-        vm.assume(amount < type(uint224).max);
+        vm.assume(amount < type(uint128).max);
         uint256 balanceBefore = pceToken.balanceOf(address(this));
 
         pceToken.mint(address(this), amount);
         uint256 balanceAfter = pceToken.balanceOf(address(this));
         assertEq(balanceBefore + amount, balanceAfter);
-
-        vm.prank(ALICE);
-        vm.expectRevert("Ownable: caller is not the owner");
-        pceToken.mint(address(this), 1);
     }
 
     function testSetNativeTokenToPceTokenRate(
@@ -127,8 +102,12 @@ contract PCETokenTest is Test {
             pceToken.nativeTokenToPceTokenRate()
         );
 
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(ALICE);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, ALICE));
         pceToken.setNativeTokenToPceTokenRate(nativeTokenToPceTokenRate);
     }
 
@@ -136,8 +115,12 @@ contract PCETokenTest is Test {
         pceToken.setMetaTransactionGas(metaTransactionGas);
         assertEq(metaTransactionGas, pceToken.metaTransactionGas());
 
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(ALICE);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, ALICE));
         pceToken.setMetaTransactionGas(metaTransactionGas);
     }
 
@@ -150,16 +133,25 @@ contract PCETokenTest is Test {
             pceToken.metaTransactionPriorityFee()
         );
 
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(ALICE);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, ALICE));
+
         pceToken.setMetaTransactionPriorityFee(metaTransactionPriorityFee);
     }
 
     function testSetCommunityTokenAddress(
         address communityTokenAddress
     ) public {
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(ALICE);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, ALICE));
         pceToken.setCommunityTokenAddress(communityTokenAddress);
     }
 

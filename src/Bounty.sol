@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -39,7 +39,7 @@ contract Bounty is Initializable, OwnableUpgradeable {
         uint256 _bountyAmount,
         address _governance
     ) public initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         bountyAmount = _bountyAmount;
         bountyToken = _bountyToken;
         governance = _governance;

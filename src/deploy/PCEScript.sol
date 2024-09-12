@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
 import "../PCEToken.sol";
@@ -12,7 +12,12 @@ contract PCEScript is Script {
 
         PCECommunityToken communityToken = new PCECommunityToken();
         PCEToken pceToken = new PCEToken();
-        pceToken.initialize("PCE Coin", "PCE", address(communityToken));
+        pceToken.initialize(
+            "PCE Coin",
+            "PCE",
+            address(communityToken),
+            address(0)
+        );
 
         vm.stopBroadcast();
     }

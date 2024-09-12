@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 contract GovernorBravoEvents {
     /// @notice An event emitted when a new proposal is created

@@ -2,14 +2,17 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
-import "../PCECommunityToken.sol";
+import "../ContractFactory.sol";
 
-contract PCECommunityScript is Script {
+contract ContractFactoryScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        PCECommunityToken comminity = new PCECommunityToken();
+        address deployerAddress = vm.addr(deployerPrivateKey);
+
+        ContractFactory factory = new ContractFactory(deployerAddress);
+
         vm.stopBroadcast();
     }
 }

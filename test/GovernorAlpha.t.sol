@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {PCEToken} from "../src/PCEToken.sol";
@@ -34,9 +34,9 @@ contract GovernorAlphaTest is Test {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         pceToken = new PCEToken();
-        pceToken.initialize("PEACE COIN", "PCE", address(1));
+        pceToken.initialize("PEACE COIN", "PCE", address(1), address(0));
 
-        timelock = new Timelock(alice, 2 days);
+        timelock = new Timelock(alice, 10 minutes);
         gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
 
         pceToken.transfer(address(this), initialAmount);
@@ -55,11 +55,11 @@ contract GovernorAlphaTest is Test {
     }
 
     function test__quorumVotes() public view {
-        assertEq(gov.quorumVotes(), 4000e18);
+        assertEq(gov.quorumVotes(), 1000e18);
     }
 
     function test__proposalThreshold() public view {
-        assertEq(gov.proposalThreshold(), 1000e18);
+        assertEq(gov.proposalThreshold(), 100e18);
     }
 
     function test__proposalMaxOperations() public view {
@@ -71,7 +71,7 @@ contract GovernorAlphaTest is Test {
     }
 
     function test__votingPeriod() public view {
-        assertEq(gov.votingPeriod(), 17280);
+        assertEq(gov.votingPeriod(), 300);
     }
 
     function test__proposalCount() public view {

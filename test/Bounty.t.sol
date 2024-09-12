@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {PCEToken} from "../src/PCEToken.sol";
@@ -23,10 +23,11 @@ contract BountyTest is Test {
     uint256 constant proposalBountyAmount = 1500;
 
     function setUp() public {
+        vm.startPrank(alice);
         pceToken = new PCEToken();
-        pceToken.initialize("PEACE COIN", "PCE", address(1));
+        pceToken.initialize("PEACE COIN", "PCE", address(1), address(0));
 
-        timelock = new Timelock(alice, 2 days);
+        timelock = new Timelock(alice, 10 minutes);
         gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
         bounty = new Bounty();
         bounty.initialize(
@@ -41,7 +42,6 @@ contract BountyTest is Test {
         pceToken.transfer(address(timelock), INITIAL_AMOUNT);
         pceToken.transfer(address(bounty), INITIAL_AMOUNT);
 
-        vm.startPrank(alice);
         pceToken.delegate(alice);
         vm.stopPrank();
 
@@ -132,19 +132,29 @@ contract BountyTest is Test {
 
     // Unit test for the Bounty Contract
     function testSetBountyAmount() public {
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, bob));
         bounty.setBountyAmount(bountyAmount);
 
+        vm.prank(alice);
         bounty.setBountyAmount(bountyAmount);
         assertEq(bounty.bountyAmount(), bountyAmount);
     }
 
     function testSetContributor() public {
+        vm.prank(alice);
         bounty.setContributor(trent, true);
 
+        bytes4 selector = bytes4(
+            keccak256("OwnableUnauthorizedAccount(address)")
+        );
+
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(selector, bob));
         bounty.setContributor(trent, true);
     }
 

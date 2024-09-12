@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import { ExchangeAllowMethod } from "./Enum.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ExchangeAllowMethod} from "./Enum.sol";
 
 contract TokenSetting is OwnableUpgradeable {
     uint256 public decreaseIntervalDays = 0;
@@ -19,8 +19,10 @@ contract TokenSetting is OwnableUpgradeable {
     uint256 public mintArigatoCreationToday;
     uint256 public mintArigatoCreationTodayForGuest;
 
-    ExchangeAllowMethod public incomeExchangeAllowMethod = ExchangeAllowMethod.None;
-    ExchangeAllowMethod public outgoExchangeAllowMethod = ExchangeAllowMethod.None;
+    ExchangeAllowMethod public incomeExchangeAllowMethod =
+        ExchangeAllowMethod.None;
+    ExchangeAllowMethod public outgoExchangeAllowMethod =
+        ExchangeAllowMethod.None;
 
     address[] public incomeTargetTokens;
     address[] public outgoTargetTokens;
