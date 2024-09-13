@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
-import {SafeMathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -10,11 +9,9 @@ import {PCEToken} from "./PCEToken.sol";
 import {Utils} from "./lib/Utils.sol";
 import {EIP3009} from "./lib/EIP3009.sol";
 import {TokenSetting} from "./lib/TokenSetting.sol";
-import {IERC20Internal} from "./lib/IERC20Internal.sol";
 import {ExchangeAllowMethod} from "./lib/Enum.sol";
-import {IPCEToken} from "./interfaces/IPCEToken.sol";
 
-import "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PCECommunityToken is
     Initializable,
@@ -24,9 +21,8 @@ contract PCECommunityToken is
     EIP3009,
     TokenSetting
 {
-    using SafeMathUpgradeable for uint256;
     uint256 public constant INITIAL_FACTOR = 10 ** 18;
-    uint16 public constant BP_BASE = 10000;
+    uint16 public constant BP_BASE = 10_000;
     uint16 public constant MAX_CHARACTER_LENGTH = 10;
 
     address public pceAddress;
@@ -40,6 +36,7 @@ contract PCECommunityToken is
         uint256 lastModifiedMidnightBalanceTime;
         uint256 mintArigatoCreationToday;
     }
+
     mapping(address user => AccountInfo accountInfo) private _accountInfos;
 
     event PCETransfer(
@@ -66,7 +63,7 @@ contract PCECommunityToken is
         uint256 _initialFactor
     ) public initializer {
         __ERC20_init(name, symbol);
-        __Ownable_init();
+        __Ownable_init(_msgSender());
         pceAddress = _msgSender();
         epochTime = block.timestamp;
         lastDecreaseTime = block.timestamp;
@@ -88,7 +85,7 @@ contract PCECommunityToken is
                 decreaseIntervalDays
             )
         ) {
-            return lastModifiedFactor.mul(afterDecreaseBp).div(BP_BASE);
+            return (lastModifiedFactor * afterDecreaseBp) / BP_BASE;
         } else {
             return lastModifiedFactor;
         }
@@ -116,7 +113,7 @@ contract PCECommunityToken is
         if (currentFactor < 1) {
             currentFactor = 1;
         }
-        return rawBalance.div(currentFactor);
+        return rawBalance / currentFactor;
     }
 
     function displayBalanceToRawBalance(
@@ -126,7 +123,7 @@ contract PCECommunityToken is
         if (currentFactor < 1) {
             currentFactor = 1;
         }
-        return displayBalance.mul(currentFactor);
+        return displayBalance * currentFactor;
     }
 
     function totalSupply() public view override returns (uint256) {
@@ -137,12 +134,21 @@ contract PCECommunityToken is
         return rawBalanceToDisplayBalance(super.balanceOf(account));
     }
 
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal override {
+        _beforeTokenTransfer(from, to, value);
+        super._update(from, to, value);
+        _afterTokenTransfer(from, to, value);
+    }
+
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) internal override {
-        super._beforeTokenTransfer(from, to, amount);
+    ) internal {
         if (midnightTotalSupplyModifiedTime == 0) {
             midnightTotalSupply = amount;
             midnightTotalSupplyModifiedTime = block.timestamp;
@@ -188,34 +194,35 @@ contract PCECommunityToken is
         address from,
         address to,
         uint256 amount
-    ) internal override {
-        super._afterTokenTransfer(from, to, amount);
-        updateFactorIfNeeded();
-
-        uint256 _pceAmount = IPCEToken(pceAddress).getSwapRate(address(this));
-
-        IPCEToken(pceAddress).moveVotingPower(from, to, _pceAmount);
+    ) internal {
         emit PCETransfer(from, to, rawBalanceToDisplayBalance(amount), amount);
     }
 
     function _mintArigatoCreation(
-        address sender,
-        uint256 rawAmount,
+        address _sender,
+        uint256 _rawAmount,
         uint256 rawBalance,
         uint256 messageCharacters
     ) internal {
+        address sender = _sender;
+        uint256 rawAmount = _rawAmount;
         // ** Global mint limit
-        uint256 maxArigatoCreationMintToday = midnightTotalSupply
-            .mul(maxIncreaseOfTotalSupplyBp)
-            .div(BP_BASE);
+        uint256 maxArigatoCreationMintToday = (midnightTotalSupply *
+            maxIncreaseOfTotalSupplyBp) / BP_BASE;
+        console2.log(
+            "maxtArigatoCreationToday: %s",
+            maxArigatoCreationMintToday
+        );
+        console2.log("mintArigatoCreationToday: %s", mintArigatoCreationToday);
         if (
             maxArigatoCreationMintToday <= 0 ||
             maxArigatoCreationMintToday <= mintArigatoCreationToday
         ) {
+            console2.log("return 167");
             return;
         }
-        uint256 remainingArigatoCreationMintToday = maxArigatoCreationMintToday
-            .sub(mintArigatoCreationToday);
+        uint256 remainingArigatoCreationMintToday = maxArigatoCreationMintToday -
+                mintArigatoCreationToday;
         uint256 remainingArigatoCreationMintTodayForGuest;
 
         AccountInfo memory accountInfo = _accountInfos[sender];
@@ -223,57 +230,69 @@ contract PCECommunityToken is
         bool isGuest = accountInfo.firstTransactionTime ==
             accountInfo.lastModifiedMidnightBalanceTime;
         if (isGuest) {
-            uint256 maxArigatoCreationMintTodayForGuest = maxArigatoCreationMintToday
-                    .div(10);
+            uint256 maxArigatoCreationMintTodayForGuest = maxArigatoCreationMintToday /
+                    10;
             if (
                 maxArigatoCreationMintTodayForGuest <= 0 ||
                 maxArigatoCreationMintTodayForGuest <=
                 mintArigatoCreationTodayForGuest
             ) {
+                console2.log("return 182");
                 return;
             }
-            remainingArigatoCreationMintTodayForGuest = maxArigatoCreationMintTodayForGuest
-                .sub(mintArigatoCreationTodayForGuest);
+            remainingArigatoCreationMintTodayForGuest =
+                maxArigatoCreationMintTodayForGuest -
+                mintArigatoCreationTodayForGuest;
         }
 
-        uint256 increaseBp;
-        {
-            // ** Calculation of mint amount
-            // increaseRate = (maxIncreaseRate - changeRate * abs(maxUsageRate - usageRate)) * valueOfMessageCharacter
-            uint256 usageBp = rawAmount.mul(BP_BASE).div(rawBalance);
-            uint256 absUsageBp = usageBp > maxUsageBp
-                ? usageBp.sub(maxUsageBp)
-                : uint256(maxUsageBp).sub(usageBp);
-            uint256 changeMulBp = uint256(changeBp).mul(absUsageBp).div(
-                BP_BASE
+        // ** Calculation of mint amount
+        // increaseRate = (maxIncreaseRate - changeRate * abs(maxUsageRate - usageRate)) * valueOfMessageCharacter
+        uint256 usageBp = (rawAmount * BP_BASE) / rawBalance;
+        uint256 absUsageBp = usageBp > maxUsageBp
+            ? usageBp - maxUsageBp
+            : uint256(maxUsageBp) - usageBp;
+        uint256 changeMulBp = (uint256(changeBp) * absUsageBp) / BP_BASE;
+        if (changeMulBp >= maxIncreaseBp) {
+            console2.log(
+                "changeMulBp >= maxIncreaseBp %s >= %s",
+                changeMulBp,
+                maxIncreaseBp
             );
-            if (changeMulBp >= maxIncreaseBp) {
-                return;
-            }
-            uint256 messageLength = messageCharacters > 0
-                ? messageCharacters
-                : 1;
-            uint256 messageBp = messageLength > MAX_CHARACTER_LENGTH
-                ? BP_BASE
-                : messageLength.mul(BP_BASE).div(MAX_CHARACTER_LENGTH);
-
-            increaseBp = uint256(maxIncreaseBp)
-                .sub(changeMulBp)
-                .mul(messageBp)
-                .div(BP_BASE);
+            return;
         }
+        uint256 messageLength = messageCharacters > 0 ? messageCharacters : 1;
+        uint256 messageBp = messageLength > MAX_CHARACTER_LENGTH
+            ? BP_BASE
+            : (messageLength * BP_BASE) / MAX_CHARACTER_LENGTH;
 
-        uint256 mintAmount = rawAmount.mul(increaseBp).div(BP_BASE);
+        uint256 increaseBp = uint256(maxIncreaseBp) -
+            (changeMulBp * messageBp) /
+            BP_BASE;
+
+        uint256 mintAmount = (rawAmount * increaseBp) / BP_BASE;
+
         if (mintAmount > remainingArigatoCreationMintToday) {
+            console2.log(
+                "mintAmount > remainingArigatoCreationMintToday %s",
+                remainingArigatoCreationMintToday
+            );
             mintAmount = remainingArigatoCreationMintToday;
         }
 
         // ** Sender mint limit
         if (!isGuest) {
-            uint256 maxArigatoCreationMintTodayForSender = maxArigatoCreationMintToday
-                    .mul(accountInfo.midnightBalance)
-                    .div(midnightTotalSupply);
+            console2.log(
+                "accountInfo.midnightBalance: %s",
+                accountInfo.midnightBalance
+            );
+            console2.log("midnightTotalSupply: %s", midnightTotalSupply);
+            uint256 maxArigatoCreationMintTodayForSender = (maxArigatoCreationMintToday *
+                    accountInfo.midnightBalance) / midnightTotalSupply;
             if (maxArigatoCreationMintTodayForSender <= 0) {
+                console2.log(
+                    "return maxArigatoCreationMintTodayForSender <= 0 %s",
+                    maxArigatoCreationMintTodayForSender
+                );
                 return;
             }
             if (mintAmount > maxArigatoCreationMintTodayForSender) {
@@ -282,14 +301,26 @@ contract PCECommunityToken is
         } else {
             // Guest can mint only 1% of maxArigatoCreationMintToday
             if (mintAmount > remainingArigatoCreationMintTodayForGuest) {
+                console2.log(
+                    "mintAmount > remainingArigatoCreationMintTodayForGuest %s",
+                    remainingArigatoCreationMintTodayForGuest
+                );
                 mintAmount = remainingArigatoCreationMintTodayForGuest;
             }
-            uint256 maxArigatoCreationMintTodayForGuestSender = maxArigatoCreationMintToday
-                    .div(100);
+            uint256 maxArigatoCreationMintTodayForGuestSender = maxArigatoCreationMintToday /
+                    100;
             if (maxArigatoCreationMintTodayForGuestSender <= 0) {
+                console2.log(
+                    "return maxArigatoCreationMintTodayForGuestSender <= 0 %s",
+                    maxArigatoCreationMintTodayForGuestSender
+                );
                 return;
             }
             if (mintAmount > maxArigatoCreationMintTodayForGuestSender) {
+                console2.log(
+                    "mintAmount > maxArigatoCreationMintTodayForGuestSender %s",
+                    maxArigatoCreationMintTodayForGuestSender
+                );
                 mintAmount = maxArigatoCreationMintTodayForGuestSender;
             }
         }
@@ -308,6 +339,7 @@ contract PCECommunityToken is
             rawBalanceToDisplayBalance(mintAmount),
             mintAmount
         );
+        console2.log("complete mintAmount: %s", mintAmount);
     }
 
     function transfer(
@@ -317,7 +349,8 @@ contract PCECommunityToken is
         updateFactorIfNeeded();
         uint256 rawBalance = super.balanceOf(_msgSender());
         uint256 rawAmount = displayBalanceToRawBalance(displayAmount);
-
+        // console2.log("rawBalance", rawBalance);
+        // console2.log("rawAmount: %s, displayAmount: %s", rawAmount, displayAmount);
         bool ret = super.transfer(receiver, rawAmount);
 
         _mintArigatoCreation(_msgSender(), rawAmount, rawBalance, 1);
@@ -371,24 +404,16 @@ contract PCECommunityToken is
         super.burnFrom(account, displayBalanceToRawBalance(displayBalance));
     }
 
-    function _transfer(
-        address sender,
-        address recipient,
-        uint256 rawAmount
-    ) internal override(IERC20Internal, ERC20Upgradeable) {
-        super._transfer(sender, recipient, rawAmount);
-    }
-
     function intervalDaysOf(
-        uint start,
-        uint end,
-        uint intervalDays
+        uint256 start,
+        uint256 end,
+        uint256 intervalDays
     ) public pure returns (bool) {
         if (start >= end) {
             return false;
         }
-        uint startDay = start / 1 days;
-        uint endDay = end / 1 days;
+        uint256 startDay = start / 1 days;
+        uint256 endDay = end / 1 days;
         if (startDay == endDay) {
             return false;
         }
@@ -481,16 +506,13 @@ contract PCECommunityToken is
             "Income exchange not allowed"
         );
 
-        uint256 targetTokenAmount = amountToSwap
-            .mul(10 ** 18)
-            .div(fromToken.exchangeRate)
-            .mul(pceToken.getCurrentFactor())
-            .div(getCurrentFactor());
-        targetTokenAmount = targetTokenAmount
-            .mul(toToken.exchangeRate)
-            .div(INITIAL_FACTOR)
-            .mul(to.getCurrentFactor())
-            .div(pceToken.getCurrentFactor());
+        uint256 targetTokenAmount = (((amountToSwap * 10 ** 18) /
+            fromToken.exchangeRate) * pceToken.getCurrentFactor()) /
+            getCurrentFactor();
+        targetTokenAmount =
+            (((targetTokenAmount * toToken.exchangeRate) / INITIAL_FACTOR) *
+                to.getCurrentFactor()) /
+            pceToken.getCurrentFactor();
         require(targetTokenAmount > 0, "Invalid amount to swap");
 
         super._burn(sender, displayBalanceToRawBalance(amountToSwap));
@@ -504,7 +526,7 @@ contract PCECommunityToken is
         PCEToken pceToken = PCEToken(pceAddress);
         uint256 pceTokenFee = pceToken.getMetaTransactionFee();
         uint256 rate = pceToken.getSwapRate(address(this));
-        return pceTokenFee.mul(rate) >> 96;
+        return (pceTokenFee * rate) >> 96;
     }
 
     function transferWithAuthorization(
@@ -546,5 +568,36 @@ contract PCECommunityToken is
         );
 
         _mintArigatoCreation(from, rawAmount, rawBalance, 1);
+    }
+
+    /*
+        @notice Returns the total balance that can be swapped to PCE today
+        The balance is 0.01 times the total supply at UTC 0
+    */
+    function getTodaySwapableToPCEBalance() public view returns (uint256) {
+        PCEToken pceToken = PCEToken(pceAddress);
+
+        return
+            rawBalanceToDisplayBalance(
+                (midnightTotalSupply * pceToken.swapableToPCERate()) / BP_BASE
+            );
+    }
+
+    /*
+        @notice Returns the total balance that can be swapped to PCE today for the individual
+        The balance is 0.01 times the balance of the individual at UTC 0
+    */
+    function getTodaySwapableToPCEBalanceForIndividual(
+        address checkAddress
+    ) public view returns (uint256) {
+        PCEToken pceToken = PCEToken(pceAddress);
+
+        AccountInfo memory accountInfo = _accountInfos[checkAddress];
+
+        return
+            rawBalanceToDisplayBalance(
+                (accountInfo.midnightBalance *
+                    pceToken.swapableToPCEIndividualRate()) / BP_BASE
+            );
     }
 }

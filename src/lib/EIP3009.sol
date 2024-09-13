@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
-import {IERC20Internal} from "./IERC20Internal.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {EIP712Domain} from "./EIP712Domain.sol";
 import {EIP712} from "./EIP712.sol";
 
-import "forge-std/console.sol";
-
-abstract contract EIP3009 is IERC20Internal, EIP712Domain {
+abstract contract EIP3009 is ERC20Upgradeable, EIP712Domain {
     /*
         keccak256(
             "TransferWithAuthorization(address from,address to,

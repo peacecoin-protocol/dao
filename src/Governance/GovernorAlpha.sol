@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 contract GovernorAlpha {
     /// @notice The name of this contract
@@ -7,12 +7,12 @@ contract GovernorAlpha {
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public pure returns (uint) {
-        return 4000e18;
+        return 1000e18;
     } // 400,000 = 4% of PCE
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public pure returns (uint) {
-        return 1000e18;
+        return 100e18;
     } // 100,000 = 1% of PCE
 
     /// @notice The maximum number of actions that can be included in a proposal
@@ -27,7 +27,7 @@ contract GovernorAlpha {
 
     /// @notice The duration of voting on a proposal, in blocks
     function votingPeriod() public pure virtual returns (uint) {
-        return 17280;
+        return 300;
     } // ~3 days in blocks (assuming 15s blocks)
 
     /// @notice The address of the Timelock
@@ -69,6 +69,7 @@ contract GovernorAlpha {
         bool canceled;
         /// @notice Flag marking whether the proposal has been executed
         bool executed;
+        string description;
         /// @notice Receipts of ballots for the entire set of voters
         mapping(address => Receipt) receipts;
     }
@@ -208,6 +209,7 @@ contract GovernorAlpha {
         newProposal.againstVotes = 0;
         newProposal.canceled = false;
         newProposal.executed = false;
+        newProposal.description = description;
 
         latestProposalIds[newProposal.proposer] = newProposal.id;
 
@@ -223,6 +225,28 @@ contract GovernorAlpha {
             description
         );
         return newProposal.id;
+    }
+
+    function batchQueue(uint[] calldata proposalIds) public {
+        for (uint256 id = 0; id <= proposalIds.length; id++) {
+            require(
+                state(proposalIds[id]) == ProposalState.Succeeded,
+                "GovernorAlpha::queue: proposal can only be queued if it is succeeded"
+            );
+            Proposal storage proposal = proposals[proposalIds[id]];
+            uint eta = add256(block.timestamp, timelock.delay());
+            for (uint i = 0; i < proposal.targets.length; i++) {
+                _queueOrRevert(
+                    proposal.targets[i],
+                    proposal.values[i],
+                    proposal.signatures[i],
+                    proposal.calldatas[i],
+                    eta
+                );
+            }
+            proposal.eta = eta;
+            emit ProposalQueued(proposalIds[id], eta);
+        }
     }
 
     function queue(uint proposalId) public {
@@ -259,6 +283,27 @@ contract GovernorAlpha {
             "GovernorAlpha::_queueOrRevert: proposal action already queued at eta"
         );
         timelock.queueTransaction(target, value, signature, data, eta);
+    }
+
+    function batchExecute(uint[] calldata proposalIds) public payable {
+        for (uint256 id = 0; id <= proposalIds.length; id++) {
+            require(
+                state(proposalIds[id]) == ProposalState.Queued,
+                "GovernorAlpha::execute: proposal can only be executed if it is queued"
+            );
+            Proposal storage proposal = proposals[proposalIds[id]];
+            proposal.executed = true;
+            for (uint i = 0; i < proposal.targets.length; i++) {
+                timelock.executeTransaction{value: proposal.values[i]}(
+                    proposal.targets[i],
+                    proposal.values[i],
+                    proposal.signatures[i],
+                    proposal.calldatas[i],
+                    proposal.eta
+                );
+            }
+            emit ProposalExecuted(proposalIds[id]);
+        }
     }
 
     function execute(uint proposalId) public payable {

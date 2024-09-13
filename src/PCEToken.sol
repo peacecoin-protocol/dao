@@ -1,37 +1,42 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
-import {SafeMathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ERC20BurnableUpgradeable, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import {ClonesUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {PCECommunityToken} from "./PCECommunityToken.sol";
 import {Utils} from "./lib/Utils.sol";
 import {ExchangeAllowMethod} from "./lib/Enum.sol";
-import {VotesUpgradeable} from "./lib/VotesUpgradeable.sol";
-import {IPCEToken} from "./interfaces/IPCEToken.sol";
-import "forge-std/console.sol";
+import {NativeMetaTransaction} from "./lib/polygon/NativeMetaTransaction.sol";
 
 contract PCEToken is
     Initializable,
+    ERC20Upgradeable,
     OwnableUpgradeable,
     ERC20BurnableUpgradeable,
-    VotesUpgradeable,
-    IPCEToken
+    ERC20VotesUpgradeable,
+    NativeMetaTransaction
 {
-    using SafeMathUpgradeable for uint256;
-
     // initial rate is 1(NativeToken):5(PCEToken) = 5<<96 = 396140812571321687967719751680
-    uint160 public nativeTokenToPceTokenRate = 396140812571321687967719751680;
-    uint256 public metaTransactionGas = 200000;
-    uint256 public metaTransactionPriorityFee = 50000000000; // 50 gwei
+    uint160 public nativeTokenToPceTokenRate =
+        396_140_812_571_321_687_967_719_751_680;
+    uint256 public metaTransactionGas = 200_000;
+    uint256 public metaTransactionPriorityFee = 50_000_000_000; // 50 gwei
+
+    // Daily swap rate from community token to PCE in basis points
+    uint256 public swapableToPCERate = 300; // 300BP is 3%
+    // Individual daily swap limit from community token to PCE in basis points
+    uint256 public swapableToPCEIndividualRate = 300; // 300BP is 3%
 
     address private _communityTokenAddress;
     address[] public tokens;
     mapping(address deployedAddress => Utils.LocalToken localToken)
         public localTokens;
-    mapping(address => bool) public isCommunityToken;
+
+    address public polygonChainManager;
 
     event TokenCreated(
         address indexed tokenAddress,
@@ -81,17 +86,17 @@ contract PCEToken is
     function initialize(
         string memory _name,
         string memory _symbol,
-        address communityTokenAddress
+        address communityTokenAddress,
+        address _polygonChainManager
     ) public initializer {
         __ERC20_init(_name, _symbol);
-        __ERC20Votes_init_unchained();
-        __ERC20Permit_init(_name);
-        __Ownable_init();
-        _mint(_msgSender(), 10000 * INITIAL_FACTOR);
+        __Ownable_init(_msgSender());
+        _mint(_msgSender(), 10_000 * INITIAL_FACTOR);
         _communityTokenAddress = communityTokenAddress;
         epochTime = block.timestamp;
         lastDecreaseTime = block.timestamp;
         lastModifiedFactor = INITIAL_FACTOR;
+        polygonChainManager = _polygonChainManager;
     }
 
     function getLocalToken(
@@ -105,8 +110,7 @@ contract PCEToken is
             return 0;
         }
         if (hasDecreaseTimeWithin(lastDecreaseTime, block.timestamp)) {
-            return
-                lastModifiedFactor.mul(DECREASE_RATE).div(DECREASE_RATE_BASE);
+            return (lastModifiedFactor * DECREASE_RATE) / DECREASE_RATE_BASE;
         } else {
             return lastModifiedFactor;
         }
@@ -149,7 +153,7 @@ contract PCEToken is
         return super.approve(spender, balance);
     }
 
-    function mint(address to, uint256 balance) external onlyOwner {
+    function mint(address to, uint256 balance) external {
         updateFactorIfNeeded();
         _mint(to, balance);
     }
@@ -160,7 +164,7 @@ contract PCEToken is
 
     // for DEV
     function faucet() public returns (bool) {
-        _mint(msg.sender, 10000 * INITIAL_FACTOR);
+        _mint(msg.sender, 10_000 * INITIAL_FACTOR);
 
         return true;
     }
@@ -171,7 +175,9 @@ contract PCEToken is
         _communityTokenAddress = communityTokenAddress;
     }
 
-    function createToken(TokenInfo calldata tokenInfo) public {
+    function createToken(
+        TokenInfo calldata tokenInfo
+    ) public returns (address) {
         require(tokenInfo.amountToExchange > 0, "Amount must be > 0");
         require(
             balanceOf(_msgSender()) >= tokenInfo.amountToExchange,
@@ -186,10 +192,10 @@ contract PCEToken is
             tokenInfo.afterDecreaseBp <= 10000,
             "After decrease bp <= 10000"
         );
+
         updateFactorIfNeeded();
-        address newTokenAddress = ClonesUpgradeable.clone(
-            _communityTokenAddress
-        );
+
+        address newTokenAddress = Clones.clone(_communityTokenAddress);
         PCECommunityToken newToken = PCECommunityToken(newTokenAddress);
         newToken.initialize(
             tokenInfo.name,
@@ -208,29 +214,29 @@ contract PCEToken is
             tokenInfo.incomeTargetTokens,
             tokenInfo.outgoTargetTokens
         );
-        uint256 newTokenAmount = tokenInfo
-            .amountToExchange
-            .mul(tokenInfo.dilutionFactor)
-            .div(INITIAL_FACTOR);
+
+        uint256 newTokenAmount = (tokenInfo.amountToExchange *
+            tokenInfo.dilutionFactor) / INITIAL_FACTOR;
         _transfer(_msgSender(), address(this), tokenInfo.amountToExchange);
-        isCommunityToken[address(newToken)] = true;
+        newToken.mint(_msgSender(), newTokenAmount);
+
         localTokens[newTokenAddress] = Utils.LocalToken(
             true,
             tokenInfo.dilutionFactor,
             tokenInfo.amountToExchange
         );
-
         tokens.push(newTokenAddress);
 
-        newToken.mint(_msgSender(), newTokenAmount);
-
         newToken.transferOwnership(_msgSender());
+
         emit TokenCreated(
             newTokenAddress,
             _msgSender(),
             tokenInfo.amountToExchange,
             newTokenAmount
         );
+
+        return newTokenAddress;
     }
 
     function getDepositedPCETokens(
@@ -249,18 +255,14 @@ contract PCEToken is
         return localTokens[communityToken].exchangeRate;
     }
 
-    function getSwapRate(
-        address toToken
-    ) public view override returns (uint256) {
+    function getSwapRate(address toToken) public view returns (uint256) {
         require(localTokens[toToken].isExists, "Target token not found");
 
         PCECommunityToken target = PCECommunityToken(toToken);
 
         return
-            (localTokens[toToken].exchangeRate << 96)
-                .div(INITIAL_FACTOR)
-                .mul(target.getCurrentFactor())
-                .div(lastModifiedFactor);
+            (((localTokens[toToken].exchangeRate << 96) / INITIAL_FACTOR) *
+                target.getCurrentFactor()) / lastModifiedFactor;
     }
 
     function swapToLocalToken(address toToken, uint256 amountToSwap) public {
@@ -274,11 +276,9 @@ contract PCEToken is
         PCECommunityToken target = PCECommunityToken(toToken);
         target.updateFactorIfNeeded();
 
-        uint256 targetTokenAmount = amountToSwap
-            .mul(localTokens[toToken].exchangeRate)
-            .div(INITIAL_FACTOR)
-            .mul(target.getCurrentFactor())
-            .div(lastModifiedFactor);
+        uint256 targetTokenAmount = (((amountToSwap *
+            localTokens[toToken].exchangeRate) / INITIAL_FACTOR) *
+            target.getCurrentFactor()) / lastModifiedFactor;
         require(targetTokenAmount > 0, "Invalid amount to swap");
 
         _transfer(_msgSender(), address(this), amountToSwap);
@@ -311,15 +311,22 @@ contract PCEToken is
             "Insufficient balance"
         );
 
-        uint256 pcetokenAmount = amountToSwap
-            .mul(INITIAL_FACTOR)
-            .div(localTokens[fromToken].exchangeRate)
-            .mul(lastModifiedFactor)
-            .div(target.getCurrentFactor());
+        uint256 pcetokenAmount = (((amountToSwap * INITIAL_FACTOR) /
+            localTokens[fromToken].exchangeRate) * lastModifiedFactor) /
+            target.getCurrentFactor();
         require(pcetokenAmount > 0, "Target token deposit low");
 
-        target.burnFrom(_msgSender(), amountToSwap);
+        require(
+            target.getTodaySwapableToPCEBalance() >= amountToSwap,
+            "Insufficient balance"
+        );
+        require(
+            target.getTodaySwapableToPCEBalanceForIndividual(_msgSender()) >=
+                amountToSwap,
+            "Insufficient balance"
+        );
 
+        target.burnFrom(_msgSender(), amountToSwap);
         _transfer(address(this), _msgSender(), pcetokenAmount);
 
         localTokens[fromToken].depositedPCEToken =
@@ -372,90 +379,81 @@ contract PCEToken is
     function getMetaTransactionFee() public view returns (uint256) {
         uint256 nativeTokenFee = metaTransactionGas *
             (block.basefee + metaTransactionPriorityFee);
-        return nativeTokenFee.mul(getNativeTokenToPceTokenRate()) >> 96;
+        return (nativeTokenFee * getNativeTokenToPceTokenRate()) >> 96;
     }
 
     function hasDecreaseTimeWithin(
-        uint _start,
-        uint _end
+        uint256 _start,
+        uint256 _end
     ) public pure returns (bool) {
         return getElapsedMinutes(_start, _end) > 1;
         //return isWednesdayBetween(_start, _end);
     }
 
     function getElapsedMinutes(
-        uint _start,
-        uint _end
-    ) public pure returns (uint) {
+        uint256 _start,
+        uint256 _end
+    ) public pure returns (uint256) {
         require(_start <= _end, "Start time must be <= end");
 
-        uint elapsedSeconds = _end - _start;
-        uint elapsedMinutes = elapsedSeconds / 60;
+        uint256 elapsedSeconds = _end - _start;
+        uint256 elapsedMinutes = elapsedSeconds / 60;
 
         return elapsedMinutes;
     }
 
     function isWednesdayBetween(
-        uint start,
-        uint end
+        uint256 start,
+        uint256 end
     ) public pure returns (bool) {
         require(start <= end, "Start time must be <= end");
         if (start == end) {
             return false;
         }
-        uint startDay = start / 1 days;
-        uint endDay = end / 1 days;
+        uint256 startDay = start / 1 days;
+        uint256 endDay = end / 1 days;
         if (startDay == endDay) {
             return false;
         }
 
         // 0 = Thursday, 1 = Friday, 2 = Saturday, ..., 6 = Wednesday
-        uint startWeekday = startDay % 7;
-        uint endWeekday = endDay % 7;
+        uint256 startWeekday = startDay % 7;
+        uint256 endWeekday = endDay % 7;
 
         if (startWeekday != 6 && startWeekday >= endWeekday) {
             return true;
         } else if (endWeekday == 6) {
             return true;
         } else {
-            uint startWeek = startDay / 7;
-            uint endWeek = startDay / 7;
+            uint256 startWeek = startDay / 7;
+            uint256 endWeek = startDay / 7;
             return startWeek != endWeek;
         }
     }
 
-    function moveVotingPower(
-        address from,
-        address to,
-        uint256 amount
-    ) external override {
-        require(isCommunityToken[msg.sender], "NOT_COMMUNITY_TOKEN");
-        _moveVotingPower(from, to, amount);
+    // for polygon bridge
+    function deposit(address user, bytes calldata depositData) external {
+        require(
+            msg.sender == polygonChainManager,
+            "Only polygon chain manager can call this function"
+        );
+        uint256 amount = abi.decode(depositData, (uint256));
+        _mint(user, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        _burn(_msgSender(), amount);
     }
 
     function version() public pure returns (string memory) {
         return "1.0.0";
     }
 
-    function _mint(
-        address account,
-        uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
-        super._mint(account, amount);
-    }
-
-    function _burn(
-        address account,
-        uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
-        super._burn(account, amount);
-    }
-
-    function _afterTokenTransfer(
+    function _update(
         address from,
         address to,
-        uint256 amount
-    ) internal override(VotesUpgradeable, ERC20Upgradeable) {
-        super._afterTokenTransfer(from, to, amount);
+        uint256 value
+    ) internal virtual override(ERC20Upgradeable, ERC20VotesUpgradeable) {
+        super._update(from, to, value);
     }
 }

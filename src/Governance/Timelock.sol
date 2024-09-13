@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.25;
 
 contract Timelock {
     event NewAdmin(address indexed newAdmin);
@@ -31,8 +31,8 @@ contract Timelock {
     );
 
     uint public constant GRACE_PERIOD = 14 days;
-    uint public constant MINIMUM_DELAY = 2 days;
-    uint public constant MAXIMUM_DELAY = 30 days;
+    uint public constant MINIMUM_DELAY = 10 minutes;
+    uint public constant MAXIMUM_DELAY = 30 hours;
 
     address public admin;
     address public pendingAdmin;
