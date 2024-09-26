@@ -30,9 +30,9 @@ contract Timelock {
         uint eta
     );
 
-    uint public constant GRACE_PERIOD = 14 days;
-    uint public constant MINIMUM_DELAY = 10 minutes;
-    uint public constant MAXIMUM_DELAY = 30 hours;
+    uint public GRACE_PERIOD = 14 days;
+    uint public MINIMUM_DELAY = 1 minutes;
+    uint public MAXIMUM_DELAY = 30 hours;
 
     address public admin;
     address public pendingAdmin;
@@ -54,6 +54,20 @@ contract Timelock {
 
         admin = admin_;
         delay = delay_;
+    }
+
+    function updateVariables(
+        uint gracePeriod_,
+        uint minDelay_,
+        uint maxDelay_
+    ) public {
+        require(
+            msg.sender == address(this),
+            "Timelock::updateVariables: Call must come from Timelock."
+        );
+        GRACE_PERIOD = gracePeriod_;
+        MINIMUM_DELAY = minDelay_;
+        MAXIMUM_DELAY = maxDelay_;
     }
 
     function setDelay(uint delay_) public {

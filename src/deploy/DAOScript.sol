@@ -13,7 +13,7 @@ contract DAOScript is Script {
 
         address deployerAddress = vm.addr(deployerPrivateKey);
 
-        Timelock timelock = new Timelock(deployerAddress, 10 minutes);
+        Timelock timelock = new Timelock(deployerAddress, 1 minutes);
         GovernorAlpha governance = new GovernorAlpha(
             address(timelock),
             pceToken,
