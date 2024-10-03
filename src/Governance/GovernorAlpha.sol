@@ -5,29 +5,35 @@ contract GovernorAlpha {
     /// @notice The name of this contract
     string public constant name = "PCE Governor Alpha";
 
+    uint256 public _quorumVotes = 1000e18;
+    uint256 public _proposalThreshold = 100e18;
+    uint256 public _proposalMaxOperations = 10;
+    uint256 public _votingDelay = 1;
+    uint256 public _votingPeriod = 30;
+
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint) {
-        return 1000e18;
+    function quorumVotes() public view returns (uint) {
+        return _quorumVotes;
     } // 400,000 = 4% of PCE
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint) {
-        return 100e18;
+    function proposalThreshold() public view returns (uint) {
+        return _proposalThreshold;
     } // 100,000 = 1% of PCE
 
     /// @notice The maximum number of actions that can be included in a proposal
-    function proposalMaxOperations() public pure returns (uint) {
-        return 10;
+    function proposalMaxOperations() public view returns (uint) {
+        return _proposalMaxOperations;
     } // 10 actions
 
     /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public pure returns (uint) {
-        return 1;
+    function votingDelay() public view returns (uint) {
+        return _votingDelay;
     } // 1 block
 
     /// @notice The duration of voting on a proposal, in blocks
-    function votingPeriod() public pure virtual returns (uint) {
-        return 300;
+    function votingPeriod() public view returns (uint) {
+        return _votingPeriod;
     } // ~3 days in blocks (assuming 15s blocks)
 
     /// @notice The address of the Timelock
@@ -468,6 +474,21 @@ contract GovernorAlpha {
         receipt.votes = votes;
 
         emit VoteCast(voter, proposalId, support, votes);
+    }
+
+    function updateVariables(
+        uint256 quorumVotes_,
+        uint256 proposalThreshold_,
+        uint256 proposalMaxOperations_
+    ) public {
+        require(
+            msg.sender == guardian || msg.sender == address(timelock),
+            "GovernorAlpha::updateVariables: only guardian or timelock can update variables"
+        );
+
+        _quorumVotes = quorumVotes_;
+        _proposalThreshold = proposalThreshold_;
+        _proposalMaxOperations = proposalMaxOperations_;
     }
 
     function __acceptAdmin() public {
