@@ -2,10 +2,12 @@
 pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
-import {PCEToken} from "../src/PCEToken.sol";
-import {PCECommunityToken} from "../src/PCECommunityToken.sol";
-import {ExchangeAllowMethod} from "../src/lib/Enum.sol";
+import {PCETokenV2} from "../src/PCETokenV2.sol";
+import {PCECommunityToken} from "lib/v1-core/src/PCECommunityToken.sol";
+import {ExchangeAllowMethod} from "lib/v1-core/src/lib/Enum.sol";
+import {PCEToken} from "lib/v1-core/src/PCEToken.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+
 import {console2} from "forge-std/console2.sol";
 
 contract PCETokenTest is Test {
@@ -15,7 +17,7 @@ contract PCETokenTest is Test {
     address COMMUNITY_TOKEN;
     uint256 constant INITIAL_AMOUNT = 50000;
 
-    PCEToken pceToken;
+    PCETokenV2 pceToken;
     PCECommunityToken cToken;
 
     function setUp() public {
@@ -23,7 +25,7 @@ contract PCETokenTest is Test {
         vm.label(BOB, "bob");
 
         cToken = new PCECommunityToken();
-        pceToken = new PCEToken();
+        pceToken = new PCETokenV2();
         pceToken.initialize("PEACE COIN", "PCE", address(cToken), address(0));
 
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
