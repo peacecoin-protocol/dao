@@ -2,8 +2,8 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
-import "../PCEToken.sol";
-import "../PCECommunityToken.sol";
+import {PCETokenV2} from "../PCETokenV2.sol";
+import {PCECommunityToken} from "lib/v1-core/src/PCECommunityToken.sol";
 
 contract PCEScript is Script {
     function run() external {
@@ -11,7 +11,7 @@ contract PCEScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         PCECommunityToken communityToken = new PCECommunityToken();
-        PCEToken pceToken = new PCEToken();
+        PCETokenV2 pceToken = new PCETokenV2();
         pceToken.initialize(
             "PCE Coin",
             "PCE",

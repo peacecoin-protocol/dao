@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
-import "../PCECommunityToken.sol";
+import {PCECommunityToken} from "lib/v1-core/src/PCECommunityToken.sol";
 
 contract PCECommunityScript is Script {
     function run() external {

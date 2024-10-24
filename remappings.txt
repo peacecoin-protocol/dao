@@ -1,2 +1,10 @@
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+ds-test/=lib/openzeppelin-contracts-upgradeable/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/
 forge-std/=lib/forge-std/src/
+openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+openzeppelin-foundry-upgrades/=lib/v1-core/lib/openzeppelin-foundry-upgrades/src/
+solidity-stringutils/=lib/v1-core/lib/openzeppelin-foundry-upgrades/lib/solidity-stringutils/
+v1-core/=lib/v1-core/
