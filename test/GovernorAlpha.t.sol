@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
-import {PCETokenV2} from "../src/PCETokenV2.sol";
+import {PCECommunityGovToken} from "../src/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {console} from "forge-std/console.sol";
@@ -12,7 +12,7 @@ contract GovernorAlphaTest is Test {
     address bob = address(0xDCBA);
     address trent = address(this);
 
-    PCETokenV2 pceToken;
+    PCECommunityGovToken pceToken;
     GovernorAlpha gov;
     Timelock timelock;
     uint256 initialAmount = 50000;
@@ -33,8 +33,8 @@ contract GovernorAlphaTest is Test {
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-        pceToken = new PCETokenV2();
-        pceToken.initialize("PEACE COIN", "PCE", address(1), address(0));
+        pceToken = new PCECommunityGovToken();
+        pceToken.initialize(address(pceToken), address(pceToken));
 
         timelock = new Timelock(alice, 10 minutes);
         gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
