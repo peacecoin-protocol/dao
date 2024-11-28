@@ -2,18 +2,16 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
-import "../PCEGovToken.sol";
+import {DAOFactory} from "../DAOFactory.sol";
 
-contract PCEGovTokenScript is Script {
+contract DAOFactoryScript is Script {
     function run() external {
-        address pceToken = 0x7e7887bE34AD96b553E1a16cA76d99697608ce23;
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
 
-        PCEGovToken pceGovToken = new PCEGovToken();
-        pceGovToken.initialize(deployerAddress, pceToken);
+        DAOFactory daoFactory = new DAOFactory();
 
         vm.stopBroadcast();
     }

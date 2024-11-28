@@ -1,46 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Timelock} from "./Timelock.sol";
+
 contract GovernorAlpha {
     /// @notice The name of this contract
-    string public constant name = "PCE Governor Alpha";
+    string public name;
 
-    uint256 public _quorumVotes = 1000e18;
-    uint256 public _proposalThreshold = 100e18;
-    uint256 public _proposalMaxOperations = 10;
-    uint256 public _votingDelay = 1;
-    uint256 public _votingPeriod = 30;
-
-    /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public view returns (uint) {
-        return _quorumVotes;
-    } // 400,000 = 4% of PCE
-
-    /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public view returns (uint) {
-        return _proposalThreshold;
-    } // 100,000 = 1% of PCE
-
-    /// @notice The maximum number of actions that can be included in a proposal
-    function proposalMaxOperations() public view returns (uint) {
-        return _proposalMaxOperations;
-    } // 10 actions
-
-    /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public view returns (uint) {
-        return _votingDelay;
-    } // 1 block
-
-    /// @notice The duration of voting on a proposal, in blocks
-    function votingPeriod() public view returns (uint) {
-        return _votingPeriod;
-    } // ~3 days in blocks (assuming 15s blocks)
+    uint256 public proposalMaxOperations = 10;
+    uint256 public votingDelay;
+    uint256 public votingPeriod;
+    uint256 public proposalThreshold;
+    uint256 public quorumVotes;
 
     /// @notice The address of the Timelock
     TimelockInterface public timelock;
 
     /// @notice The address of the PCE governance token
-    PCEInterface public pce;
+    GovInterface public token;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
@@ -143,10 +121,23 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint id);
 
-    constructor(address timelock_, address pce_, address guardian_) {
-        timelock = TimelockInterface(timelock_);
-        pce = PCEInterface(pce_);
-        guardian = guardian_;
+    constructor(
+        string memory daoName,
+        IERC20 _token,
+        address _timelock,
+        uint256 _votingDelay,
+        uint256 _votingPeriod,
+        uint256 _proposalThreshold,
+        uint256 _quorumVotes
+    ) {
+        name = daoName;
+        token = GovInterface(address(_token));
+        timelock = TimelockInterface(_timelock);
+        votingDelay = _votingDelay;
+        votingPeriod = _votingPeriod;
+        proposalThreshold = _proposalThreshold;
+        quorumVotes = _quorumVotes;
+        guardian = msg.sender;
     }
 
     function propose(
@@ -157,8 +148,8 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint) {
         require(
-            pce.getPastVotes(msg.sender, sub256(block.number, 1)) >
-                proposalThreshold(),
+            token.getPastVotes(msg.sender, sub256(block.number, 1)) >
+                proposalThreshold,
             "GovernorAlpha::propose: proposer votes below proposal threshold"
         );
         require(
@@ -172,7 +163,7 @@ contract GovernorAlpha {
             "GovernorAlpha::propose: must provide actions"
         );
         require(
-            targets.length <= proposalMaxOperations(),
+            targets.length <= proposalMaxOperations,
             "GovernorAlpha::propose: too many actions"
         );
 
@@ -191,8 +182,8 @@ contract GovernorAlpha {
             );
         }
 
-        uint startBlock = add256(block.number, votingDelay());
-        uint endBlock = add256(startBlock, votingPeriod());
+        uint startBlock = add256(block.number, votingDelay);
+        uint endBlock = add256(startBlock, votingPeriod);
 
         proposalCount++;
         uint proposalId = proposalCount;
@@ -341,8 +332,8 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                pce.getPastVotes(proposal.proposer, sub256(block.number, 1)) <
-                proposalThreshold(),
+                token.getPastVotes(proposal.proposer, sub256(block.number, 1)) <
+                proposalThreshold,
             "GovernorAlpha::cancel: proposer above threshold"
         );
 
@@ -397,7 +388,7 @@ contract GovernorAlpha {
             return ProposalState.Active;
         } else if (
             proposal.forVotes <= proposal.againstVotes ||
-            proposal.forVotes < quorumVotes()
+            proposal.forVotes < quorumVotes
         ) {
             return ProposalState.Defeated;
         } else if (proposal.eta == 0) {
@@ -461,7 +452,7 @@ contract GovernorAlpha {
             receipt.hasVoted == false,
             "GovernorAlpha::_castVote: voter already voted"
         );
-        uint96 votes = pce.getPastVotes(voter, proposal.startBlock);
+        uint96 votes = token.getPastVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -486,9 +477,9 @@ contract GovernorAlpha {
             "GovernorAlpha::updateVariables: only guardian or timelock can update variables"
         );
 
-        _quorumVotes = quorumVotes_;
-        _proposalThreshold = proposalThreshold_;
-        _proposalMaxOperations = proposalMaxOperations_;
+        quorumVotes = quorumVotes_;
+        proposalThreshold = proposalThreshold_;
+        proposalMaxOperations = proposalMaxOperations_;
     }
 
     function __acceptAdmin() public {
@@ -589,7 +580,7 @@ interface TimelockInterface {
     ) external payable returns (bytes memory);
 }
 
-interface PCEInterface {
+interface GovInterface {
     function getPastVotes(
         address account,
         uint blockNumber
