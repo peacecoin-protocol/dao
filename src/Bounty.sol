@@ -13,16 +13,8 @@ contract Bounty is Initializable, OwnableUpgradeable {
     }
 
     event UpdatedBountyAmount(uint256 bountyAmount);
-    event AddedContributorBounty(
-        address indexed user,
-        address indexed contributor,
-        uint256 amount
-    );
-    event AddedProposalBounty(
-        address indexed user,
-        uint256 indexed proposalId,
-        uint256 amount
-    );
+    event AddedContributorBounty(address indexed user, address indexed contributor, uint256 amount);
+    event AddedProposalBounty(address indexed user, uint256 indexed proposalId, uint256 amount);
     event ClaimedBounty(address indexed user, uint256 amount);
 
     uint256 public bountyAmount;
@@ -34,11 +26,7 @@ contract Bounty is Initializable, OwnableUpgradeable {
     mapping(address => BountyInfo) public contributorBounties;
     mapping(address => bool) public isContributor;
 
-    function initialize(
-        ERC20Upgradeable _bountyToken,
-        uint256 _bountyAmount,
-        address _governance
-    ) public initializer {
+    function initialize(ERC20Upgradeable _bountyToken, uint256 _bountyAmount, address _governance) public initializer {
         __Ownable_init(msg.sender);
         bountyAmount = _bountyAmount;
         bountyToken = _bountyToken;
@@ -50,10 +38,7 @@ contract Bounty is Initializable, OwnableUpgradeable {
         emit UpdatedBountyAmount(_bountyAmount);
     }
 
-    function setContributor(
-        address _contributor,
-        bool status
-    ) external onlyOwner {
+    function setContributor(address _contributor, bool status) external onlyOwner {
         require(_contributor != address(0), "Invalid contributor");
         isContributor[_contributor] = status;
     }
@@ -61,10 +46,8 @@ contract Bounty is Initializable, OwnableUpgradeable {
     function addProposalBounty(uint256 _proposalId, uint256 _amount) external {
         require(_amount > 0, "Amount must be greater than 0");
         require(
-            IGovernance(governance).state(_proposalId) ==
-                ProposalState.Executed ||
-                IGovernance(governance).state(_proposalId) ==
-                ProposalState.Succeeded,
+            IGovernance(governance).state(_proposalId) == ProposalState.Executed
+                || IGovernance(governance).state(_proposalId) == ProposalState.Succeeded,
             "Invalid proposal state"
         );
 
@@ -74,10 +57,7 @@ contract Bounty is Initializable, OwnableUpgradeable {
         emit AddedProposalBounty(msg.sender, _proposalId, _amount);
     }
 
-    function addContributorBounty(
-        address _contributor,
-        uint256 _amount
-    ) external {
+    function addContributorBounty(address _contributor, uint256 _amount) external {
         require(_amount > 0, "Amount must be greater than 0");
         require(_contributor != address(0), "Invalid contributor");
 
@@ -111,9 +91,7 @@ contract Bounty is Initializable, OwnableUpgradeable {
         emit ClaimedBounty(msg.sender, claimable);
     }
 
-    function claimableProposalAmount(
-        address _user
-    ) public view returns (uint256) {
+    function claimableProposalAmount(address _user) public view returns (uint256) {
         uint256 _totalBounty;
         uint256 proposalCount = IGovernance(governance).proposalCount();
         for (uint256 i = 0; i < proposalCount; i++) {
@@ -126,14 +104,10 @@ contract Bounty is Initializable, OwnableUpgradeable {
         return _totalBounty - proposalBountyWithdrawn[_user];
     }
 
-    function claimableContributorAmount(
-        address user
-    ) public view returns (uint256) {
+    function claimableContributorAmount(address user) public view returns (uint256) {
         uint256 extraAmount = isContributor[user] ? bountyAmount : 0;
         BountyInfo storage bounty = contributorBounties[msg.sender];
-        uint256 claimable = bounty.bountyAmount +
-            extraAmount -
-            bounty.withdrawn;
+        uint256 claimable = bounty.bountyAmount + extraAmount - bounty.withdrawn;
         return claimable;
     }
 
