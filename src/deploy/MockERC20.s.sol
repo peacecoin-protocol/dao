@@ -2,15 +2,16 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Script.sol";
-import "../PCECommunityToken.sol";
+import "../mocks/MockERC20.sol";
 
-contract PCECTokenScript is Script {
+contract MockERC20Script is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        PCECommunityToken bounty = new PCECommunityToken();
-        bounty.initialize("PCE Community Token", "PCE", 18e10);
+        MockERC20 mockERC20 = new MockERC20();
+        mockERC20.initialize();
+
         vm.stopBroadcast();
     }
 }

@@ -64,8 +64,8 @@ $ cast --help
 forge script 'src/deploy/DAOScript.sol':DAOScript --rpc-url $AMOY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --broadcast --verify
 ```
 
-
 ### Start Anvil: Deploy Contracts on Local Testnet
+
 Open Terminal and run:
 
 ```shell
@@ -73,6 +73,7 @@ anvil
 ```
 
 ### Use the Pre-Funded Account:
+
 The account will have test ETH ready to interact with your local testnet. Use this ETH for deploying contracts or testing transactions.
 
 ### Deploy Contracts
@@ -81,8 +82,14 @@ The account will have test ETH ready to interact with your local testnet. Use th
 forge script 'src/deploy/DAOFactoryScript.sol:DAOFactoryScript' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
 ```
 
-
 ### Deploy Testnet
+
 ```shell
 forge script 'src/deploy/PCECommunityGovTokenScript.sol:PCECommunityGovTokenScript' --fork-url $AMOY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --broadcast --verify --via-ir
+```
+
+### Deploy Contract on Anvil Local Testnet
+
+```shell
+forge script 'src/deploy/script.s.sol:script' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
 ```

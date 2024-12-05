@@ -16,9 +16,7 @@ contract ContractFactory {
     }
 
     // Deploy a contract using bytecode and constructor arguments
-    function deploy(
-        bytes memory bytecode
-    ) external onlyOwner returns (address deployedAddress) {
+    function deploy(bytes memory bytecode) external onlyOwner returns (address deployedAddress) {
         // Create a new contract using assembly
         // solhint-disable-next-line no-inline-assembly
         assembly {

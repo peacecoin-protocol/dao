@@ -14,11 +14,7 @@ contract BountyScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         Bounty bounty = new Bounty();
-        bounty.initialize(
-            ERC20Upgradeable(pceToken),
-            _bountyAmount,
-            governance
-        );
+        bounty.initialize(ERC20Upgradeable(pceToken), _bountyAmount, governance);
         vm.stopBroadcast();
     }
 }

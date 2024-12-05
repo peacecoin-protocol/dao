@@ -3,26 +3,14 @@
 pragma solidity 0.8.25;
 
 interface IStaking {
-    event RewardsSet(
-        uint256 rewardPerBlock,
-        uint256 firstBlockWithReward,
-        uint256 lastBlockWithReward
-    );
+    event RewardsSet(uint256 rewardPerBlock, uint256 firstBlockWithReward, uint256 lastBlockWithReward);
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
-    event RewardRestaked(
-        address indexed user,
-        uint256 reward,
-        uint256 stakingTokens
-    );
+    event RewardRestaked(address indexed user, uint256 reward, uint256 stakingTokens);
     event RewardTokensRecovered(uint256 amount);
 
-    function setRewards(
-        uint256 _rewardPerBlock,
-        uint256 _startingBlock,
-        uint256 _blocksAmount
-    ) external;
+    function setRewards(uint256 _rewardPerBlock, uint256 _startingBlock, uint256 _blocksAmount) external;
 
     function recoverNonLockedRewardTokens() external;
 

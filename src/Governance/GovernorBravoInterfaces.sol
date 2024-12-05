@@ -4,14 +4,14 @@ pragma solidity 0.8.25;
 contract GovernorBravoEvents {
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
-        uint id,
+        uint256 id,
         address proposer,
         address[] targets,
-        uint[] values,
+        uint256[] values,
         string[] signatures,
         bytes[] calldatas,
-        uint startBlock,
-        uint endBlock,
+        uint256 startBlock,
+        uint256 endBlock,
         string description
     );
 
@@ -21,40 +21,28 @@ contract GovernorBravoEvents {
     /// @param support Support value for the vote. 0=against, 1=for, 2=abstain
     /// @param votes Number of votes which were cast by the voter
     /// @param reason The reason given for the vote by the voter
-    event VoteCast(
-        address indexed voter,
-        uint proposalId,
-        uint8 support,
-        uint votes,
-        string reason
-    );
+    event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 votes, string reason);
 
     /// @notice An event emitted when a proposal has been canceled
-    event ProposalCanceled(uint id);
+    event ProposalCanceled(uint256 id);
 
     /// @notice An event emitted when a proposal has been queued in the Timelock
-    event ProposalQueued(uint id, uint eta);
+    event ProposalQueued(uint256 id, uint256 eta);
 
     /// @notice An event emitted when a proposal has been executed in the Timelock
-    event ProposalExecuted(uint id);
+    event ProposalExecuted(uint256 id);
 
     /// @notice An event emitted when the voting delay is set
-    event VotingDelaySet(uint oldVotingDelay, uint newVotingDelay);
+    event VotingDelaySet(uint256 oldVotingDelay, uint256 newVotingDelay);
 
     /// @notice An event emitted when the voting period is set
-    event VotingPeriodSet(uint oldVotingPeriod, uint newVotingPeriod);
+    event VotingPeriodSet(uint256 oldVotingPeriod, uint256 newVotingPeriod);
 
     /// @notice Emitted when implementation is changed
-    event NewImplementation(
-        address oldImplementation,
-        address newImplementation
-    );
+    event NewImplementation(address oldImplementation, address newImplementation);
 
     /// @notice Emitted when proposal threshold is set
-    event ProposalThresholdSet(
-        uint oldProposalThreshold,
-        uint newProposalThreshold
-    );
+    event ProposalThresholdSet(uint256 oldProposalThreshold, uint256 newProposalThreshold);
 
     /// @notice Emitted when pendingAdmin is changed
     event NewPendingAdmin(address oldPendingAdmin, address newPendingAdmin);
@@ -63,7 +51,7 @@ contract GovernorBravoEvents {
     event NewAdmin(address oldAdmin, address newAdmin);
 
     /// @notice Emitted when whitelist account expiration is set
-    event WhitelistAccountExpirationSet(address account, uint expiration);
+    event WhitelistAccountExpirationSet(address account, uint256 expiration);
 
     /// @notice Emitted when the whitelistGuardian is set
     event WhitelistGuardianSet(address oldGuardian, address newGuardian);
@@ -88,19 +76,19 @@ contract GovernorBravoDelegatorStorage {
  */
 contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     /// @notice The delay before voting on a proposal may take place, once proposed, in blocks
-    uint public votingDelay;
+    uint256 public votingDelay;
 
     /// @notice The duration of voting on a proposal, in blocks
-    uint public votingPeriod;
+    uint256 public votingPeriod;
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    uint public proposalThreshold;
+    uint256 public proposalThreshold;
 
     /// @notice Initial proposal id set at become
-    uint public initialProposalId;
+    uint256 public initialProposalId;
 
     /// @notice The total number of proposals
-    uint public proposalCount;
+    uint256 public proposalCount;
 
     /// @notice The address of the PCE Protocol Timelock
     TimelockInterface public timelock;
@@ -109,36 +97,36 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     CompInterface public comp;
 
     /// @notice The official record of all proposals ever proposed
-    mapping(uint => Proposal) public proposals;
+    mapping(uint256 => Proposal) public proposals;
 
     /// @notice The latest proposal for each proposer
-    mapping(address => uint) public latestProposalIds;
+    mapping(address => uint256) public latestProposalIds;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
-        uint id;
+        uint256 id;
         /// @notice Creator of the proposal
         address proposer;
         /// @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
-        uint eta;
+        uint256 eta;
         /// @notice the ordered list of target addresses for calls to be made
         address[] targets;
         /// @notice The ordered list of values (i.e. msg.value) to be passed to the calls to be made
-        uint[] values;
+        uint256[] values;
         /// @notice The ordered list of function signatures to be called
         string[] signatures;
         /// @notice The ordered list of calldata to be passed to each call
         bytes[] calldatas;
         /// @notice The block at which voting begins: holders must delegate their votes prior to this block
-        uint startBlock;
+        uint256 startBlock;
         /// @notice The block at which voting ends: votes must be cast prior to this block
-        uint endBlock;
+        uint256 endBlock;
         /// @notice Current number of votes in favor of this proposal
-        uint forVotes;
+        uint256 forVotes;
         /// @notice Current number of votes in opposition to this proposal
-        uint againstVotes;
+        uint256 againstVotes;
         /// @notice Current number of votes for abstaining for this proposal
-        uint abstainVotes;
+        uint256 abstainVotes;
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
         /// @notice Flag marking whether the proposal has been executed
@@ -172,48 +160,45 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
 
 contract GovernorBravoDelegateStorageV2 is GovernorBravoDelegateStorageV1 {
     /// @notice Stores the expiration of account whitelist status as a timestamp
-    mapping(address => uint) public whitelistAccountExpirations;
+    mapping(address => uint256) public whitelistAccountExpirations;
 
     /// @notice Address which manages whitelisted proposals and whitelist accounts
     address public whitelistGuardian;
 }
 
 interface TimelockInterface {
-    function delay() external view returns (uint);
-    function GRACE_PERIOD() external view returns (uint);
+    function delay() external view returns (uint256);
+    function GRACE_PERIOD() external view returns (uint256);
     function acceptAdmin() external;
     function queuedTransactions(bytes32 hash) external view returns (bool);
     function queueTransaction(
         address target,
-        uint value,
+        uint256 value,
         string calldata signature,
         bytes calldata data,
-        uint eta
+        uint256 eta
     ) external returns (bytes32);
     function cancelTransaction(
         address target,
-        uint value,
+        uint256 value,
         string calldata signature,
         bytes calldata data,
-        uint eta
+        uint256 eta
     ) external;
     function executeTransaction(
         address target,
-        uint value,
+        uint256 value,
         string calldata signature,
         bytes calldata data,
-        uint eta
+        uint256 eta
     ) external payable returns (bytes memory);
 }
 
 interface CompInterface {
-    function getPastVotes(
-        address account,
-        uint blockNumber
-    ) external view returns (uint96);
+    function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
 }
 
 interface GovernorAlpha {
     /// @notice The total number of proposals
-    function proposalCount() external returns (uint);
+    function proposalCount() external returns (uint256);
 }
