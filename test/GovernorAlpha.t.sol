@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
-import {PCECommunityGovToken} from "../src/PCECommunityGovToken.sol";
+import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {console} from "forge-std/console.sol";
@@ -12,10 +12,10 @@ contract GovernorAlphaTest is Test {
     address bob = address(0xDCBA);
     address trent = address(this);
 
-    PCECommunityGovToken pceToken;
+    MockGovToken pceToken;
     GovernorAlpha gov;
     Timelock timelock;
-    uint256 initialAmount = 50000;
+    uint256 initialAmount = 50000e18;
     address communityToken = 0xffD4505B3452Dc22f8473616d50503bA9E1710Ac;
 
     event ProposalCreated(
@@ -33,22 +33,32 @@ contract GovernorAlphaTest is Test {
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-        pceToken = new PCECommunityGovToken();
-        pceToken.initialize(address(pceToken), address(pceToken));
+        pceToken = new MockGovToken();
+        pceToken.initialize();
 
         timelock = new Timelock(alice, 10 minutes);
-        gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
+        
+        // Updated constructor parameters
+        gov = new GovernorAlpha(
+            "PCE DAO",
+            pceToken,
+            address(timelock),
+            1,
+            86400,
+            100e18,
+            1000e18
+        );
 
-        pceToken.transfer(address(this), initialAmount);
-        pceToken.transfer(alice, initialAmount);
-        pceToken.transfer(bob, initialAmount);
-        pceToken.transfer(address(timelock), initialAmount);
+        pceToken.mint(address(this), initialAmount);
+        pceToken.mint(alice, initialAmount);
+        pceToken.mint(bob, initialAmount);
+        pceToken.mint(address(timelock), initialAmount);
 
         vm.prank(alice);
         pceToken.delegate(alice);
 
         vm.prank(bob);
-        pceToken.delegate(bob);
+        pceToken.delegate(alice);
 
         vm.prank(trent);
         pceToken.delegate(trent);
@@ -71,7 +81,7 @@ contract GovernorAlphaTest is Test {
     }
 
     function test__votingPeriod() public view {
-        assertEq(gov.votingPeriod(), 300);
+        assertEq(gov.votingPeriod(), 86400);
     }
 
     function test__proposalCount() public view {
@@ -79,7 +89,7 @@ contract GovernorAlphaTest is Test {
     }
 
     function test__guardian() public view {
-        assertEq(gov.guardian(), alice);
+        assertEq(gov.guardian(), trent); // Now the deployer is the guardian
     }
 
     function test__propose() public {
@@ -93,7 +103,6 @@ contract GovernorAlphaTest is Test {
         signatures[0] = "transfer(address,uint256)";
 
         bytes[] memory data = new bytes[](1);
-
         data[0] = abi.encode(alice, 100);
 
         string memory description = "Transfer PCE";
@@ -109,7 +118,7 @@ contract GovernorAlphaTest is Test {
 
         bytes[] memory inv_data = new bytes[](2);
         inv_data[0] = new bytes(1);
-        inv_data[0] = new bytes(2);
+        inv_data[1] = new bytes(2);
 
         vm.expectRevert(
             "GovernorAlpha::propose: proposal function information arity mismatch"
@@ -135,12 +144,24 @@ contract GovernorAlphaTest is Test {
         );
 
         // Create Proposal
+        vm.expectEmit(true, true, true, true);
+        emit ProposalCreated(
+            1,
+            address(this),
+            targets,
+            values,
+            signatures,
+            data,
+            block.number + gov.votingDelay(),
+            block.number + gov.votingDelay() + gov.votingPeriod(),
+            description
+        );
         gov.propose(targets, values, signatures, data, description);
 
         assertEq(gov.proposalCount(), 1);
-        assertEq(gov.latestProposalIds(msg.sender), 0);
+        assertEq(gov.latestProposalIds(address(this)), 1);
 
-        // Cant create new proposal if user has active/pending proposal
+        // Can't create new proposal if user has active/pending proposal
         vm.expectRevert(
             "GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal"
         );
@@ -162,22 +183,24 @@ contract GovernorAlphaTest is Test {
         vm.prank(alice);
         timelock.setPendingAdmin(address(gov));
 
+        vm.prank(alice);
         vm.expectRevert(
             "GovernorAlpha::__acceptAdmin: sender must be gov guardian"
         );
         gov.__acceptAdmin();
 
-        vm.prank(alice);
+        vm.prank(trent);
         gov.__acceptAdmin();
     }
 
     function test__abdicate() public {
+        vm.prank(alice);
         vm.expectRevert(
             "GovernorAlpha::__abdicate: sender must be gov guardian"
         );
         gov.__abdicate();
 
-        vm.prank(alice);
+        vm.prank(trent);
         gov.__abdicate();
         assertEq(gov.guardian(), address(0));
     }
@@ -188,13 +211,11 @@ contract GovernorAlphaTest is Test {
         test__acceptAdmin();
 
         vm.prank(bob);
-
         vm.expectRevert("GovernorAlpha::cancel: proposer above threshold");
         gov.cancel(1);
 
         // Guardian can Cancel
-        vm.prank(alice);
-
+        vm.prank(trent);
         gov.cancel(1);
     }
 
@@ -205,7 +226,7 @@ contract GovernorAlphaTest is Test {
         //Create Proposal
         test__castVote();
 
-        vm.roll(gov.votingPeriod() * 2);
+        vm.roll(block.number + gov.votingPeriod());
         gov.queue(1);
     }
 

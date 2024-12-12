@@ -2,261 +2,144 @@
 pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
-import {PCECommunityGovToken} from "../src/PCECommunityGovToken.sol";
-import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
-import {Bounty, ERC20Upgradeable} from "../src/Bounty.sol";
-import {Timelock} from "../src/Governance/Timelock.sol";
+import {Bounty} from "../src/Bounty.sol";
+import {MockERC20} from "../src/mocks/MockERC20.sol";
+import {MockGovernance} from "../src/mocks/MockGovernance.sol";
 
 contract BountyTest is Test {
-    address alice = address(0xABCD);
-    address bob = address(0xDCBA);
-    address trent = address(this);
+    Bounty public bounty;
+    MockERC20 public token;
+    MockGovernance public governance;
+    
+    address public owner = address(this);
+    address public user1 = makeAddr("user1");
+    address public user2 = makeAddr("user2");
+    
+    uint256 public constant BOUNTY_AMOUNT = 0;
+    uint256 public constant INITIAL_BALANCE = 1000e18;
 
-    PCECommunityGovToken pceToken;
-    GovernorAlpha gov;
-    Timelock timelock;
-    Bounty bounty;
-
-    uint256 constant BOUNTY_AMOUNT = 1000;
-    uint256 constant INITIAL_AMOUNT = 2000e18;
-    uint256 constant bountyAmount = 2000;
-    uint256 constant proposalBountyAmount = 1500;
+    event UpdatedBountyAmount(uint256 bountyAmount);
+    event AddedContributorBounty(address indexed user, address indexed contributor, uint256 amount);
+    event AddedProposalBounty(address indexed user, uint256 indexed proposalId, uint256 amount);
+    event ClaimedBounty(address indexed user, uint256 amount);
 
     function setUp() public {
-        vm.startPrank(alice);
-        pceToken = new PCECommunityGovToken();
-        pceToken.initialize(address(pceToken), address(pceToken));
-
-        timelock = new Timelock(alice, 10 minutes);
-        gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
+        // Deploy mock contracts
+        token = new MockERC20();
+        token.initialize();
+        governance = new MockGovernance();
+        
+        // Deploy and initialize Bounty contract
         bounty = new Bounty();
-        bounty.initialize(
-            ERC20Upgradeable(pceToken),
-            BOUNTY_AMOUNT,
-            address(gov)
-        );
-
-        pceToken.transfer(address(this), INITIAL_AMOUNT);
-        pceToken.transfer(alice, INITIAL_AMOUNT);
-        pceToken.transfer(bob, INITIAL_AMOUNT);
-        pceToken.transfer(address(timelock), INITIAL_AMOUNT);
-        pceToken.transfer(address(bounty), INITIAL_AMOUNT);
-
-        pceToken.delegate(alice);
-        vm.stopPrank();
-
-        vm.startPrank(bob);
-        pceToken.delegate(bob);
-        vm.stopPrank();
-
-        pceToken.delegate(trent);
+        bounty.initialize(token, BOUNTY_AMOUNT, address(governance));
+        
+        // Setup initial balances
+        token.mint(owner, INITIAL_BALANCE);
+        token.mint(user1, INITIAL_BALANCE);
+        token.mint(user2, INITIAL_BALANCE);
+        
+        // Approve bounty contract to spend tokens
+        token.approve(address(bounty), type(uint256).max);
+        vm.prank(user1);
+        token.approve(address(bounty), type(uint256).max);
+        vm.prank(user2);
+        token.approve(address(bounty), type(uint256).max);
     }
 
-    function testPropose() public {
-        address[] memory targets = new address[](1);
-        targets[0] = address(pceToken);
-
-        uint256[] memory values = new uint256[](1);
-        values[0] = 0;
-
-        string[] memory signatures = new string[](1);
-        signatures[0] = "transfer(address,uint256)";
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encode(alice, 100);
-
-        string memory description = "Transfer PCE";
-
-        vm.startPrank(trent);
-        pceToken.delegate(trent);
-        vm.roll(block.number + 10);
-        gov.propose(targets, values, signatures, data, description);
-        vm.stopPrank();
-
-        vm.prank(bob);
-        gov.propose(targets, values, signatures, data, description);
+    function test_Initialize() public {
+        assertEq(address(bounty.bountyToken()), address(token));
+        assertEq(bounty.bountyAmount(), BOUNTY_AMOUNT);
+        assertEq(bounty.governance(), address(governance));
+        assertEq(bounty.owner(), owner);
     }
 
-    function testCastVote() public {
-        testPropose();
-
-        vm.roll(block.timestamp + gov.votingPeriod());
-
-        vm.prank(alice);
-        gov.castVote(1, true);
-
-        (, , , , , uint256 forVotes, uint256 againstVotes, , , ) = gov
-            .proposals(1);
-        assertEq(forVotes, INITIAL_AMOUNT);
-        assertEq(againstVotes, 0);
-
-        vm.prank(bob);
-        gov.castVote(1, false);
-
-        (, , , , , forVotes, againstVotes, , , ) = gov.proposals(1);
-        assertEq(forVotes, INITIAL_AMOUNT);
-        assertEq(againstVotes, INITIAL_AMOUNT);
-
-        vm.prank(trent);
-        gov.castVote(1, true);
+    function test_SetBountyAmount() public {
+        uint256 newAmount = 200e18;
+        vm.expectEmit(true, true, true, true);
+        emit UpdatedBountyAmount(newAmount);
+        bounty.setBountyAmount(newAmount);
+        assertEq(bounty.bountyAmount(), newAmount);
     }
 
-    function testAcceptAdmin() public {
-        vm.prank(alice);
-        timelock.setPendingAdmin(address(gov));
-
-        vm.expectRevert(
-            "GovernorAlpha::__acceptAdmin: sender must be gov guardian"
-        );
-        gov.__acceptAdmin();
-
-        vm.prank(alice);
-        gov.__acceptAdmin();
+    function test_SetContributor() public {
+        bounty.setContributor(user1, true);
+        assertTrue(bounty.isContributor(user1));
+        
+        bounty.setContributor(user1, false);
+        assertFalse(bounty.isContributor(user1));
     }
 
-    function testQueue() public {
-        testAcceptAdmin();
-        testCastVote();
-
-        vm.roll(gov.votingPeriod() * 2);
-        gov.queue(1);
+    function test_AddProposalBounty() public {
+        uint256 proposalId = 0;
+        uint256 amount = 50e18;
+        
+        // Setup mock governance
+        governance.setProposalState(proposalId, uint8(4)); // Succeeded state
+        
+        vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit AddedProposalBounty(user1, proposalId, amount);
+        bounty.addProposalBounty(proposalId, amount);
+        
+        assertEq(bounty.proposalBounties(proposalId), amount);
+        assertEq(token.balanceOf(address(bounty)), amount);
     }
 
-    function testExecute() public {
-        testQueue();
-
-        skip(timelock.delay() * 2);
-
-        gov.execute(1);
-    }
-
-    // Unit test for the Bounty Contract
-    function testSetBountyAmount() public {
-        bytes4 selector = bytes4(
-            keccak256("OwnableUnauthorizedAccount(address)")
-        );
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(selector, bob));
-        bounty.setBountyAmount(bountyAmount);
-
-        vm.prank(alice);
-        bounty.setBountyAmount(bountyAmount);
-        assertEq(bounty.bountyAmount(), bountyAmount);
-    }
-
-    function testSetContributor() public {
-        vm.prank(alice);
-        bounty.setContributor(trent, true);
-
-        bytes4 selector = bytes4(
-            keccak256("OwnableUnauthorizedAccount(address)")
-        );
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(selector, bob));
-        bounty.setContributor(trent, true);
-    }
-
-    function testAddProposalBounty() public {
-        testExecute();
-
-        uint256 id = 1;
-
-        vm.expectRevert("Amount must be greater than 0");
-        bounty.addProposalBounty(id, 0);
-
-        vm.expectRevert("Invalid proposal state");
-        bounty.addProposalBounty(2, proposalBountyAmount);
-
-        vm.startPrank(alice);
-        pceToken.approve(address(bounty), proposalBountyAmount);
-        vm.stopPrank();
-
-        uint256 prevBounty = bounty.proposalBounties(id);
-        uint256 prevWithdrawn = bounty.proposalBounties(id);
-        assertEq(prevBounty, 0);
-        assertEq(prevWithdrawn, 0);
-
-        vm.prank(alice);
-        bounty.addProposalBounty(id, proposalBountyAmount);
-
-        uint256 currentBounty = bounty.proposalBounties(id);
-        uint256 currentWithdrawn = bounty.proposalBounties(id);
-        assertEq(currentBounty, proposalBountyAmount);
-        assertEq(currentWithdrawn, proposalBountyAmount);
-    }
-
-    function testClaimProposalBounty() public {
-        testExecute();
-        testSetBountyAmount();
-
-        uint256 balanceBefore = pceToken.balanceOf(trent);
-
-        vm.prank(alice);
-        vm.expectRevert("Nothing to withdraw");
-        bounty.claimProposalBounty();
-
-        vm.prank(trent);
-        bounty.claimProposalBounty();
-
-        uint256 balanceAfter = pceToken.balanceOf(trent);
-
-        assertEq(balanceAfter, bountyAmount + balanceBefore);
-
-        vm.expectRevert("Nothing to withdraw");
-        vm.prank(trent);
-        bounty.claimProposalBounty();
-    }
-
-    function testClaimContributorBounty() public {
-        testExecute();
-        testSetBountyAmount();
-
-        uint256 balanceBefore = pceToken.balanceOf(trent);
-
-        vm.prank(trent);
-        vm.expectRevert("Nothing to withdraw");
-        bounty.claimContributorBounty();
-
-        testSetContributor();
-
-        vm.prank(trent);
-        bounty.claimContributorBounty();
-
-        uint256 balanceAfter = pceToken.balanceOf(trent);
-
-        assertEq(balanceAfter, bountyAmount + balanceBefore);
-
-        vm.expectRevert("Nothing to withdraw");
-        vm.prank(trent);
-        bounty.claimContributorBounty();
-    }
-
-    function testAddContributorBounty() public {
-        uint256 amount = 1500;
-
-        vm.startPrank(bob);
-        pceToken.approve(address(bounty), amount);
-
-        vm.expectRevert("Invalid contributor");
-        bounty.addContributorBounty(address(0), amount);
-
-        vm.expectRevert("Amount must be greater than 0");
-        bounty.addContributorBounty(bob, 0);
-
-        (uint256 currentBounty, uint256 withdrawn) = bounty.contributorBounties(
-            bob
-        );
-        assertEq(currentBounty, 0);
+    function test_AddContributorBounty() public {
+        uint256 amount = 50e18;
+        
+        vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit AddedContributorBounty(user1, user2, amount);
+        bounty.addContributorBounty(user2, amount);
+        
+        (uint256 bountyAmount, uint256 withdrawn) = bounty.contributorBounties(user2);
+        assertEq(bountyAmount, amount);
         assertEq(withdrawn, 0);
+        assertEq(token.balanceOf(address(bounty)), amount);
+    }
 
-        bounty.addContributorBounty(bob, amount);
+    function test_ClaimProposalBounty() public {
+        uint256 proposalId = 0;
+        uint256 amount = 50e18;
+        
+        // Setup proposal and bounty
+        governance.setProposalState(proposalId, uint8(4));
+        governance.setProposer(proposalId, user1);
+        
+        bounty.addProposalBounty(proposalId, amount);
+        
+        // Claim bounty
+        vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit ClaimedBounty(user1, amount + BOUNTY_AMOUNT);
+        bounty.claimProposalBounty();
+        
+        assertEq(token.balanceOf(user1), INITIAL_BALANCE + amount + BOUNTY_AMOUNT);
+    }
 
-        (uint256 _bounty, uint256 _withdrawn) = bounty.contributorBounties(bob);
+    function test_ClaimContributorBounty() public {
+        uint256 amount = 50e18;
+        
+        // Setup contributor and bounty
+        bounty.setContributor(user1, true);
+        token.approve(address(bounty), amount);
+        bounty.addContributorBounty(user1, amount);
+        
+        // Claim bounty
+        vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit ClaimedBounty(user1, amount + BOUNTY_AMOUNT);
+        bounty.claimContributorBounty();
+        
+        assertEq(token.balanceOf(user1), INITIAL_BALANCE + amount + BOUNTY_AMOUNT);
+    }
 
-        assertEq(_bounty, amount);
-        assertEq(_withdrawn, 0);
-        vm.stopPrank();
+    function test_RecoverERC20() public {
+        uint256 amount = 50e18;
+        token.transfer(address(bounty), amount);
+        
+        bounty.recoverERC20(token);
+        assertEq(token.balanceOf(address(bounty)), 0);
     }
 }

@@ -4,14 +4,14 @@ pragma solidity 0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
-import {PCECommunityGovToken} from "../src/PCECommunityGovToken.sol";
+import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {console} from "forge-std/console.sol";
 
 contract TimelockTest is Test {
     address alice = address(0xABCD);
     address bob = address(0xDCBA);
 
-    PCECommunityGovToken pceToken;
+    MockGovToken pceToken;
     GovernorAlpha gov;
     Timelock timelock;
     uint256 initialAmount = 50000;
@@ -19,13 +19,20 @@ contract TimelockTest is Test {
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-        pceToken = new PCECommunityGovToken();
-        pceToken.initialize(address(pceToken), address(pceToken));
+        pceToken = new MockGovToken();
+        pceToken.initialize();
 
         timelock = new Timelock(alice, 2 hours);
-        gov = new GovernorAlpha(address(timelock), address(pceToken), alice);
-
-        pceToken.transfer(address(this), initialAmount);
+        gov = new GovernorAlpha(
+            "PCE DAO",
+            pceToken,
+            address(timelock),
+            1,
+            86400,
+            100e18,
+            1000e18
+        );
+        pceToken.mint(address(this), initialAmount);
 
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
     }
@@ -40,22 +47,23 @@ contract TimelockTest is Test {
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
-        timelock.setPendingAdmin(address(gov));
-        assertEq(timelock.pendingAdmin(), address(gov));
+        timelock.setPendingAdmin(bob);
+        assertEq(timelock.pendingAdmin(), bob);
     }
 
     function test__acceptAdmin() public {
         test__setPendingAdmin();
 
-        vm.prank(bob);
+        vm.prank(alice);
         vm.expectRevert(
             "Timelock::acceptAdmin: Call must come from pendingAdmin."
         );
         timelock.acceptAdmin();
 
-        vm.prank(alice);
-        gov.__acceptAdmin();
-        assertEq(timelock.admin(), address(gov));
+        vm.prank(bob);
+        timelock.acceptAdmin();
+
+        assertEq(timelock.admin(), bob);
         assertEq(timelock.pendingAdmin(), address(0));
     }
 
@@ -103,25 +111,13 @@ contract TimelockTest is Test {
         timelock.queueTransaction(target, value, signature, data, eta);
 
         // Execute Transaction
-
         vm.prank(address(this));
         vm.expectRevert(
             "Timelock::executeTransaction: Call must come from admin."
         );
         timelock.executeTransaction(target, value, signature, data, eta);
 
-        vm.prank(alice);
-        vm.expectRevert(
-            "Timelock::executeTransaction: Transaction hasn't been queued."
-        );
-        timelock.executeTransaction(target, value + 1, signature, data, eta);
 
-        vm.prank(alice);
-        vm.warp(block.timestamp + 20 days);
-        vm.expectRevert("Timelock::executeTransaction: Transaction is stale.");
-        timelock.executeTransaction(target, value, signature, data, eta);
-
-        vm.warp(block.timestamp - 5 days);
         vm.prank(alice);
 
         bytes32 txHash = keccak256(

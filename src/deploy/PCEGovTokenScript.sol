@@ -6,7 +6,7 @@ import "../PCEGovToken.sol";
 
 contract PCEGovTokenScript is Script {
     function run() external {
-        address pceToken = 0xf939595726798393F63Dbe098a54C7948DEF8faF;
+        address pceToken = 0x7e7887bE34AD96b553E1a16cA76d99697608ce23;
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 

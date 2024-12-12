@@ -9,12 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 
 import "./interfaces/IStaking.sol";
 
-contract Staking is
-    IStaking,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable
-{
+contract Staking is IStaking, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     ERC20Upgradeable public stakingToken;
     ERC20Upgradeable public rewardsToken;
 
@@ -31,11 +26,7 @@ contract Staking is
     uint256 public totalStaked;
     mapping(address => uint256) public staked;
 
-    function initialize(
-        address _stakingToken,
-        address _rewardsToken,
-        address _owner
-    ) external initializer {
+    function initialize(address _stakingToken, address _rewardsToken, address _owner) external initializer {
         stakingToken = ERC20Upgradeable(_stakingToken);
         rewardsToken = ERC20Upgradeable(_rewardsToken);
 
@@ -55,11 +46,12 @@ contract Staking is
         _;
     }
 
-    function setRewards(
-        uint256 _rewardPerBlock,
-        uint256 _startingBlock,
-        uint256 _blocksAmount
-    ) external override onlyOwner updateReward(address(0)) {
+    function setRewards(uint256 _rewardPerBlock, uint256 _startingBlock, uint256 _blocksAmount)
+        external
+        override
+        onlyOwner
+        updateReward(address(0))
+    {
         uint256 unlockedTokens = _getFutureRewardTokens();
 
         rewardPerBlock = _rewardPerBlock;
@@ -72,24 +64,15 @@ contract Staking is
             : stakingToken.balanceOf(address(this)) + totalStaked;
 
         rewardTokensLocked = rewardTokensLocked - unlockedTokens + lockedTokens;
-        require(
-            rewardTokensLocked <= rewardBalance,
-            "Not enough tokens for the rewards"
-        );
+        require(rewardTokensLocked <= rewardBalance, "Not enough tokens for the rewards");
 
-        emit RewardsSet(
-            _rewardPerBlock,
-            firstBlockWithReward,
-            lastBlockWithReward
-        );
+        emit RewardsSet(_rewardPerBlock, firstBlockWithReward, lastBlockWithReward);
     }
 
     function recoverNonLockedRewardTokens() external override onlyOwner {
         uint256 nonLockedTokens = address(stakingToken) != address(rewardsToken)
             ? rewardsToken.balanceOf(address(this)) - rewardTokensLocked
-            : rewardsToken.balanceOf(address(this)) -
-                rewardTokensLocked -
-                totalStaked;
+            : rewardsToken.balanceOf(address(this)) - rewardTokensLocked - totalStaked;
 
         rewardsToken.transfer(owner(), nonLockedTokens);
         emit RewardTokensRecovered(nonLockedTokens);
@@ -108,14 +91,9 @@ contract Staking is
         getReward();
     }
 
-    function stake(
-        uint256 _amount
-    ) external override whenNotPaused nonReentrant updateReward(msg.sender) {
+    function stake(uint256 _amount) external override whenNotPaused nonReentrant updateReward(msg.sender) {
         require(_amount > 0, "Stake: can't stake 0");
-        require(
-            block.number < lastBlockWithReward,
-            "Stake: staking  period is over"
-        );
+        require(block.number < lastBlockWithReward, "Stake: staking  period is over");
 
         totalStaked = totalStaked + _amount;
         staked[msg.sender] = staked[msg.sender] + _amount;
@@ -124,9 +102,7 @@ contract Staking is
         emit Staked(msg.sender, _amount);
     }
 
-    function withdraw(
-        uint256 _amount
-    ) public override nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 _amount) public override nonReentrant updateReward(msg.sender) {
         require(_amount > 0, "Amount should be greater then 0");
         require(staked[msg.sender] >= _amount, "Insufficient staked amount");
         totalStaked = totalStaked - _amount;
@@ -147,12 +123,8 @@ contract Staking is
     }
 
     function blocksWithRewardsPassed() public view override returns (uint256) {
-        uint256 from = lastUpdateBlock > firstBlockWithReward
-            ? lastBlockWithReward
-            : firstBlockWithReward;
-        uint256 to = block.number > lastBlockWithReward
-            ? lastBlockWithReward
-            : block.number;
+        uint256 from = lastUpdateBlock > firstBlockWithReward ? lastBlockWithReward : firstBlockWithReward;
+        uint256 to = block.number > lastBlockWithReward ? lastBlockWithReward : block.number;
 
         return from > to ? 0 : to - from;
     }
@@ -162,18 +134,14 @@ contract Staking is
             return rewardPerTokenStored;
         }
 
-        uint256 accumulatedReward = (blocksWithRewardsPassed() *
-            rewardPerBlock *
-            (1e18)) / totalStaked;
+        uint256 accumulatedReward = (blocksWithRewardsPassed() * rewardPerBlock * (1e18)) / totalStaked;
 
         return rewardPerTokenStored + accumulatedReward;
     }
 
     function earned(address _account) public view override returns (uint256) {
-        uint256 rewardsDifference = rewardPerToken() -
-            userRewardPerTokenPaid[_account];
-        uint256 newlyAccumulated = (staked[_account] * rewardsDifference) /
-            (1e18);
+        uint256 rewardsDifference = rewardPerToken() - userRewardPerTokenPaid[_account];
+        uint256 newlyAccumulated = (staked[_account] * rewardsDifference) / (1e18);
         return rewards[_account] + newlyAccumulated;
     }
 

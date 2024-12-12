@@ -8,9 +8,7 @@ interface IPCEToken {
         uint256 depositedPCEToken;
     }
 
-    function getLocalToken(
-        address communityToken
-    ) external view returns (LocalToken memory);
+    function getLocalToken(address communityToken) external view returns (LocalToken memory);
 
     function owner() external view returns (address);
 }
