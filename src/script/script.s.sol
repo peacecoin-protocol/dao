@@ -14,7 +14,6 @@ import {console} from "forge-std/console.sol";
 
 contract script is Script {
     function run() external {
-
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
         vm.startBroadcast(deployerPrivateKey);
 
@@ -32,17 +31,10 @@ contract script is Script {
         pceGovToken.delegate(address(this));
 
         Timelock timelock = new Timelock(alice, 10 minutes);
-        GovernorAlpha gov = new GovernorAlpha(
-            "PCE DAO",
-            IERC20(address(pceGovToken)),
-            address(timelock),
-            1,
-            86400,
-            100e18,
-            1000e18
-        );
+        GovernorAlpha gov =
+            new GovernorAlpha("PCE DAO", IERC20(address(pceGovToken)), address(timelock), 1, 86400, 100e18, 1000e18);
 
-        Bounty bounty = new Bounty();   // Deploy Bounty Contract
+        Bounty bounty = new Bounty(); // Deploy Bounty Contract
         bounty.initialize(ERC20Upgradeable(address(mockERC20)), _bountyAmount, address(gov));
 
         ContractFactory contractFactory = new ContractFactory(msg.sender);

@@ -34,6 +34,11 @@ contract DaoFactoryTest is Test {
     }
 
     function testDAOCreationAndProposalFlow() public {
+        // Set bytecode for governor token
+        console.log("Setting bytecode for governor token");
+        console.logBytes(type(PCECommunityGovToken).creationCode);
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
         // Create DAO
         daoFactory.createDAO(
             "Test DAO",
@@ -45,78 +50,95 @@ contract DaoFactoryTest is Test {
                 telegram: "https://t.me/test"
             }),
             address(pceToken),
-            10,  // votingDelay
+            10, // votingDelay
             100, // votingPeriod
             1000, // proposalThreshold
             400, // quorumPercentage
-            100  // timelockDelay
+            100 // timelockDelay
         );
 
         // Verify DAO creation
         bytes32 daoId = keccak256(abi.encodePacked("Test DAO"));
         DAOFactory.DAOConfig memory daoConfig = daoFactory.getDAO(daoId);
-        
-        // Basic assertions for DAO creation
-        assertEq(daoConfig.governanceToken, address(pceToken), "Governance token mismatch");
-        
+
         // Get governor and timelock instances
         GovernorAlpha governor = GovernorAlpha(daoConfig.governor);
         Timelock timelock = Timelock(daoConfig.timelock);
-        
+        address governorToken = daoConfig.governanceToken;
+
+        pceToken.approve(governorToken, pceToken.balanceOf(address(alice)));
+        PCECommunityGovToken(governorToken).deposit(pceToken.balanceOf(address(alice)));
+
+        PCECommunityGovToken(governorToken).delegate(address(alice));
+
+        vm.roll(block.number + 10000);
+
         // Create proposal parameters
         address[] memory targets = new address[](1);
         targets[0] = address(pceToken);
-        
+
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
-        
+
         string[] memory signatures = new string[](1);
         signatures[0] = "approve(address,uint256)";
-        
+
         bytes[] memory calldatas = new bytes[](1);
         calldatas[0] = abi.encode(address(timelock), 1000000);
-        
+
         // Submit proposal
-        uint256 proposalId = governor.propose(
-            targets,
-            values,
-            signatures,
-            calldatas,
-            "Test Proposal"
-        );
-        
+        uint256 proposalId = governor.propose(targets, values, signatures, calldatas, "Test Proposal");
+
         // Move past voting delay
         vm.roll(block.number + 11); // voting delay + 1
-        
+
         // Verify proposal state
-        assertEq(uint(governor.state(proposalId)), uint(GovernorAlpha.ProposalState.Active), "Proposal should be active");
-        
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(GovernorAlpha.ProposalState.Active),
+            "Proposal should be active"
+        );
+
         // Cast vote
         governor.castVote(proposalId, true);
-        
+
         // Move past voting period
         vm.roll(block.number + 101); // voting period + 1
-        
+
         // Verify proposal succeeded
-        assertEq(uint(governor.state(proposalId)), uint(GovernorAlpha.ProposalState.Succeeded), "Proposal should have succeeded");
-        
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(GovernorAlpha.ProposalState.Succeeded),
+            "Proposal should have succeeded"
+        );
+
         // Queue proposal
         governor.queue(proposalId);
-        
+
         // Verify proposal queued
-        assertEq(uint(governor.state(proposalId)), uint(GovernorAlpha.ProposalState.Queued), "Proposal should be queued");
-        
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(GovernorAlpha.ProposalState.Queued),
+            "Proposal should be queued"
+        );
+
         // Move past timelock delay
         vm.warp(block.timestamp + 101); // timelock delay + 1
-        
+
         // Execute proposal
         governor.execute(proposalId);
-        
+
         // Verify proposal executed
-        assertEq(uint(governor.state(proposalId)), uint(GovernorAlpha.ProposalState.Executed), "Proposal should be executed");
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(GovernorAlpha.ProposalState.Executed),
+            "Proposal should be executed"
+        );
     }
 
     function testCannotCreateDAOWithInvalidParameters() public {
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
         // Test with zero address for governance token
         vm.expectRevert("Invalid governance token");
         daoFactory.createDAO(
@@ -128,12 +150,18 @@ contract DaoFactoryTest is Test {
                 twitter: "https://twitter.com/test",
                 telegram: "https://t.me/test"
             }),
-            address(0),  // zero address
-            10, 100, 1000, 400, 100
+            address(0), // zero address
+            10,
+            100,
+            1000,
+            400,
+            100
         );
     }
 
     function testCannotCreateDuplicateDAO() public {
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
         // Create first DAO
         daoFactory.createDAO(
             "Test DAO",
@@ -145,13 +173,17 @@ contract DaoFactoryTest is Test {
                 telegram: "https://t.me/test"
             }),
             address(pceToken),
-            10, 100, 1000, 400, 100
+            10,
+            100,
+            1000,
+            400,
+            100
         );
 
         // Attempt to create DAO with same name
         vm.expectRevert("DAO name already exists");
         daoFactory.createDAO(
-            "Test DAO",  // same name
+            "Test DAO", // same name
             DAOFactory.SocialConfig({
                 description: "Different Description",
                 website: "https://test2.com",
@@ -160,7 +192,11 @@ contract DaoFactoryTest is Test {
                 telegram: "https://t.me/test2"
             }),
             address(pceToken),
-            10, 100, 1000, 400, 100
+            10,
+            100,
+            1000,
+            400,
+            100
         );
     }
 }
