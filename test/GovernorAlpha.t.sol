@@ -19,14 +19,14 @@ contract GovernorAlphaTest is Test {
     address communityToken = 0xffD4505B3452Dc22f8473616d50503bA9E1710Ac;
 
     event ProposalCreated(
-        uint id,
+        uint256 id,
         address proposer,
         address[] targets,
-        uint[] values,
+        uint256[] values,
         string[] signatures,
         bytes[] calldatas,
-        uint startBlock,
-        uint endBlock,
+        uint256 startBlock,
+        uint256 endBlock,
         string description
     );
 
@@ -37,17 +37,9 @@ contract GovernorAlphaTest is Test {
         pceToken.initialize();
 
         timelock = new Timelock(alice, 10 minutes);
-        
+
         // Updated constructor parameters
-        gov = new GovernorAlpha(
-            "PCE DAO",
-            pceToken,
-            address(timelock),
-            1,
-            86400,
-            100e18,
-            1000e18
-        );
+        gov = new GovernorAlpha("PCE DAO", pceToken, address(timelock), 1, 86400, 100e18, 1000e18);
 
         pceToken.mint(address(this), initialAmount);
         pceToken.mint(alice, initialAmount);
@@ -107,9 +99,7 @@ contract GovernorAlphaTest is Test {
 
         string memory description = "Transfer PCE";
 
-        vm.expectRevert(
-            "GovernorAlpha::propose: proposer votes below proposal threshold"
-        );
+        vm.expectRevert("GovernorAlpha::propose: proposer votes below proposal threshold");
         gov.propose(targets, values, signatures, data, description);
 
         vm.prank(address(this));
@@ -120,28 +110,14 @@ contract GovernorAlphaTest is Test {
         inv_data[0] = new bytes(1);
         inv_data[1] = new bytes(2);
 
-        vm.expectRevert(
-            "GovernorAlpha::propose: proposal function information arity mismatch"
-        );
+        vm.expectRevert("GovernorAlpha::propose: proposal function information arity mismatch");
         gov.propose(targets, values, signatures, inv_data, description);
 
         vm.expectRevert("GovernorAlpha::propose: must provide actions");
-        gov.propose(
-            new address[](0),
-            new uint256[](0),
-            new string[](0),
-            new bytes[](0),
-            description
-        );
+        gov.propose(new address[](0), new uint256[](0), new string[](0), new bytes[](0), description);
 
         vm.expectRevert("GovernorAlpha::propose: too many actions");
-        gov.propose(
-            new address[](11),
-            new uint256[](11),
-            new string[](11),
-            new bytes[](11),
-            description
-        );
+        gov.propose(new address[](11), new uint256[](11), new string[](11), new bytes[](11), description);
 
         // Create Proposal
         vm.expectEmit(true, true, true, true);
@@ -162,9 +138,7 @@ contract GovernorAlphaTest is Test {
         assertEq(gov.latestProposalIds(address(this)), 1);
 
         // Can't create new proposal if user has active/pending proposal
-        vm.expectRevert(
-            "GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal"
-        );
+        vm.expectRevert("GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal");
         gov.propose(targets, values, signatures, data, description);
     }
 
@@ -179,14 +153,13 @@ contract GovernorAlphaTest is Test {
         vm.prank(trent);
         gov.castVote(1, true);
     }
+
     function test__acceptAdmin() public {
         vm.prank(alice);
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
-        vm.expectRevert(
-            "GovernorAlpha::__acceptAdmin: sender must be gov guardian"
-        );
+        vm.expectRevert("GovernorAlpha::__acceptAdmin: sender must be gov guardian");
         gov.__acceptAdmin();
 
         vm.prank(trent);
@@ -195,9 +168,7 @@ contract GovernorAlphaTest is Test {
 
     function test__abdicate() public {
         vm.prank(alice);
-        vm.expectRevert(
-            "GovernorAlpha::__abdicate: sender must be gov guardian"
-        );
+        vm.expectRevert("GovernorAlpha::__abdicate: sender must be gov guardian");
         gov.__abdicate();
 
         vm.prank(trent);

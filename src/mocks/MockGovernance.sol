@@ -24,4 +24,4 @@ contract MockGovernance {
     function proposer(uint256 proposalId) external view returns (address) {
         return proposers[proposalId];
     }
-} 
+}

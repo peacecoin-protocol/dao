@@ -23,15 +23,7 @@ contract TimelockTest is Test {
         pceToken.initialize();
 
         timelock = new Timelock(alice, 2 hours);
-        gov = new GovernorAlpha(
-            "PCE DAO",
-            pceToken,
-            address(timelock),
-            1,
-            86400,
-            100e18,
-            1000e18
-        );
+        gov = new GovernorAlpha("PCE DAO", pceToken, address(timelock), 1, 86400, 100e18, 1000e18);
         pceToken.mint(address(this), initialAmount);
 
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
@@ -41,9 +33,7 @@ contract TimelockTest is Test {
         vm.expectRevert("Timelock::setPendingAdmin: Invalid address");
         timelock.setPendingAdmin(address(0));
 
-        vm.expectRevert(
-            "Timelock::setPendingAdmin: First call must come from admin."
-        );
+        vm.expectRevert("Timelock::setPendingAdmin: First call must come from admin.");
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
@@ -55,9 +45,7 @@ contract TimelockTest is Test {
         test__setPendingAdmin();
 
         vm.prank(alice);
-        vm.expectRevert(
-            "Timelock::acceptAdmin: Call must come from pendingAdmin."
-        );
+        vm.expectRevert("Timelock::acceptAdmin: Call must come from pendingAdmin.");
         timelock.acceptAdmin();
 
         vm.prank(bob);
@@ -76,21 +64,17 @@ contract TimelockTest is Test {
 
         bytes memory data = abi.encode(3 days);
 
-        uint eta = block.timestamp + 2 days;
+        uint256 eta = block.timestamp + 2 days;
 
         vm.prank(bob);
-        vm.expectRevert(
-            "Timelock::queueTransaction: Call must come from admin."
-        );
+        vm.expectRevert("Timelock::queueTransaction: Call must come from admin.");
         timelock.queueTransaction(target, value, signature, data, eta);
 
         // Queue Transaction
         vm.prank(alice);
         timelock.queueTransaction(target, value, signature, data, eta);
 
-        bytes32 txHash = keccak256(
-            abi.encode(target, value, signature, data, eta)
-        );
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
 
         vm.assertEq(timelock.queuedTransactions(txHash), true);
     }
@@ -104,7 +88,7 @@ contract TimelockTest is Test {
 
         bytes memory data = abi.encode(3 days);
 
-        uint eta = block.timestamp + 2 days;
+        uint256 eta = block.timestamp + 2 days;
 
         // Queue Transaction
         vm.prank(alice);
@@ -112,17 +96,12 @@ contract TimelockTest is Test {
 
         // Execute Transaction
         vm.prank(address(this));
-        vm.expectRevert(
-            "Timelock::executeTransaction: Call must come from admin."
-        );
+        vm.expectRevert("Timelock::executeTransaction: Call must come from admin.");
         timelock.executeTransaction(target, value, signature, data, eta);
-
 
         vm.prank(alice);
 
-        bytes32 txHash = keccak256(
-            abi.encode(target, value, signature, data, eta)
-        );
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
         vm.assertEq(timelock.queuedTransactions(txHash), true);
 
         vm.assertEq(timelock.delay(), 2 hours);
