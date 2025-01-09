@@ -237,7 +237,7 @@ contract DaoFactoryTest is Test {
             10,
             100,
             1000,
-            0, 
+            0,
             100
         );
     }
@@ -264,7 +264,7 @@ contract DaoFactoryTest is Test {
         );
 
         bytes32 daoId = keccak256(abi.encodePacked("Test DAO"));
-        
+
         // Update social config
         DAOFactory.SocialConfig memory newConfig = DAOFactory.SocialConfig({
             description: "Updated Description",
@@ -273,7 +273,7 @@ contract DaoFactoryTest is Test {
             twitter: "https://twitter.com/updated",
             telegram: "https://t.me/updated"
         });
-        
+
         daoFactory.updateDAOSocialConfig(daoId, newConfig);
 
         // Verify update
@@ -287,7 +287,7 @@ contract DaoFactoryTest is Test {
 
     function testCannotUpdateNonExistentDAO() public {
         bytes32 nonExistentDaoId = keccak256(abi.encodePacked("Non Existent DAO"));
-        
+
         vm.expectRevert("DAO does not exist");
         daoFactory.updateDAOSocialConfig(
             nonExistentDaoId,

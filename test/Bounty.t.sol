@@ -158,10 +158,10 @@ contract BountyTest is Test {
     function test_RevertWhen_AddingProposalBountyForInvalidProposal() public {
         uint256 proposalId = 0;
         uint256 amount = 50e18;
-        
+
         // Set proposal state to something other than Succeeded (4)
         governance.setProposalState(proposalId, uint8(3)); // Pending state
-        
+
         vm.prank(user1);
         vm.expectRevert("Invalid proposal state");
         bounty.addProposalBounty(proposalId, amount);

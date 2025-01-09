@@ -111,7 +111,7 @@ contract TimelockTest is Test {
         address target = address(timelock);
         uint256 value = 0;
         string memory signature = "setDelay(uint256)";
-        bytes memory data = abi.encode(timelock.MAXIMUM_DELAY() -1);
+        bytes memory data = abi.encode(timelock.MAXIMUM_DELAY() - 1);
         uint256 eta = block.timestamp + 2 days;
 
         // Queue Transaction
@@ -128,8 +128,6 @@ contract TimelockTest is Test {
 
         // Warp to after timelock period
         vm.warp(block.timestamp + 2 days + timelock.delay() + 1);
-
-
     }
 
     function test__executeExpiredTransaction() public {

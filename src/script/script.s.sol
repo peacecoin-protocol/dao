@@ -61,12 +61,11 @@ contract script is Script {
             socialConfig,
             address(mockERC20),
             votingDelay,
-            votingPeriod, 
+            votingPeriod,
             proposalThreshold,
             quorum,
             timelockDelay
         );
-
 
         console.log("PCE Token: ", address(mockERC20));
         console.log("PCE Gov Token: ", address(pceGovToken));

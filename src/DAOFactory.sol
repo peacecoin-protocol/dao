@@ -166,26 +166,16 @@ contract DAOFactory is Ownable {
 
     function updateDAOSocialConfig(bytes32 daoId, SocialConfig memory newConfig) external {
         require(daos[daoId].exists, "DAO does not exist");
-        
+
         daos[daoId].socialConfig = newConfig;
 
         emit DAOSocialConfigUpdated(
-            daoId,
-            newConfig.description,
-            newConfig.website, 
-            newConfig.linkedin,
-            newConfig.twitter,
-            newConfig.telegram
+            daoId, newConfig.description, newConfig.website, newConfig.linkedin, newConfig.twitter, newConfig.telegram
         );
     }
 
     event DAOSocialConfigUpdated(
-        bytes32 indexed daoId,
-        string description,
-        string website,
-        string linkedin,
-        string twitter,
-        string telegram
+        bytes32 indexed daoId, string description, string website, string linkedin, string twitter, string telegram
     );
 }
 
