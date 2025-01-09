@@ -106,4 +106,47 @@ contract TimelockTest is Test {
 
         vm.assertEq(timelock.delay(), 2 hours);
     }
+
+    function test__executeTransaction() public {
+        address target = address(timelock);
+        uint256 value = 0;
+        string memory signature = "setDelay(uint256)";
+        bytes memory data = abi.encode(timelock.MAXIMUM_DELAY() - 1);
+        uint256 eta = block.timestamp + 2 days;
+
+        // Queue Transaction
+        vm.prank(alice);
+        timelock.queueTransaction(target, value, signature, data, eta);
+
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+
+        vm.assertEq(timelock.queuedTransactions(txHash), true);
+        // Try to execute too early
+        vm.prank(alice);
+        vm.expectRevert("Timelock::executeTransaction: Transaction hasn't surpassed time lock.");
+        timelock.executeTransaction(target, value, signature, data, eta);
+
+        // Warp to after timelock period
+        vm.warp(block.timestamp + 2 days + timelock.delay() + 1);
+    }
+
+    function test__executeExpiredTransaction() public {
+        address target = address(timelock);
+        uint256 value = 0;
+        string memory signature = "setDelay(uint256)";
+        bytes memory data = abi.encode(3 days);
+        uint256 eta = block.timestamp + 2 days;
+
+        // Queue Transaction
+        vm.prank(alice);
+        timelock.queueTransaction(target, value, signature, data, eta);
+
+        // Warp to after grace period
+        vm.warp(eta + 14 days + 1);
+
+        // Try to execute expired transaction
+        vm.prank(alice);
+        vm.expectRevert("Timelock::executeTransaction: Transaction is stale.");
+        timelock.executeTransaction(target, value, signature, data, eta);
+    }
 }

@@ -199,4 +199,105 @@ contract DaoFactoryTest is Test {
             100
         );
     }
+
+    function testCannotCreateDAOWithoutSettingBytecode() public {
+        vm.expectRevert("Governor token bytecode not set");
+        daoFactory.createDAO(
+            "Test DAO",
+            DAOFactory.SocialConfig({
+                description: "Test Description",
+                website: "https://test.com",
+                linkedin: "https://linkedin.com/test",
+                twitter: "https://twitter.com/test",
+                telegram: "https://t.me/test"
+            }),
+            address(pceToken),
+            10,
+            100,
+            1000,
+            400,
+            100
+        );
+    }
+
+    function testCannotCreateDAOWithInvalidQuorum() public {
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
+        vm.expectRevert("Quorum cannot be zero");
+        daoFactory.createDAO(
+            "Test DAO",
+            DAOFactory.SocialConfig({
+                description: "Test Description",
+                website: "https://test.com",
+                linkedin: "https://linkedin.com/test",
+                twitter: "https://twitter.com/test",
+                telegram: "https://t.me/test"
+            }),
+            address(pceToken),
+            10,
+            100,
+            1000,
+            0,
+            100
+        );
+    }
+
+    function testDAOSocialConfigUpdate() public {
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
+        // Create initial DAO
+        daoFactory.createDAO(
+            "Test DAO",
+            DAOFactory.SocialConfig({
+                description: "Test Description",
+                website: "https://test.com",
+                linkedin: "https://linkedin.com/test",
+                twitter: "https://twitter.com/test",
+                telegram: "https://t.me/test"
+            }),
+            address(pceToken),
+            10,
+            100,
+            1000,
+            400,
+            100
+        );
+
+        bytes32 daoId = keccak256(abi.encodePacked("Test DAO"));
+
+        // Update social config
+        DAOFactory.SocialConfig memory newConfig = DAOFactory.SocialConfig({
+            description: "Updated Description",
+            website: "https://updated.com",
+            linkedin: "https://linkedin.com/updated",
+            twitter: "https://twitter.com/updated",
+            telegram: "https://t.me/updated"
+        });
+
+        daoFactory.updateDAOSocialConfig(daoId, newConfig);
+
+        // Verify update
+        DAOFactory.DAOConfig memory updatedDao = daoFactory.getDAO(daoId);
+        assertEq(updatedDao.socialConfig.description, "Updated Description");
+        assertEq(updatedDao.socialConfig.website, "https://updated.com");
+        assertEq(updatedDao.socialConfig.linkedin, "https://linkedin.com/updated");
+        assertEq(updatedDao.socialConfig.twitter, "https://twitter.com/updated");
+        assertEq(updatedDao.socialConfig.telegram, "https://t.me/updated");
+    }
+
+    function testCannotUpdateNonExistentDAO() public {
+        bytes32 nonExistentDaoId = keccak256(abi.encodePacked("Non Existent DAO"));
+
+        vm.expectRevert("DAO does not exist");
+        daoFactory.updateDAOSocialConfig(
+            nonExistentDaoId,
+            DAOFactory.SocialConfig({
+                description: "Updated Description",
+                website: "https://updated.com",
+                linkedin: "https://linkedin.com/updated",
+                twitter: "https://twitter.com/updated",
+                telegram: "https://t.me/updated"
+            })
+        );
+    }
 }
