@@ -11,6 +11,7 @@ contract MockERC20Script is Script {
 
         MockERC20 mockERC20 = new MockERC20();
         mockERC20.initialize();
+        // mockERC20.mint();
 
         vm.stopBroadcast();
     }

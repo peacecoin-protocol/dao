@@ -9,6 +9,7 @@ import "../Governance/GovernorAlpha.sol";
 import "../Governance/Timelock.sol";
 import "../ContractFactory.sol";
 import "../DAOFactory.sol";
+import "../PCECommunityGovToken.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -39,6 +40,33 @@ contract script is Script {
 
         ContractFactory contractFactory = new ContractFactory(msg.sender);
         DAOFactory daoFactory = new DAOFactory();
+        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+
+        DAOFactory.SocialConfig memory socialConfig = DAOFactory.SocialConfig({
+            description: "PCE DAO",
+            website: "https://pce.com",
+            linkedin: "",
+            twitter: "",
+            telegram: ""
+        });
+
+        uint256 votingDelay = 1; // 1 block
+        uint256 votingPeriod = 86400; // ~13 days
+        uint256 proposalThreshold = 100e18;
+        uint256 quorum = 1000e18;
+        uint256 timelockDelay = 123;
+
+        daoFactory.createDAO(
+            "PCE DAO",
+            socialConfig,
+            address(mockERC20),
+            votingDelay,
+            votingPeriod, 
+            proposalThreshold,
+            quorum,
+            timelockDelay
+        );
+
 
         console.log("PCE Token: ", address(mockERC20));
         console.log("PCE Gov Token: ", address(pceGovToken));

@@ -22,7 +22,7 @@ contract DAOFactory is Ownable {
         uint256 votingDelay;
         uint256 votingPeriod;
         uint256 proposalThreshold;
-        uint256 quorumPercentage;
+        uint256 quorum;
         SocialConfig socialConfig;
         bool exists;
     }
@@ -65,7 +65,7 @@ contract DAOFactory is Ownable {
         uint256 votingDelay,
         uint256 votingPeriod,
         uint256 proposalThreshold,
-        uint256 quorumPercentage,
+        uint256 quorum,
         uint256 timelockDelay
     ) external returns (bytes32) {
         require(communityToken != address(0), "Invalid governance token");
@@ -83,10 +83,12 @@ contract DAOFactory is Ownable {
         address timelockAddress = deploy(timelockBytecodeWithConstructorArgs);
 
         // Deploy Governance Token
+        require(governanceTokenBytecode.length > 0, "Governor token bytecode not set");
         address governanceTokenAddress = deploy(governanceTokenBytecode);
         IGovernanceToken(governanceTokenAddress).initialize(communityToken);
 
         // Deploy Governor
+        require(quorum > 0, "Quorum cannot be zero");
 
         bytes memory governorBytecode = type(GovernorAlpha).creationCode;
         bytes memory governorConstructorArgs = abi.encode(
@@ -96,7 +98,7 @@ contract DAOFactory is Ownable {
             votingDelay,
             votingPeriod,
             proposalThreshold,
-            quorumPercentage
+            quorum
         );
         bytes memory governorBytecodeWithConstructorArgs = abi.encodePacked(governorBytecode, governorConstructorArgs);
         address governorAddress = deploy(governorBytecodeWithConstructorArgs);
@@ -113,7 +115,7 @@ contract DAOFactory is Ownable {
             votingDelay: votingDelay,
             votingPeriod: votingPeriod,
             proposalThreshold: proposalThreshold,
-            quorumPercentage: quorumPercentage,
+            quorum: quorum,
             socialConfig: socialConfig,
             exists: true
         });
@@ -161,6 +163,30 @@ contract DAOFactory is Ownable {
         // Emit an event with the address of the new contract
         emit ContractDeployed(deployedAddress);
     }
+
+    function updateDAOSocialConfig(bytes32 daoId, SocialConfig memory newConfig) external {
+        require(daos[daoId].exists, "DAO does not exist");
+        
+        daos[daoId].socialConfig = newConfig;
+
+        emit DAOSocialConfigUpdated(
+            daoId,
+            newConfig.description,
+            newConfig.website, 
+            newConfig.linkedin,
+            newConfig.twitter,
+            newConfig.telegram
+        );
+    }
+
+    event DAOSocialConfigUpdated(
+        bytes32 indexed daoId,
+        string description,
+        string website,
+        string linkedin,
+        string twitter,
+        string telegram
+    );
 }
 
 interface IGovernanceToken {

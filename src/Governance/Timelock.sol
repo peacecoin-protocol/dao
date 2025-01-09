@@ -37,6 +37,8 @@ contract Timelock {
 
     function updateVariables(uint256 gracePeriod_, uint256 minDelay_, uint256 maxDelay_) public {
         require(msg.sender == address(this), "Timelock::updateVariables: Call must come from Timelock.");
+        require(minDelay_ >= MINIMUM_DELAY, "Timelock::updateVariables: Minimum delay must exceed minimum delay.");
+        require(maxDelay_ <= MAXIMUM_DELAY, "Timelock::updateVariables: Maximum delay must not exceed maximum delay.");
         GRACE_PERIOD = gracePeriod_;
         MINIMUM_DELAY = minDelay_;
         MAXIMUM_DELAY = maxDelay_;

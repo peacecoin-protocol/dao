@@ -211,4 +211,75 @@ contract GovernorAlphaTest is Test {
         assertEq(initialAmount + 100, pceToken.balanceOf(alice));
         assertEq(initialAmount - 100, pceToken.balanceOf(address(timelock)));
     }
+
+ 
+
+    function test__proposalState() public {
+        test__propose();
+        
+        // Should be Pending right after creation
+        assertEq(uint(gov.state(1)), uint(GovernorAlpha.ProposalState.Pending));
+        
+        // Move to Active state
+        vm.roll(block.number + gov.votingDelay() + 1);
+        assertEq(uint(gov.state(1)), uint(GovernorAlpha.ProposalState.Active));
+        
+        // Cast some votes
+        vm.prank(alice);
+        gov.castVote(1, true);
+        
+        // Move to end of voting period
+        vm.roll(block.number + gov.votingPeriod());
+        assertEq(uint(gov.state(1)), uint(GovernorAlpha.ProposalState.Succeeded));
+    }
+
+    function test__doubleVotePrevention() public {
+        test__propose();
+        
+        vm.roll(block.timestamp + gov.votingPeriod());
+        
+        vm.prank(alice);
+        gov.castVote(1, true);
+        
+        vm.prank(alice);
+        vm.expectRevert("GovernorAlpha::_castVote: voter already voted");
+        gov.castVote(1, true);
+    }
+
+    function test__votingPeriodBoundaries() public {
+        test__propose();
+        
+        // Too early to vote
+        vm.prank(alice);
+        vm.expectRevert("GovernorAlpha::_castVote: voting is closed");
+        gov.castVote(1, true);
+        
+        // Move to just after voting delay
+        vm.roll(block.number + gov.votingDelay() + 1);
+        vm.prank(alice);
+        gov.castVote(1, true); // Should succeed
+        
+        // Move past voting period
+        vm.roll(block.number + gov.votingPeriod() + 1);
+        vm.prank(bob);
+        vm.expectRevert("GovernorAlpha::_castVote: voting is closed");
+        gov.castVote(1, true);
+    }
+
+    function test__queueInvalidStates() public {
+        test__propose();
+        
+        // Can't queue before voting period ends
+        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        gov.queue(1);
+        
+        // Move to voting period and defeat the proposal
+        vm.roll(block.number + gov.votingDelay() + 1);
+        vm.prank(alice);
+        gov.castVote(1, false);
+        
+        vm.roll(block.number + gov.votingPeriod());
+        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        gov.queue(1);
+    }
 }

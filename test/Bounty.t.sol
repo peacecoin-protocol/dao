@@ -142,4 +142,85 @@ contract BountyTest is Test {
         bounty.recoverERC20(token);
         assertEq(token.balanceOf(address(bounty)), 0);
     }
+
+    function test_RevertWhen_NonOwnerSetsContributor() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
+        bounty.setContributor(user2, true);
+    }
+
+    function test_RevertWhen_NonOwnerSetsBountyAmount() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
+        bounty.setBountyAmount(100e18);
+    }
+
+    function test_RevertWhen_AddingProposalBountyForInvalidProposal() public {
+        uint256 proposalId = 0;
+        uint256 amount = 50e18;
+        
+        // Set proposal state to something other than Succeeded (4)
+        governance.setProposalState(proposalId, uint8(3)); // Pending state
+        
+        vm.prank(user1);
+        vm.expectRevert("Invalid proposal state");
+        bounty.addProposalBounty(proposalId, amount);
+    }
+
+    function test_RevertWhen_AddingZeroBounty() public {
+        vm.prank(user1);
+        vm.expectRevert("Amount must be greater than 0");
+        bounty.addContributorBounty(user2, 0);
+
+        vm.prank(user1);
+        vm.expectRevert("Amount must be greater than 0");
+        bounty.addProposalBounty(0, 0);
+    }
+
+    function test_RevertWhen_NonContributorClaimsBounty() public {
+        uint256 amount = 50e18;
+        bounty.addContributorBounty(user1, amount);
+
+        vm.prank(user2);
+        vm.expectRevert("Nothing to withdraw");
+        bounty.claimContributorBounty();
+    }
+
+    function test_RevertWhen_ClaimingProposalBountyWithoutValidProposal() public {
+        vm.prank(user1);
+        vm.expectRevert("Nothing to withdraw");
+        bounty.claimProposalBounty();
+    }
+
+    function test_MultipleContributorBounties() public {
+        uint256 amount1 = 50e18;
+        uint256 amount2 = 30e18;
+
+        // Setup contributor
+        bounty.setContributor(user1, true);
+
+        // Add multiple bounties
+        bounty.addContributorBounty(user1, amount1);
+        bounty.addContributorBounty(user1, amount2);
+
+        // Verify total bounty
+        (uint256 bountyAmount, uint256 withdrawn) = bounty.contributorBounties(user1);
+        assertEq(bountyAmount, amount1 + amount2);
+        assertEq(withdrawn, 0);
+
+        // Claim bounty
+        vm.prank(user1);
+        bounty.claimContributorBounty();
+
+        // Verify claim
+        (bountyAmount, withdrawn) = bounty.contributorBounties(user1);
+        assertEq(withdrawn, amount1 + amount2);
+        assertEq(token.balanceOf(user1), INITIAL_BALANCE + amount1 + amount2 + BOUNTY_AMOUNT);
+    }
+
+    function test_RevertWhen_NonOwnerRecoversERC20() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
+        bounty.recoverERC20(token);
+    }
 }
