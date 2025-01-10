@@ -28,7 +28,7 @@ contract script is Script {
         mockERC20.mint(address(this), pceTokenAmount);
 
         PCEGovTokenTest pceGovToken = new PCEGovTokenTest();
-        pceGovToken.initialize(address(this));
+        pceGovToken.initialize();
         pceGovToken.delegate(address(this));
 
         Timelock timelock = new Timelock(alice, 10 minutes);

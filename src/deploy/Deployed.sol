@@ -10,7 +10,7 @@ contract Deployed is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         PCEGovTokenTest bounty = new PCEGovTokenTest();
-        bounty.initialize(0x59178bAc7A9BBfa287F39887EAA2826666f14A2a);
+        bounty.initialize();
         vm.stopBroadcast();
     }
 }
