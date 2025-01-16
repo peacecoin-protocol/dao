@@ -16,6 +16,7 @@ import {console} from "forge-std/console.sol";
 contract script is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
+        address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 
         address alice = address(0xABCD);
@@ -25,11 +26,11 @@ contract script is Script {
 
         MockERC20 mockERC20 = new MockERC20(); // PCE Token
         mockERC20.initialize();
-        mockERC20.mint(address(this), pceTokenAmount);
+        mockERC20.mint(deployerAddress, pceTokenAmount);
 
         PCEGovTokenTest pceGovToken = new PCEGovTokenTest();
-        pceGovToken.initialize(address(this));
-        pceGovToken.delegate(address(this));
+        pceGovToken.initialize();
+        pceGovToken.delegate(deployerAddress);
 
         Timelock timelock = new Timelock(alice, 10 minutes);
         GovernorAlpha gov =
@@ -38,7 +39,7 @@ contract script is Script {
         Bounty bounty = new Bounty(); // Deploy Bounty Contract
         bounty.initialize(ERC20Upgradeable(address(mockERC20)), _bountyAmount, address(gov));
 
-        ContractFactory contractFactory = new ContractFactory(msg.sender);
+        ContractFactory contractFactory = new ContractFactory(deployerAddress);
         DAOFactory daoFactory = new DAOFactory();
         daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
 
@@ -51,7 +52,7 @@ contract script is Script {
         });
 
         uint256 votingDelay = 1; // 1 block
-        uint256 votingPeriod = 86400; // ~13 days
+        uint256 votingPeriod = 100; // ~100 blocks
         uint256 proposalThreshold = 100e18;
         uint256 quorum = 1000e18;
         uint256 timelockDelay = 123;
