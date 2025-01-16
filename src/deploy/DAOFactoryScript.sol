@@ -4,6 +4,8 @@ pragma solidity 0.8.25;
 import "forge-std/Script.sol";
 import {DAOFactory} from "../DAOFactory.sol";
 import {PCECommunityGovToken} from "../PCECommunityGovToken.sol";
+import {GovernorAlpha} from "../Governance/GovernorAlpha.sol";
+import {Timelock} from "../Governance/Timelock.sol";
 
 contract DAOFactoryScript is Script {
     function run() external {
@@ -13,7 +15,7 @@ contract DAOFactoryScript is Script {
         address deployerAddress = vm.addr(deployerPrivateKey);
 
         DAOFactory daoFactory = new DAOFactory();
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         vm.stopBroadcast();
     }
