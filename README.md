@@ -91,7 +91,7 @@ anvil
 ### Deploy Contract on Anvil Local Testnet
 
 ```shell
-forge script 'src/deploy/script.s.sol:script' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
+forge script 'src/script/script.s.sol:script' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
 ```
 
 ### Setting up a local Subgraph Environment
