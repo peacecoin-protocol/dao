@@ -2,8 +2,6 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Governance/GovernorAlpha.sol";
-import "./Governance/Timelock.sol";
 
 contract DAOFactory is Ownable {
     struct SocialConfig {
@@ -35,6 +33,8 @@ contract DAOFactory is Ownable {
     uint256 public totalDAOs;
 
     bytes public governanceTokenBytecode;
+    bytes public timelockBytecode;
+    bytes public governorBytecode;
 
     event ContractDeployed(address contractAddress);
 
@@ -54,8 +54,10 @@ contract DAOFactory is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
-    function setBytecodeForGovernorToken(bytes calldata _bytecode) external onlyOwner {
-        governanceTokenBytecode = _bytecode;
+    function setByteCodes(bytes calldata _governorBytecode, bytes calldata _timelockBytecode, bytes calldata _governanceTokenBytecode) external onlyOwner {
+        governorBytecode = _governorBytecode;
+        timelockBytecode = _timelockBytecode;
+        governanceTokenBytecode = _governanceTokenBytecode;
     }
 
     function createDAO(
@@ -77,7 +79,6 @@ contract DAOFactory is Ownable {
         require(!daos[daoId].exists, "DAO already exists");
         // Deploy Timelock
 
-        bytes memory timelockBytecode = type(Timelock).creationCode;
         bytes memory timelockConstructorArgs = abi.encode(address(this), timelockDelay);
         bytes memory timelockBytecodeWithConstructorArgs = abi.encodePacked(timelockBytecode, timelockConstructorArgs);
         address timelockAddress = deploy(timelockBytecodeWithConstructorArgs);
@@ -90,7 +91,7 @@ contract DAOFactory is Ownable {
         // Deploy Governor
         require(quorum > 0, "Quorum cannot be zero");
 
-        bytes memory governorBytecode = type(GovernorAlpha).creationCode;
+
         bytes memory governorConstructorArgs = abi.encode(
             daoName,
             address(governanceTokenAddress),
@@ -103,8 +104,8 @@ contract DAOFactory is Ownable {
         bytes memory governorBytecodeWithConstructorArgs = abi.encodePacked(governorBytecode, governorConstructorArgs);
         address governorAddress = deploy(governorBytecodeWithConstructorArgs);
 
-        Timelock(timelockAddress).setPendingAdmin(governorAddress);
-        GovernorAlpha(governorAddress).__acceptAdmin();
+        ITimelock(timelockAddress).setPendingAdmin(governorAddress);
+        IGovernorAlpha(governorAddress).__acceptAdmin();
 
         // Store DAO configuration
         daos[daoId] = DAOConfig({
@@ -182,4 +183,12 @@ contract DAOFactory is Ownable {
 interface IGovernanceToken {
     function owner() external view returns (address);
     function initialize(address _communityToken) external;
+}
+
+interface ITimelock {
+    function setPendingAdmin(address newAdmin) external;
+}
+
+interface IGovernorAlpha {
+    function __acceptAdmin() external;
 }

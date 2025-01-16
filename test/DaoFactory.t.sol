@@ -37,7 +37,7 @@ contract DaoFactoryTest is Test {
         // Set bytecode for governor token
         console.log("Setting bytecode for governor token");
         console.logBytes(type(PCECommunityGovToken).creationCode);
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         // Create DAO
         daoFactory.createDAO(
@@ -137,7 +137,7 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDAOWithInvalidParameters() public {
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         // Test with zero address for governance token
         vm.expectRevert("Invalid governance token");
@@ -160,7 +160,7 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDuplicateDAO() public {
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         // Create first DAO
         daoFactory.createDAO(
@@ -221,7 +221,7 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDAOWithInvalidQuorum() public {
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         vm.expectRevert("Quorum cannot be zero");
         daoFactory.createDAO(
@@ -243,7 +243,7 @@ contract DaoFactoryTest is Test {
     }
 
     function testDAOSocialConfigUpdate() public {
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         // Create initial DAO
         daoFactory.createDAO(

@@ -10,6 +10,8 @@ import "../Governance/Timelock.sol";
 import "../ContractFactory.sol";
 import "../DAOFactory.sol";
 import "../PCECommunityGovToken.sol";
+import "../Governance/GovernorAlpha.sol";
+import "../Governance/Timelock.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -41,7 +43,7 @@ contract script is Script {
 
         ContractFactory contractFactory = new ContractFactory(deployerAddress);
         DAOFactory daoFactory = new DAOFactory();
-        daoFactory.setBytecodeForGovernorToken(type(PCECommunityGovToken).creationCode);
+        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
 
         DAOFactory.SocialConfig memory socialConfig = DAOFactory.SocialConfig({
             description: "PCE DAO",
