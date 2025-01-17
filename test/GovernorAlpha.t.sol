@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
@@ -36,10 +36,12 @@ contract GovernorAlphaTest is Test {
         pceToken = new MockGovToken();
         pceToken.initialize();
 
-        timelock = new Timelock(alice, 10 minutes);
+        timelock = new Timelock();
+        timelock.initialize(alice, 10 minutes);
 
         // Updated constructor parameters
-        gov = new GovernorAlpha("PCE DAO", pceToken, address(timelock), 1, 86400, 100e18, 1000e18);
+        gov = new GovernorAlpha();
+        gov.initialize("PCE DAO", address(pceToken), address(timelock), 1, 86400, 100e18, 1000e18);
 
         pceToken.mint(address(this), initialAmount);
         pceToken.mint(alice, initialAmount);

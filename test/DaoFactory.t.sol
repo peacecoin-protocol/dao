@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
@@ -27,6 +27,11 @@ contract DaoFactoryTest is Test {
         daoFactory = new DAOFactory();
         pceToken = new PCECommunityGovToken();
         pceToken.initialize(address(testERC20));
+
+        Timelock _timelock = new Timelock();
+        GovernorAlpha _gov = new GovernorAlpha();
+        daoFactory.setImplementation(address(_timelock), address(_gov), address(pceToken));
+
         testERC20.approve(address(pceToken), 1000000);
         pceToken.deposit(1000000);
         pceToken.delegate(address(alice));
@@ -34,11 +39,6 @@ contract DaoFactoryTest is Test {
     }
 
     function testDAOCreationAndProposalFlow() public {
-        // Set bytecode for governor token
-        console.log("Setting bytecode for governor token");
-        console.logBytes(type(PCECommunityGovToken).creationCode);
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
-
         // Create DAO
         daoFactory.createDAO(
             "Test DAO",
@@ -137,7 +137,10 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDAOWithInvalidParameters() public {
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
+        Timelock timelock = new Timelock();
+        GovernorAlpha gov = new GovernorAlpha();
+
+        daoFactory.setImplementation(address(timelock), address(gov), address(pceToken));
 
         // Test with zero address for governance token
         vm.expectRevert("Invalid governance token");
@@ -160,8 +163,6 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDuplicateDAO() public {
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
-
         // Create first DAO
         daoFactory.createDAO(
             "Test DAO",
@@ -200,29 +201,7 @@ contract DaoFactoryTest is Test {
         );
     }
 
-    function testCannotCreateDAOWithoutSettingBytecode() public {
-        vm.expectRevert("Governor token bytecode not set");
-        daoFactory.createDAO(
-            "Test DAO",
-            DAOFactory.SocialConfig({
-                description: "Test Description",
-                website: "https://test.com",
-                linkedin: "https://linkedin.com/test",
-                twitter: "https://twitter.com/test",
-                telegram: "https://t.me/test"
-            }),
-            address(pceToken),
-            10,
-            100,
-            1000,
-            400,
-            100
-        );
-    }
-
     function testCannotCreateDAOWithInvalidQuorum() public {
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
-
         vm.expectRevert("Quorum cannot be zero");
         daoFactory.createDAO(
             "Test DAO",
@@ -243,8 +222,6 @@ contract DaoFactoryTest is Test {
     }
 
     function testDAOSocialConfigUpdate() public {
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
-
         // Create initial DAO
         daoFactory.createDAO(
             "Test DAO",

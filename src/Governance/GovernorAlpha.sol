@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Timelock} from "./Timelock.sol";
+pragma solidity 0.8.26;
 
 contract GovernorAlpha {
     /// @notice The name of this contract
     string public name;
 
-    uint256 public proposalMaxOperations = 10;
+    uint256 public proposalMaxOperations;
     uint256 public votingDelay;
     uint256 public votingPeriod;
     uint256 public proposalThreshold;
@@ -86,13 +83,6 @@ contract GovernorAlpha {
     /// @notice The latest proposal for each proposer
     mapping(address => uint256) public latestProposalIds;
 
-    /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 public constant DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
-
-    /// @notice The EIP-712 typehash for the ballot struct used by the contract
-    bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
-
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
         uint256 id,
@@ -118,15 +108,15 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
-    constructor(
+    function initialize(
         string memory daoName,
-        IERC20 _token,
+        address _token,
         address _timelock,
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _proposalThreshold,
         uint256 _quorumVotes
-    ) {
+    ) external {
         name = daoName;
         token = GovInterface(address(_token));
         timelock = TimelockInterface(_timelock);
@@ -135,6 +125,7 @@ contract GovernorAlpha {
         proposalThreshold = _proposalThreshold;
         quorumVotes = _quorumVotes;
         guardian = msg.sender;
+        proposalMaxOperations = 10;
     }
 
     function propose(
@@ -339,16 +330,6 @@ contract GovernorAlpha {
 
     function proposer(uint256 proposalId) public view returns (address) {
         return proposals[proposalId].proposer;
-    }
-
-    function castVoteBySig(uint256 proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
-        bytes32 domainSeparator =
-            keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
-        bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-        address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "GovernorAlpha::castVoteBySig: invalid signature");
-        return _castVote(signatory, proposalId, support);
     }
 
     function _castVote(address voter, uint256 proposalId, bool support) internal {

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
-contract Timelock {
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {console} from "forge-std/console.sol";
+
+contract Timelock is Initializable {
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
@@ -15,9 +18,9 @@ contract Timelock {
         bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta
     );
 
-    uint256 public GRACE_PERIOD = 14 days;
-    uint256 public MINIMUM_DELAY = 1 minutes;
-    uint256 public MAXIMUM_DELAY = 30 hours;
+    uint256 public GRACE_PERIOD;
+    uint256 public MINIMUM_DELAY;
+    uint256 public MAXIMUM_DELAY;
 
     address public admin;
     address public pendingAdmin;
@@ -27,7 +30,11 @@ contract Timelock {
 
     mapping(bytes32 => bool) public queuedTransactions;
 
-    constructor(address admin_, uint256 delay_) {
+    function initialize(address admin_, uint256 delay_) external initializer {
+        GRACE_PERIOD = 14 days;
+        MINIMUM_DELAY = 1 minutes;
+        MAXIMUM_DELAY = 30 hours;
+
         require(delay_ >= MINIMUM_DELAY, "Timelock::constructor: Delay must exceed minimum delay.");
         require(delay_ <= MAXIMUM_DELAY, "Timelock::setDelay: Delay must not exceed maximum delay.");
 

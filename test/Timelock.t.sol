@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
@@ -22,8 +22,11 @@ contract TimelockTest is Test {
         pceToken = new MockGovToken();
         pceToken.initialize();
 
-        timelock = new Timelock(alice, 2 hours);
-        gov = new GovernorAlpha("PCE DAO", pceToken, address(timelock), 1, 86400, 100e18, 1000e18);
+        timelock = new Timelock();
+        timelock.initialize(alice, 2 hours);
+
+        gov = new GovernorAlpha();
+        gov.initialize("PCE DAO", address(pceToken), address(timelock), 1, 86400, 100e18, 1000e18);
         pceToken.mint(address(this), initialAmount);
 
         assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
