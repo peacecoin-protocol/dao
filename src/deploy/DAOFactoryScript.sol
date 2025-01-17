@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
 import "forge-std/Script.sol";
 import {DAOFactory} from "../DAOFactory.sol";
@@ -13,9 +13,12 @@ contract DAOFactoryScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
+        address timelockAddress = address(new Timelock());
+        address governorAddress = address(new GovernorAlpha());
+        address governanceTokenAddress = address(new PCECommunityGovToken());
 
         DAOFactory daoFactory = new DAOFactory();
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
+        daoFactory.setImplementation(timelockAddress, governorAddress, governanceTokenAddress);
 
         vm.stopBroadcast();
     }

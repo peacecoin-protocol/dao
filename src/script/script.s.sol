@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.26;
 
 import "forge-std/Script.sol";
 import "../mocks/MockERC20.sol";
@@ -10,8 +10,6 @@ import "../Governance/Timelock.sol";
 import "../ContractFactory.sol";
 import "../DAOFactory.sol";
 import "../PCECommunityGovToken.sol";
-import "../Governance/GovernorAlpha.sol";
-import "../Governance/Timelock.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -34,16 +32,21 @@ contract script is Script {
         pceGovToken.initialize();
         pceGovToken.delegate(deployerAddress);
 
-        Timelock timelock = new Timelock(alice, 10 minutes);
-        GovernorAlpha gov =
-            new GovernorAlpha("PCE DAO", IERC20(address(pceGovToken)), address(timelock), 1, 86400, 100e18, 1000e18);
+        Timelock timelock = new Timelock();
+        GovernorAlpha gov = new GovernorAlpha();
 
         Bounty bounty = new Bounty(); // Deploy Bounty Contract
         bounty.initialize(ERC20Upgradeable(address(mockERC20)), _bountyAmount, address(gov));
 
+        timelock.initialize(address(this), 10 minutes);
+        gov.initialize("PCE DAO", address(pceGovToken), address(timelock), 1, 86400, 100e18, 1000e18);
+
         ContractFactory contractFactory = new ContractFactory(deployerAddress);
         DAOFactory daoFactory = new DAOFactory();
-        daoFactory.setByteCodes(type(GovernorAlpha).creationCode, type(Timelock).creationCode, type(PCECommunityGovToken).creationCode);
+
+        PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
+
+        daoFactory.setImplementation(address(timelock), address(gov), address(pceCommunityGovToken));
 
         DAOFactory.SocialConfig memory socialConfig = DAOFactory.SocialConfig({
             description: "PCE DAO",
@@ -57,7 +60,7 @@ contract script is Script {
         uint256 votingPeriod = 100; // ~100 blocks
         uint256 proposalThreshold = 100e18;
         uint256 quorum = 1000e18;
-        uint256 timelockDelay = 123;
+        uint256 timelockDelay = 100;
 
         daoFactory.createDAO(
             "PCE DAO",

@@ -2,8 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract DAOFactory is Ownable {
+    using Clones for address;
+
     struct SocialConfig {
         string description;
         string website;
@@ -32,9 +35,9 @@ contract DAOFactory is Ownable {
     // Counter for total DAOs
     uint256 public totalDAOs;
 
-    bytes public governanceTokenBytecode;
-    bytes public timelockBytecode;
-    bytes public governorBytecode;
+    address public timelockImplementation;
+    address public governorImplementation;
+    address public governanceTokenImplementation;
 
     event ContractDeployed(address contractAddress);
 
@@ -54,10 +57,14 @@ contract DAOFactory is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
-    function setByteCodes(bytes calldata _governorBytecode, bytes calldata _timelockBytecode, bytes calldata _governanceTokenBytecode) external onlyOwner {
-        governorBytecode = _governorBytecode;
-        timelockBytecode = _timelockBytecode;
-        governanceTokenBytecode = _governanceTokenBytecode;
+    function setImplementation(
+        address _timelockImplementation,
+        address _governorImplementation,
+        address _governanceTokenImplementation
+    ) external onlyOwner {
+        timelockImplementation = _timelockImplementation;
+        governorImplementation = _governorImplementation;
+        governanceTokenImplementation = _governanceTokenImplementation;
     }
 
     function createDAO(
@@ -77,32 +84,31 @@ contract DAOFactory is Ownable {
 
         bytes32 daoId = keccak256(abi.encodePacked(daoName));
         require(!daos[daoId].exists, "DAO already exists");
-        // Deploy Timelock
 
-        bytes memory timelockConstructorArgs = abi.encode(address(this), timelockDelay);
-        bytes memory timelockBytecodeWithConstructorArgs = abi.encodePacked(timelockBytecode, timelockConstructorArgs);
-        address timelockAddress = deploy(timelockBytecodeWithConstructorArgs);
+        // Deploy Timelock
+        require(timelockImplementation != address(0), "Timelock implementation not set");
+        address timelockAddress = timelockImplementation.clone();
+        ITimelock(timelockAddress).initialize(address(this), timelockDelay);
 
         // Deploy Governance Token
-        require(governanceTokenBytecode.length > 0, "Governor token bytecode not set");
-        address governanceTokenAddress = deploy(governanceTokenBytecode);
+        require(governanceTokenImplementation != address(0), "Governor token address not set");
+        address governanceTokenAddress = governanceTokenImplementation.clone();
         IGovernanceToken(governanceTokenAddress).initialize(communityToken);
 
         // Deploy Governor
         require(quorum > 0, "Quorum cannot be zero");
 
-
-        bytes memory governorConstructorArgs = abi.encode(
+        require(governorImplementation != address(0), "Governor implementation not set");
+        address governorAddress = governorImplementation.clone();
+        IGovernorAlpha(governorAddress).initialize(
             daoName,
-            address(governanceTokenAddress),
+            governanceTokenAddress,
             address(timelockAddress),
             votingDelay,
             votingPeriod,
             proposalThreshold,
             quorum
         );
-        bytes memory governorBytecodeWithConstructorArgs = abi.encodePacked(governorBytecode, governorConstructorArgs);
-        address governorAddress = deploy(governorBytecodeWithConstructorArgs);
 
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
         IGovernorAlpha(governorAddress).__acceptAdmin();
@@ -154,14 +160,9 @@ contract DAOFactory is Ownable {
         // Create a new contract using assembly
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            // Create a new contract using the `create` opcode
             deployedAddress := create(0, add(bytecode, 0x20), mload(bytecode))
         }
-
-        // Check if deployment was successful
         require(deployedAddress != address(0), "Contract deployment failed");
-
-        // Emit an event with the address of the new contract
         emit ContractDeployed(deployedAddress);
     }
 
@@ -187,8 +188,18 @@ interface IGovernanceToken {
 
 interface ITimelock {
     function setPendingAdmin(address newAdmin) external;
+    function initialize(address _owner, uint256 _delay) external;
 }
 
 interface IGovernorAlpha {
     function __acceptAdmin() external;
+    function initialize(
+        string memory daoName,
+        address _token,
+        address _timelock,
+        uint256 _votingDelay,
+        uint256 _votingPeriod,
+        uint256 _proposalThreshold,
+        uint256 _quorumVotes
+    ) external;
 }
