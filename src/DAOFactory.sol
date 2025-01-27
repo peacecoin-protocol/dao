@@ -78,7 +78,7 @@ contract DAOFactory is Ownable {
         uint256 timelockDelay
     ) external returns (bytes32) {
         require(communityToken != address(0), "Invalid governance token");
-        require(IGovernanceToken(communityToken).owner() == msg.sender, "Invalid community token owner");
+        // require(IGovernanceToken(communityToken).owner() == msg.sender, "Invalid community token owner");
         require(bytes(daoName).length > 0, "Empty name not allowed");
         require(!daoNames[daoName], "DAO name already exists");
 
