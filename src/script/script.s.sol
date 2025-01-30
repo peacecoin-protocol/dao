@@ -80,5 +80,7 @@ contract script is Script {
         console.log("Bounty: ", address(bounty));
         console.log("ContractFactory: ", address(contractFactory));
         console.log("DAOFactory: ", address(daoFactory));
+
+        vm.stopBroadcast();
     }
 }
