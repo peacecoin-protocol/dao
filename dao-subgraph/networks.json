@@ -1,8 +1,12 @@
 {
   "sepolia": {
+    "Campagins": {
+      "address": "0xa7C1323B4219D9BBE50eA20569969b744da98724",
+      "startBlock": 0
+    },
     "DAOFactory": {
       "address": "0xB299A1d65bfF0edf9c2f296cf1Ecd3F719d2A84C",
-      "startBlock": 7536386
+      "startBlock": 0
     },
     "Bounty": {
       "address": "0xDE6C9a683287912b04B0a5f7ffCb494457cC7502"

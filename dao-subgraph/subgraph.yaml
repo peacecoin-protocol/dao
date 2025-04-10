@@ -5,6 +5,38 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum
+    name: Campagins
+    network: mainnet
+    source:
+      address: "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+      abi: Campagins
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - CampWinnersAdded
+        - CampWinnersClaimed
+        - CampaginCreated
+        - Initialized
+        - OwnershipTransferred
+      abis:
+        - name: Campagins
+          file: ./abis/Campagins.json
+      eventHandlers:
+        - event: CampWinnersAdded(indexed uint256,address[])
+          handler: handleCampWinnersAdded
+        - event: CampWinnersClaimed(indexed uint256,indexed address)
+          handler: handleCampWinnersClaimed
+        - event: CampaginCreated(indexed uint256,string,string,uint256,uint256,uint256,bool)
+          handler: handleCampaginCreated
+        - event: Initialized(uint64)
+          handler: handleInitialized
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+      file: ./src/campagins.ts
+  - kind: ethereum
     name: DAOFactory
     network: mainnet
     source:
