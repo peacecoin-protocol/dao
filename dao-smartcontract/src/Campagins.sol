@@ -55,7 +55,6 @@ contract Campagins is Initializable, OwnableUpgradeable {
     }
 
     function addCampWinners(uint256 _campaginId, address[] memory _winners) external onlyOwner {
-        require(campagins[_campaginId].endDate > block.timestamp, "Campagin has ended");
 
         for (uint256 i = 0; i < _winners.length; i++) {
             campWinners[_campaginId].push(_winners[i]);
