@@ -1,3 +1,43 @@
+type CampWinnersAdded @entity(immutable: true) {
+  id: Bytes!
+  campaginId: BigInt! # uint256
+  winners: [Bytes!]! # address[]
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CampWinnersClaimed @entity(immutable: true) {
+  id: Bytes!
+  campaginId: BigInt! # uint256
+  winner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CampaginCreated @entity(immutable: true) {
+  id: Bytes!
+  campaginId: BigInt! # uint256
+  title: String! # string
+  description: String! # string
+  amount: BigInt! # uint256
+  startDate: BigInt! # uint256
+  endDate: BigInt! # uint256
+  validateSignatures: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Initialized @entity(immutable: true) {
+  id: Bytes!
+  version: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 type ContractDeployed @entity(immutable: true) {
   id: Bytes!
   contractAddress: Bytes! # address
@@ -69,14 +109,6 @@ type ClaimedBounty @entity(immutable: true) {
   id: Bytes!
   user: Bytes! # address
   amount: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type Initialized @entity(immutable: true) {
-  id: Bytes!
-  version: BigInt! # uint64
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
