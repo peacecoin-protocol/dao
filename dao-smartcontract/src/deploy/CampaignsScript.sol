@@ -11,6 +11,8 @@ contract CampaignsScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
+        address PCE = 0x1F9FcC5f8DF936b8E3c9617565FfAd7fF6222b14;
+
         string memory uri = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
         string memory name = "PCE Contributor NFT";
         string memory symbol = "PCE_CONTRIBUTOR";
@@ -39,7 +41,7 @@ contract CampaignsScript is Script {
 
         Campaigns campaigns = new Campaigns();
         campaigns.initialize(
-            ERC20Upgradeable(address(0x8d4d8C9192C7df57840129D71c18ED49dda7Fe33)),
+            ERC20Upgradeable(PCE),
             sbt
         );
 

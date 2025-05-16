@@ -6,8 +6,8 @@ import "../Bounty.sol";
 
 contract BountyScript is Script {
     function run() external {
-        address pceToken = 0xf939595726798393F63Dbe098a54C7948DEF8faF;
-        address governance = 0xb21473F6103f79991546D44C1417362fF7873b90;
+        address pceToken = 0xBa9E16D096262023c50A3cCCC4f08af4b321fB21;
+        address governance = 0x4a1EBA4B4895b6562B8d67510FF07c95F90049d8;
         uint256 _bountyAmount = 10e18;
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -16,5 +16,7 @@ contract BountyScript is Script {
         Bounty bounty = new Bounty();
         bounty.initialize(ERC20Upgradeable(pceToken), _bountyAmount, governance);
         vm.stopBroadcast();
+
+        console.log("Bounty deployed at", address(bounty));
     }
 }

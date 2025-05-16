@@ -21,5 +21,10 @@ contract DAOFactoryScript is Script {
         daoFactory.setImplementation(timelockAddress, governorAddress, governanceTokenAddress);
 
         vm.stopBroadcast();
+
+        console.log("DAOFactory deployed at", address(daoFactory));
+        console.log("Timelock deployed at", address(timelockAddress));
+        console.log("GovernorAlpha deployed at", address(governorAddress));
+        console.log("GovernanceToken deployed at", address(governanceTokenAddress));
     }
 }

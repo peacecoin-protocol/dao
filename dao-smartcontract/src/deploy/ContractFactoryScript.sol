@@ -14,5 +14,7 @@ contract ContractFactoryScript is Script {
         ContractFactory factory = new ContractFactory(deployerAddress);
 
         vm.stopBroadcast();
+
+        console.log("ContractFactory deployed at", address(factory));
     }
 }
