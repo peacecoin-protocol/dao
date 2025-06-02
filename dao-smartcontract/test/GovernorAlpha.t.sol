@@ -436,16 +436,16 @@ contract GovernorAlphaTest is Test {
 
         vm.prank(alice);
         vm.expectRevert("GovernorAlpha::updateVariables: only guardian or timelock can update variables");
-        gov.updateVariables(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
+        gov.updateGovernanceParameters(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
 
         vm.prank(guardian);
-        gov.updateVariables(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
+        gov.updateGovernanceParameters(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
         assertEq(gov.quorumVotes(), quorumVotes_);
         assertEq(gov.proposalThreshold(), proposalThreshold_);
         assertEq(gov.proposalMaxOperations(), proposalMaxOperations_);
 
         vm.prank(address(timelock));
-        gov.updateVariables(quorumVotes_ + 1, proposalThreshold_ + 1, proposalMaxOperations_ + 1);
+        gov.updateGovernanceParameters(quorumVotes_ + 1, proposalThreshold_ + 1, proposalMaxOperations_ + 1);
         assertEq(gov.quorumVotes(), quorumVotes_ + 1);
         assertEq(gov.proposalThreshold(), proposalThreshold_ + 1);
         assertEq(gov.proposalMaxOperations(), proposalMaxOperations_ + 1);
