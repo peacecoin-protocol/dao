@@ -110,6 +110,11 @@ contract PEACECOINDAO_GOVERNOR {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
+    
+    event ProposalThresholdSet(uint256 oldProposalThreshold, uint256 newProposalThreshold);
+    event QuorumVotesSet(uint256 oldQuorumVotes, uint256 newQuorumVotes);
+    event ProposalMaxOperationsSet(uint256 oldProposalMaxOperations, uint256 newProposalMaxOperations);
+
     function initialize(
         string memory daoName,
         address _token,
@@ -423,6 +428,10 @@ contract PEACECOINDAO_GOVERNOR {
         quorumVotes = quorumVotes_;
         proposalThreshold = proposalThreshold_;
         proposalMaxOperations = proposalMaxOperations_;
+
+        emit QuorumVotesSet(quorumVotes, quorumVotes_);
+        emit ProposalThresholdSet(proposalThreshold, proposalThreshold_);
+        emit ProposalMaxOperationsSet(proposalMaxOperations, proposalMaxOperations_);
     }
 
     function __acceptAdmin() public {

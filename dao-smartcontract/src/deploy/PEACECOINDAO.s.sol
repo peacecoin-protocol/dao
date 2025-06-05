@@ -20,7 +20,7 @@ contract PEACECOINDAOScript is Script {
         uint256 _votingDelay = 1;
         uint256 _votingPeriod = 302400; // 1 week
         uint256 _proposalThreshold = 1e18; // 1 PCE
-        uint256 _quorumVotes = 1000e18; // 1000 PCE
+        uint256 _quorumVotes = 100e18; // 1000 PCE
         uint256 _proposalMaxOperations = 10;
         uint256 _timelockDelay = 1 days;
 

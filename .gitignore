@@ -19,6 +19,9 @@ dao-smartcontract/.DS_Store
 dao-subgraph/.DS_Store
 core/.DS_Store
 
+# env
+dao-smartcontract/.env
+
 # Optional npm cache directory
 .npm
 
