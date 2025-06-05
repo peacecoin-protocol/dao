@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.26;
+
+import "forge-std/Script.sol";
+import "../mocks/PCEGovTokenTest.sol";
+import "../Governance/PEACECOINDAO_GOVERNOR.sol";
+import "../Governance/Timelock.sol";
+
+contract PEACECOINDAOScript is Script {
+    function run() external {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
+
+        address deployerAddress = vm.addr(deployerPrivateKey);
+
+        PCEGovTokenTest pceGovToken = new PCEGovTokenTest();
+        pceGovToken.initialize();
+
+        string memory daoName = "PEACECOIN DAO";
+        uint256 _votingDelay = 1;
+        uint256 _votingPeriod = 302400; // 1 week
+        uint256 _proposalThreshold = 1e18; // 1 PCE
+        uint256 _quorumVotes = 100e18; // 1000 PCE
+        uint256 _proposalMaxOperations = 10;
+        uint256 _timelockDelay = 1 days;
+
+        PEACECOINDAO_GOVERNOR governor = new PEACECOINDAO_GOVERNOR();
+        Timelock timelock = new Timelock();
+
+        timelock.initialize(deployerAddress, _timelockDelay);
+        governor.initialize(daoName, address(pceGovToken), address(timelock), _votingDelay, _votingPeriod, _proposalThreshold, _quorumVotes);
+        timelock.setPendingAdmin(address(governor));
+        governor.__acceptAdmin();
+
+        vm.stopBroadcast();
+    }
+}
