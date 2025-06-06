@@ -18,10 +18,9 @@ contract PEACECOINDAOScript is Script {
 
         string memory daoName = "PEACECOIN DAO";
         uint256 _votingDelay = 1;
-        uint256 _votingPeriod = 302400; // 1 week
+        uint256 _votingPeriod = 288000; // 1 week
         uint256 _proposalThreshold = 1e18; // 1 PCE
-        uint256 _quorumVotes = 100e18; // 1000 PCE
-        uint256 _proposalMaxOperations = 10;
+        uint256 _quorumVotes = 1000e18; // 1000 PCE
         uint256 _timelockDelay = 1 days;
 
         PEACECOINDAO_GOVERNOR governor = new PEACECOINDAO_GOVERNOR();
