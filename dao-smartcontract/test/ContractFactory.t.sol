@@ -41,7 +41,9 @@ contract ContractFactoryTest is Test {
         vm.recordLogs();
 
         vm.prank(alice);
-        address deployedAddress = contractFactory.deploy(getBytecodeWithConstructorArgs(bytecode, _arguments));
+        address deployedAddress = contractFactory.deploy(
+            getBytecodeWithConstructorArgs(bytecode, _arguments)
+        );
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = logs[0].topics[0];

@@ -19,7 +19,11 @@ contract CampaignsTest is Test {
 
     function setUp() public {
         token = new MockERC20();
-        nft = new SBT("PCE Contributor NFT", "PCE_CONTRIBUTOR", "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/");
+        nft = new SBT(
+            "PCE Contributor NFT",
+            "PCE_CONTRIBUTOR",
+            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
+        );
 
         // Deploy Campaigns contract
         campaigns = new Campaigns();
@@ -97,7 +101,7 @@ contract CampaignsTest is Test {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", alice));
         campaigns.addCampWinners(1, _winners, _gists);
-        
+
         vm.prank(address(this));
         campaigns.addCampWinners(1, new address[](0), _gists);
     }

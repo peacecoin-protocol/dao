@@ -2,203 +2,166 @@
 
 pragma solidity 0.8.26;
 
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IWPCE.sol";
 
-import {IStaking} from "./interfaces/IStaking.sol";
-
-contract Staking is IStaking, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    ERC20Upgradeable public stakingToken;
-    ERC20Upgradeable public rewardsToken;
-
-    uint256 public rewardPerBlock;
-    uint256 public firstBlockWithReward;
-
-    uint256 public lastBlockWithReward;
+contract Staking is OwnableUpgradeable {
+    IERC20 public pce;
+    IWPCE public wPCE;
     uint256 public lastUpdateBlock;
-    uint256 public rewardPerTokenStored;
-    uint256 public rewardTokensLocked;
+    uint256 public rewardPerBlock;
+    uint256 public totalPool;
 
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    event UnusedRewardPoolRevoked(address recipient, uint256 amount);
+    event StakedPEACECOIN(uint256 amountPEACECOIN, uint256 amountxPEACECOIN, address indexed user);
+    event WithdrawnPEACECOIN(
+        uint256 amountPEACECOIN,
+        uint256 amountxPEACECOIN,
+        address indexed user
+    );
 
-    uint256 public totalStaked;
-    mapping(address => uint256) public staked;
-
-    function initialize(address _stakingToken, address _rewardsToken, address _owner) external initializer {
-        stakingToken = ERC20Upgradeable(_stakingToken);
-        rewardsToken = ERC20Upgradeable(_rewardsToken);
-
-        __Ownable_init(msg.sender);
-        transferOwnership(_owner);
-        __Pausable_init();
-        __ReentrancyGuard_init();
-    }
-
-    modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateBlock = block.number;
-        if (account != address(0)) {
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+    modifier updateRewardPool() {
+        if (totalPool == 0) {
+            lastUpdateBlock = block.number;
+        } else {
+            uint256 rewardToAdd;
+            (rewardToAdd, lastUpdateBlock) = _calculateReward();
+            totalPool += rewardToAdd;
         }
         _;
     }
 
-    /**
-     * @notice Sets the rewards period and amount
-     * @param _rewardPerBlock amount of tokens to be distributed per block
-     * @param _startingBlock block number when the rewards start
-     * @param _blocksAmount duration of the rewards period in blocks
-     */
-    function setRewards(uint256 _rewardPerBlock, uint256 _startingBlock, uint256 _blocksAmount)
-        external
-        override
-        onlyOwner
-        updateReward(address(0))
-    {
-        uint256 unlockedTokens = _getFutureRewardTokens();
+    function initialize(uint256 _rewardPerBlock, address _pce, address _wPCE) external initializer {
+        __Ownable_init(msg.sender);
 
+        require(_pce != address(0), "Invalid PCE address");
+        require(_wPCE != address(0), "Invalid WPCE address");
+        require(_rewardPerBlock > 0, "Reward per block must be greater than 0");
+
+        lastUpdateBlock = block.number;
         rewardPerBlock = _rewardPerBlock;
-        firstBlockWithReward = _startingBlock;
-        lastBlockWithReward = firstBlockWithReward + _blocksAmount - 1;
 
-        uint256 lockedTokens = _getFutureRewardTokens();
-        uint256 rewardBalance = address(stakingToken) != address(rewardsToken)
-            ? rewardsToken.balanceOf(address(this))
-            : stakingToken.balanceOf(address(this)) - totalStaked;
-
-        rewardTokensLocked = rewardTokensLocked - unlockedTokens + lockedTokens;
-        require(rewardTokensLocked <= rewardBalance, "Not enough tokens for the rewards");
-
-        emit RewardsSet(_rewardPerBlock, firstBlockWithReward, lastBlockWithReward);
+        pce = IERC20(_pce);
+        wPCE = IWPCE(_wPCE);
     }
 
-    /**
-     * @notice Transfers non locked reward tokens to the owner
-     */
-    function recoverNonLockedRewardTokens() external override onlyOwner {
-        uint256 nonLockedTokens = address(stakingToken) != address(rewardsToken)
-            ? rewardsToken.balanceOf(address(this)) - rewardTokensLocked
-            : rewardsToken.balanceOf(address(this)) - rewardTokensLocked - totalStaked;
+    function stake(uint256 _amountPEACECOIN) external updateRewardPool {
+        require(_amountPEACECOIN > 0, "Staking: cant stake 0 tokens");
 
-        rewardsToken.transfer(owner(), nonLockedTokens);
-        emit RewardTokensRecovered(nonLockedTokens);
+        // Transfer tokens first
+        pce.transferFrom(_msgSender(), address(this), _amountPEACECOIN);
+
+        // Update totalPool before conversion calculation
+        totalPool = totalPool + _amountPEACECOIN;
+
+        uint256 amountxPEACECOIN = _convertToWPEACECOIN(_amountPEACECOIN);
+        wPCE.mint(_msgSender(), amountxPEACECOIN);
+
+        emit StakedPEACECOIN(_amountPEACECOIN, amountxPEACECOIN, _msgSender());
     }
 
-    function pause() external override onlyOwner {
-        super._pause();
+    function withdraw(uint256 _amountxPEACECOIN) external updateRewardPool {
+        require(
+            wPCE.balanceOf(_msgSender()) >= _amountxPEACECOIN,
+            "Withdraw: not enough xPEACECOIN tokens to withdraw"
+        );
+
+        uint256 amountPEACECOIN = _convertToPEACECOIN(_amountxPEACECOIN);
+        require(amountPEACECOIN > 0, "Withdraw: calculated amount is 0");
+
+        wPCE.burn(_msgSender(), _amountxPEACECOIN);
+
+        totalPool = totalPool - amountPEACECOIN;
+        require(
+            pce.balanceOf(address(this)) >= amountPEACECOIN,
+            "Withdraw: failed to transfer PEACECOIN tokens"
+        );
+        pce.transfer(_msgSender(), amountPEACECOIN);
+
+        emit WithdrawnPEACECOIN(amountPEACECOIN, _amountxPEACECOIN, _msgSender());
     }
 
-    function unpause() external override onlyOwner {
-        super._unpause();
+    function stakingReward(uint256 _amount) public view returns (uint256) {
+        return _convertToPEACECOIN(_amount);
     }
 
-    /**
-     * @notice Withdraw sender's staked amount and claimed rewards
-     */
-    function exit() external override {
-        withdraw(staked[msg.sender]);
-        getReward();
+    function getStakedPEACECOIN(address _address) public view returns (uint256) {
+        uint256 balance = wPCE.balanceOf(_address);
+        return balance > 0 ? _convertToPEACECOIN(balance) : 0;
     }
 
-    /**
-     * @notice Stakes the given amount of tokens
-     * @param _amount of tokens to stake
-     */
-    function stake(uint256 _amount) external override whenNotPaused nonReentrant updateReward(msg.sender) {
-        require(_amount > 0, "Stake: can't stake 0");
-        require(block.number < lastBlockWithReward, "Stake: staking  period is over");
-
-        totalStaked = totalStaked + _amount;
-        staked[msg.sender] = staked[msg.sender] + _amount;
-
-        stakingToken.transferFrom(msg.sender, address(this), _amount);
-        emit Staked(msg.sender, _amount);
+    function setRewardPerBlock(uint256 _amount) external onlyOwner updateRewardPool {
+        rewardPerBlock = _amount;
     }
 
-    /**
-     * @notice Withdraws the staked amount
-     * @param _amount of tokens to withdraw
-     */
-    function withdraw(uint256 _amount) public override nonReentrant updateReward(msg.sender) {
-        require(_amount > 0, "Amount should be greater then 0");
-        require(staked[msg.sender] >= _amount, "Insufficient staked amount");
-        totalStaked = totalStaked - _amount;
-        staked[msg.sender] = staked[msg.sender] - _amount;
-        stakingToken.transfer(msg.sender, _amount);
-        emit Withdrawn(msg.sender, _amount);
+    function revokeUnusedRewardPool() external onlyOwner updateRewardPool {
+        uint256 contractBalance = pce.balanceOf(address(this));
+
+        require(contractBalance > totalPool, "There are no unused tokens to revoke");
+
+        uint256 unusedTokens = contractBalance - totalPool;
+
+        pce.transfer(msg.sender, unusedTokens);
+        emit UnusedRewardPoolRevoked(msg.sender, unusedTokens);
     }
 
-    /**
-     * @notice Transfers the rewards for the sender
-     * @dev Reduces the amount of rewards tokens locked
-     */
-    function getReward() public override nonReentrant updateReward(msg.sender) {
-        uint256 reward = rewards[msg.sender];
-        if (reward > 0) {
-            rewards[msg.sender] = 0;
-            rewardsToken.transfer(msg.sender, reward);
-            rewardTokensLocked = rewardTokensLocked - reward;
+    function _convertToWPEACECOIN(uint256 _amount) public view returns (uint256) {
+        uint256 TSxPCEToken = wPCE.totalSupply();
+        (uint256 outstandingReward, ) = _calculateReward();
+        uint256 stakingPool = totalPool + outstandingReward;
 
-            emit RewardPaid(msg.sender, reward);
+        // Prevent division by zero
+        if (stakingPool == 0 || TSxPCEToken == 0) {
+            return _amount; // First staker gets 1:1 ratio
         }
+
+        return (TSxPCEToken * _amount) / stakingPool;
     }
 
-    /**
-     * @notice Returns how many blocks have passed that are eligible for rewards since the last update
-     * @return amount of blocks with rewards passed
-     */
-    function blocksWithRewardsPassed() public view override returns (uint256) {
-        uint256 from = lastUpdateBlock > firstBlockWithReward ? lastUpdateBlock : firstBlockWithReward;
-        uint256 to = block.number > lastBlockWithReward ? lastBlockWithReward : block.number;
+    function _convertToPEACECOIN(uint256 _amount) public view returns (uint256) {
+        uint256 TSxPCEToken = wPCE.totalSupply();
+        (uint256 outstandingReward, ) = _calculateReward();
+        uint256 stakingPool = totalPool + outstandingReward;
 
-        return from > to ? 0 : to - from;
-    }
-
-    /**
-     * @notice Returns the amount of accumulative rewards per staked token
-     * @return amount of cumulative rewards per staked token
-     */
-    function rewardPerToken() public view override returns (uint256) {
-        if (totalStaked == 0 || lastUpdateBlock == block.number) {
-            return rewardPerTokenStored;
+        // Prevent division by zero
+        if (TSxPCEToken == 0) {
+            return 0;
         }
-        uint256 accumulatedReward = (blocksWithRewardsPassed() * rewardPerBlock * (1e18)) / totalStaked;
 
-        return rewardPerTokenStored + accumulatedReward;
+        return (stakingPool * _amount) / TSxPCEToken;
     }
 
-    /**
-     * @notice Returns the amount of rewards earned by the account
-     * @param _account address of the account
-     * @return amount of rewards earned by the account
-     */
-    function earned(address _account) public view override returns (uint256) {
-        uint256 rewardsDifference = rewardPerToken() - userRewardPerTokenPaid[_account];
-        uint256 newlyAccumulated = (staked[_account] * rewardsDifference) / (1e18);
-        return rewards[_account] + newlyAccumulated;
+    function _calculateReward() internal view returns (uint256, uint256) {
+        uint256 blocksPassed = block.number - lastUpdateBlock;
+        uint256 updateBlock = block.number;
+
+        // Prevent division by zero
+        if (rewardPerBlock == 0) {
+            return (0, updateBlock);
+        }
+
+        uint256 blocksWithRewardFunding = (pce.balanceOf(address(this)) - totalPool) /
+            rewardPerBlock;
+        if (blocksPassed > blocksWithRewardFunding) {
+            blocksPassed = blocksWithRewardFunding;
+            updateBlock = lastUpdateBlock + blocksWithRewardFunding;
+        }
+        return (rewardPerBlock * blocksPassed, updateBlock);
     }
 
-    /**
-     * @notice Estimates how many reward tokens are still scheduled to be distributed
-     * @return amount of reward tokens
-     */
-    function _getFutureRewardTokens() internal view returns (uint256) {
-        return _calculateBlocksLeft() * rewardPerBlock;
-    }
+    function _calculateAPR() public view returns (uint256) {
+        (uint256 outstandingReward, uint256 newestBlockWithRewards) = _calculateReward();
 
-    /**
-     * @notice Calculates how many blocks are left until the end of the staking period
-     * @return amount of blocks left
-     */
-    function _calculateBlocksLeft() internal view returns (uint256) {
-        uint256 _from = firstBlockWithReward;
-        uint256 _to = lastBlockWithReward;
-        if (block.number >= _to) return 0;
-        if (block.number < _from) return _to - _from + 1;
-        return _to - block.number;
+        if (newestBlockWithRewards != block.number) {
+            return 0; // Pool is out of rewards
+        }
+        uint256 stakingPool = totalPool + outstandingReward;
+        if (stakingPool == 0) return 0;
+        uint256 SECONDS_PER_YEAR = 31536000;
+        uint256 SECONDS_PER_BLOCK = 2;
+        return
+            ((((rewardPerBlock * 1e18) / stakingPool) * SECONDS_PER_YEAR) / SECONDS_PER_BLOCK) *
+            100;
     }
 }

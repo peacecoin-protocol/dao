@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.26;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -96,14 +96,14 @@ contract DAOFactory is Ownable {
         // Deploy Governance Token
         require(governanceTokenImplementation != address(0), "Governor token address not set");
         address governanceTokenAddress = governanceTokenImplementation.clone();
-        IGovernanceToken(governanceTokenAddress).initialize(communityToken);
+        IGovernanceToken(governanceTokenAddress).initialize();
 
         // Deploy Governor
         require(quorum > 0, "Quorum cannot be zero");
 
         require(governorImplementation != address(0), "Governor implementation not set");
         address governorAddress = governorImplementation.clone();
-        IGovernorAlpha(governorAddress).initialize(
+        ICommunityGovernance(governorAddress).initialize(
             daoName,
             governanceTokenAddress,
             address(timelockAddress),
@@ -114,7 +114,7 @@ contract DAOFactory is Ownable {
         );
 
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
-        IGovernorAlpha(governorAddress).__acceptAdmin();
+        ICommunityGovernance(governorAddress).__acceptAdmin();
 
         // Store DAO configuration
         daos[daoId] = DAOConfig({
@@ -196,7 +196,7 @@ contract DAOFactory is Ownable {
 
 interface IGovernanceToken {
     function owner() external view returns (address);
-    function initialize(address _communityToken) external;
+    function initialize() external;
 }
 
 interface ITimelock {
@@ -204,7 +204,7 @@ interface ITimelock {
     function initialize(address _owner, uint256 _delay) external;
 }
 
-interface IGovernorAlpha {
+interface ICommunityGovernance {
     function __acceptAdmin() external;
     function initialize(
         string memory daoName,
