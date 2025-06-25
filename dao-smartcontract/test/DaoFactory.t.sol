@@ -154,8 +154,8 @@ contract DaoFactoryTest is Test {
         assertEq(timelock.admin(), address(governor));
 
         vm.startPrank(bob);
-
-        pceGovToken.delegate(bob);
+        MockGovToken(address(governorToken)).mint(bob, INITIAL_BALANCE);
+        MockGovToken(address(governorToken)).delegate(bob);
 
         vm.roll(block.number + 10);
 
