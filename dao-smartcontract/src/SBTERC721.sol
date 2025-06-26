@@ -21,7 +21,7 @@ contract SBTERC721 is ERC721, Ownable {
         minters[minter] = true;
     }
 
-    function transferFrom(address, address, uint256) public override {
+    function transferFrom(address, address, uint256) public pure override {
         revert("SBT: non-transferable");
     }
 }

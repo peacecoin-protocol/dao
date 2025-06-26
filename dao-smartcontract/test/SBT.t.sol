@@ -11,7 +11,11 @@ contract SBTTest is Test {
     address public bob = makeAddr("bob");
 
     function setUp() public {
-        sbt = new SBT("PCE Contributor NFT", "PCE_CONTRIBUTOR", "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/");
+        sbt = new SBT(
+            "PCE Contributor NFT",
+            "PCE_CONTRIBUTOR",
+            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
+        );
     }
 
     function test_owner() public view {

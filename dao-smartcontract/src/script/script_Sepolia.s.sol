@@ -14,15 +14,15 @@ import "../SBT.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
 import {console} from "forge-std/console.sol";
 
-contract script is Script {
+contract scriptSepolia is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 
         uint256 _bountyAmount = 0;
 
-        address PCE_TOKEN = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
+        address PCE_TOKEN = 0x8d4d8C9192C7df57840129D71c18ED49dda7Fe33;
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
 
@@ -39,6 +39,7 @@ contract script is Script {
         PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
+        // peacecoinDaoSbt.initialize("https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/");
 
         daoFactory.setImplementation(address(timelock), address(gov), address(peacecoinDaoSbt));
 
@@ -91,12 +92,22 @@ contract script is Script {
 
         vm.roll(block.number + 1);
 
+        // SBT sbt = new SBT(name, symbol, uri);
+        // sbt.setMinter(address(this));
+
+        // for (uint256 i = 1; i <= tokenURIs.length; i++) {
+        //     sbt.setTokenURI(i, tokenURIs[i]);
+        // }
+
+        // vm.roll(block.number + 1);
+
         Campaigns campaigns = new Campaigns();
+        // sbt.setMinter(address(campaigns));
         peacecoinDaoSbt.setMinter(address(campaigns));
 
         campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), SBT(address(peacecoinDaoSbt)));
 
-        ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
+        // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
         vm.roll(block.number + 1);
         Campaigns.Campaign memory _campaign = Campaigns.Campaign({

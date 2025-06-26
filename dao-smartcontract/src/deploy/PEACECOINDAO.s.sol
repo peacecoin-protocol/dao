@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "../mocks/PCEGovTokenTest.sol";
 import "../Governance/PEACECOINDAO_GOVERNOR.sol";
 import "../Governance/Timelock.sol";
+import "../Governance/PEACECOINDAO_SBT.sol";
 
 contract PEACECOINDAOScript is Script {
     function run() external {
@@ -23,11 +24,28 @@ contract PEACECOINDAOScript is Script {
         uint256 _quorumVotes = 1000e18; // 1000 PCE
         uint256 _timelockDelay = 1 days;
 
+        PEACECOINDAO_SBT sbt = new PEACECOINDAO_SBT();
+        sbt.initialize(
+            "PEACECOIN DAO SBT",
+            "PCE_SBT",
+            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
+        );
+
         PEACECOINDAO_GOVERNOR governor = new PEACECOINDAO_GOVERNOR();
         Timelock timelock = new Timelock();
 
         timelock.initialize(deployerAddress, _timelockDelay);
-        governor.initialize(daoName, address(pceGovToken), address(timelock), _votingDelay, _votingPeriod, _proposalThreshold, _quorumVotes);
+        governor.initialize(
+            daoName,
+            address(pceGovToken),
+            address(sbt),
+            address(timelock),
+            _votingDelay,
+            _votingPeriod,
+            _proposalThreshold,
+            _quorumVotes,
+            deployerAddress
+        );
         timelock.setPendingAdmin(address(governor));
         governor.__acceptAdmin();
 

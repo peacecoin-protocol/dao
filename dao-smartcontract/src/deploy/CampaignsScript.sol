@@ -30,7 +30,7 @@ contract CampaignsScript is Script {
         SBT sbt = new SBT(name, symbol, uri);
 
         vm.roll(block.number + 1);
-        
+
         sbt.setMinter(address(this));
         for (uint256 i = 0; i < tokenURIs.length; i++) {
             sbt.setTokenURI(i, tokenURIs[i]);
@@ -40,10 +40,7 @@ contract CampaignsScript is Script {
         sbt.mint(msg.sender, 1, 1);
 
         Campaigns campaigns = new Campaigns();
-        campaigns.initialize(
-            ERC20Upgradeable(PCE),
-            sbt
-        );
+        campaigns.initialize(ERC20Upgradeable(PCE), sbt);
 
         sbt.setMinter(address(campaigns));
 
@@ -74,7 +71,7 @@ contract CampaignsScript is Script {
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
-        
+
         address[] memory winners = new address[](3);
         winners[0] = 0x6fD12d4d7E8e1D3E5EE6B3A6e8c7DD426Bb24BF5;
         winners[1] = 0x59178bAc7A9BBfa287F39887EAA2826666f14A2a;

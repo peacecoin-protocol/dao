@@ -29,13 +29,28 @@ contract TimelockTest is Test {
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
     event CancelTransaction(
-        bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        string signature,
+        bytes data,
+        uint256 eta
     );
     event ExecuteTransaction(
-        bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        string signature,
+        bytes data,
+        uint256 eta
     );
     event QueueTransaction(
-        bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        string signature,
+        bytes data,
+        uint256 eta
     );
 
     function setUp() public {
@@ -49,7 +64,13 @@ contract TimelockTest is Test {
 
         gov = new GovernorAlpha();
         gov.initialize(
-            "PCE DAO", address(pceToken), address(timelock), 1, VOTING_PERIOD, PROPOSAL_THRESHOLD, QUORUM_VOTES
+            "PCE DAO",
+            address(pceToken),
+            address(timelock),
+            1,
+            VOTING_PERIOD,
+            PROPOSAL_THRESHOLD,
+            QUORUM_VOTES
         );
         pceToken.mint(address(this), INITIAL_AMOUNT);
 
@@ -60,7 +81,13 @@ contract TimelockTest is Test {
     function _buildTransactionParams()
         private
         view
-        returns (address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+        returns (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        )
     {
         target = address(timelock);
         value = 0;
@@ -124,8 +151,13 @@ contract TimelockTest is Test {
     }
 
     function test__queueTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
 
         vm.prank(bob);
         vm.expectRevert("Timelock::queueTransaction: Call must come from admin.");
@@ -135,7 +167,12 @@ contract TimelockTest is Test {
         vm.prank(alice);
         vm.expectEmit(true, true, false, true);
         emit QueueTransaction(
-            keccak256(abi.encode(target, value, signature, data, eta)), target, value, signature, data, eta
+            keccak256(abi.encode(target, value, signature, data, eta)),
+            target,
+            value,
+            signature,
+            data,
+            eta
         );
         timelock.queueTransaction(target, value, signature, data, eta);
 
@@ -145,18 +182,30 @@ contract TimelockTest is Test {
     }
 
     function test__queueTransaction_RevertsWhen_DelayNotSatisfied() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
         eta = block.timestamp + 1 minutes;
 
         vm.prank(alice);
-        vm.expectRevert("Timelock::queueTransaction: Estimated execution block must satisfy delay.");
+        vm.expectRevert(
+            "Timelock::queueTransaction: Estimated execution block must satisfy delay."
+        );
         timelock.queueTransaction(target, value, signature, data, eta);
     }
 
     function test__cancelTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
 
         // Queue Transaction
         vm.prank(alice);
@@ -177,8 +226,13 @@ contract TimelockTest is Test {
     }
 
     function test__executeTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
         data = abi.encode(timelock.MAXIMUM_DELAY() - 1);
 
         vm.prank(bob);
@@ -209,8 +263,13 @@ contract TimelockTest is Test {
     }
 
     function test__executeTransactionWithoutSignature() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
         signature = "";
         data = abi.encodeWithSignature("setDelay(uint256)", timelock.MAXIMUM_DELAY() - 1);
 
@@ -233,8 +292,13 @@ contract TimelockTest is Test {
     }
 
     function test__executeExpiredTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
 
         // Queue Transaction
         vm.prank(alice);
@@ -250,8 +314,13 @@ contract TimelockTest is Test {
     }
 
     function test__executeNotQueuedTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
 
         // Try to execute expired transaction
         vm.prank(alice);
@@ -260,8 +329,13 @@ contract TimelockTest is Test {
     }
 
     function test__executeFailedTransaction() public {
-        (address target, uint256 value, string memory signature, bytes memory data, uint256 eta) =
-            _buildTransactionParams();
+        (
+            address target,
+            uint256 value,
+            string memory signature,
+            bytes memory data,
+            uint256 eta
+        ) = _buildTransactionParams();
         signature = "invalid(uint256)";
 
         // Queue Transaction

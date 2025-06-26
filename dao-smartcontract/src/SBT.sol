@@ -5,8 +5,7 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SBT is ERC1155, Ownable {
-    
-    uint256 private _nextTokenId;
+    uint256 private currentTokenId = 0;
     string public uri_;
     string public name;
     string public symbol;
@@ -15,7 +14,11 @@ contract SBT is ERC1155, Ownable {
 
     event SetTokenURI(uint256 indexed id, string uri);
 
-    constructor(string memory _name, string memory _symbol, string memory _uri) ERC1155(_uri) Ownable(msg.sender) {
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _uri
+    ) ERC1155(_uri) Ownable(msg.sender) {
         name = _name;
         symbol = _symbol;
         uri_ = _uri;
@@ -33,6 +36,8 @@ contract SBT is ERC1155, Ownable {
 
     function mint(address to, uint256 id, uint256 amount) external {
         require(minters[msg.sender], "SBT: not a minter");
+        currentTokenId++;
+        require(id <= currentTokenId, "Invalid token ID");
         _mint(to, id, amount, "");
     }
 
@@ -40,7 +45,13 @@ contract SBT is ERC1155, Ownable {
         minters[minter] = true;
     }
 
-    function safeTransferFrom(address, address, uint256, uint256, bytes memory) public pure override {
+    function safeTransferFrom(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public pure override {
         revert("SBT: non-transferable");
     }
 }

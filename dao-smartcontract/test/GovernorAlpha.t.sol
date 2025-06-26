@@ -219,16 +219,22 @@ contract GovernorAlphaTest is Test {
         vm.expectRevert(
             "GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal"
         );
-        
+
         gov.propose(targets, values, signatures, data, description);
     }
 
     function test_propose_Reverts_WhenUserHasActiveProposal() public {
         _createProposal();
-        (address[] memory _targets, uint256[] memory _values, string[] memory _signatures, bytes[] memory _data) =
-            gov.getActions(PROPOSAL_ID);
+        (
+            address[] memory _targets,
+            uint256[] memory _values,
+            string[] memory _signatures,
+            bytes[] memory _data
+        ) = gov.getActions(PROPOSAL_ID);
         vm.roll(block.number + gov.votingDelay() + 1);
-        vm.expectRevert("GovernorAlpha::propose: one live proposal per proposer, found an already active proposal");
+        vm.expectRevert(
+            "GovernorAlpha::propose: one live proposal per proposer, found an already active proposal"
+        );
         gov.propose(_targets, _values, _signatures, _data, "Transfer PCE");
     }
 
@@ -427,15 +433,19 @@ contract GovernorAlphaTest is Test {
         assertEq(gov.proposer(PROPOSAL_ID), guardian);
     }
 
-    function test__updateVariables(uint256 quorumVotes_, uint256 proposalThreshold_, uint256 proposalMaxOperations_)
-        public
-    {
+    function test__updateVariables(
+        uint256 quorumVotes_,
+        uint256 proposalThreshold_,
+        uint256 proposalMaxOperations_
+    ) public {
         quorumVotes_ = bound(quorumVotes_, 0, type(uint32).max);
         proposalThreshold_ = bound(proposalThreshold_, 0, type(uint32).max);
         proposalMaxOperations_ = bound(proposalMaxOperations_, 0, type(uint32).max);
 
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::updateVariables: only guardian or timelock can update variables");
+        vm.expectRevert(
+            "GovernorAlpha::updateVariables: only guardian or timelock can update variables"
+        );
         gov.updateGovernanceParameters(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
 
         vm.prank(guardian);
@@ -445,7 +455,11 @@ contract GovernorAlphaTest is Test {
         assertEq(gov.proposalMaxOperations(), proposalMaxOperations_);
 
         vm.prank(address(timelock));
-        gov.updateGovernanceParameters(quorumVotes_ + 1, proposalThreshold_ + 1, proposalMaxOperations_ + 1);
+        gov.updateGovernanceParameters(
+            quorumVotes_ + 1,
+            proposalThreshold_ + 1,
+            proposalMaxOperations_ + 1
+        );
         assertEq(gov.quorumVotes(), quorumVotes_ + 1);
         assertEq(gov.proposalThreshold(), proposalThreshold_ + 1);
         assertEq(gov.proposalMaxOperations(), proposalMaxOperations_ + 1);
@@ -453,13 +467,17 @@ contract GovernorAlphaTest is Test {
 
     function test__queueSetTimelockPendingAdmin__RevertsWhen__NotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::__queueSetTimelockPendingAdmin: sender must be gov guardian");
+        vm.expectRevert(
+            "GovernorAlpha::__queueSetTimelockPendingAdmin: sender must be gov guardian"
+        );
         gov.__queueSetTimelockPendingAdmin(alice, 0);
     }
 
     function test__executeSetTimelockPendingAdmin__RevertsWhen__NotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::__executeSetTimelockPendingAdmin: sender must be gov guardian");
+        vm.expectRevert(
+            "GovernorAlpha::__executeSetTimelockPendingAdmin: sender must be gov guardian"
+        );
         gov.__executeSetTimelockPendingAdmin(alice, 0);
     }
 
@@ -473,8 +491,12 @@ contract GovernorAlphaTest is Test {
         ) = _buildProposalParams();
         _createProposalWithParams(targets, values, signatures, data, description);
 
-        (address[] memory _targets, uint256[] memory _values, string[] memory _signatures, bytes[] memory _data) =
-            gov.getActions(PROPOSAL_ID);
+        (
+            address[] memory _targets,
+            uint256[] memory _values,
+            string[] memory _signatures,
+            bytes[] memory _data
+        ) = gov.getActions(PROPOSAL_ID);
         assertEq(_targets[0], targets[0]);
         assertEq(_values[0], values[0]);
         assertEq(_signatures[0], signatures[0]);
@@ -503,7 +525,13 @@ contract GovernorAlphaTest is Test {
         ) = _buildProposalParams();
         data[0] = abi.encode(bob, EXECUTE_TRANSFER_VALUE);
         // Adding different data to avoid having duplicated proposal actions queued
-        uint256 proposalIdTwo = _createProposalWithParams(targets, values, signatures, data, description);
+        uint256 proposalIdTwo = _createProposalWithParams(
+            targets,
+            values,
+            signatures,
+            data,
+            description
+        );
         vm.stopPrank();
 
         // Proposals votes
@@ -572,7 +600,10 @@ contract GovernorAlphaTest is Test {
 
         assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(alice));
         assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(bob));
-        assertEq(INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE * 2, pceToken.balanceOf(address(timelock)));
+        assertEq(
+            INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE * 2,
+            pceToken.balanceOf(address(timelock))
+        );
         assertEq(uint256(gov.state(proposalIdOne)), uint256(GovernorAlpha.ProposalState.Executed));
         assertEq(uint256(gov.state(proposalIdTwo)), uint256(GovernorAlpha.ProposalState.Executed));
     }

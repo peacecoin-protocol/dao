@@ -8,8 +8,8 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "prettier --write \"src/**/*.sol\" \"test/**/*.sol\""
+    "test": "forge test --via-ir",
+    "format": "prettier --write \"src/**/*.sol\" \"test/**/*.sol\" --plugin=prettier-plugin-solidity"
   },
   "keywords": [],
   "author": "",

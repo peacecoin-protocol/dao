@@ -288,7 +288,10 @@ contract BountyTest is Test {
         assertEq(bounty.claimableProposalAmount(user1), 0);
     }
 
-    function test_claimableContributorAmount(uint256 bountyAmount, uint256 contributionAmount) public {
+    function test_claimableContributorAmount(
+        uint256 bountyAmount,
+        uint256 contributionAmount
+    ) public {
         bountyAmount = bound(bountyAmount, 1e18, 5e18);
         contributionAmount = bound(contributionAmount, 30e18, 50e18);
         bounty.setBountyAmount(bountyAmount);

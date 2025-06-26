@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {SBTInterface} from "../interfaces/SBTInterface.sol";
+
 contract PEACECOINDAO_GOVERNOR {
     /// @notice The name of this contract
     string public name;
@@ -19,6 +21,9 @@ contract PEACECOINDAO_GOVERNOR {
 
     /// @notice The address of the Governor Guardian
     address public guardian;
+
+    /// @notice The address of the SBT
+    SBTInterface public sbt;
 
     /// @notice The total number of proposals
     uint256 public proposalCount;
@@ -110,31 +115,36 @@ contract PEACECOINDAO_GOVERNOR {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
-    
     event ProposalThresholdSet(uint256 oldProposalThreshold, uint256 newProposalThreshold);
     event QuorumVotesSet(uint256 oldQuorumVotes, uint256 newQuorumVotes);
-    event ProposalMaxOperationsSet(uint256 oldProposalMaxOperations, uint256 newProposalMaxOperations);
+    event ProposalMaxOperationsSet(
+        uint256 oldProposalMaxOperations,
+        uint256 newProposalMaxOperations
+    );
 
     function initialize(
         string memory daoName,
         address _token,
+        address _sbt,
         address _timelock,
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _proposalThreshold,
-        uint256 _quorumVotes
+        uint256 _quorumVotes,
+        address _guardian
     ) external {
         require(!initialized, "Governor::initialize: already initialized");
         initialized = true;
 
         name = daoName;
         token = GovInterface(address(_token));
+        sbt = SBTInterface(_sbt);
         timelock = TimelockInterface(_timelock);
         votingDelay = _votingDelay;
         votingPeriod = _votingPeriod;
         proposalThreshold = _proposalThreshold;
         quorumVotes = _quorumVotes;
-        guardian = msg.sender;
+        guardian = _guardian;
         proposalMaxOperations = 10;
     }
 
@@ -146,7 +156,9 @@ contract PEACECOINDAO_GOVERNOR {
         string memory description
     ) public returns (uint256) {
         require(
-            token.getPastVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold,
+            token.getPastVotes(msg.sender, sub256(block.number, 1)) +
+                sbt.getPastVotes(msg.sender, sub256(block.number, 1)) >
+                proposalThreshold,
             "Governor::propose: proposer votes below proposal threshold"
         );
         require(
@@ -156,10 +168,7 @@ contract PEACECOINDAO_GOVERNOR {
             "Governor::propose: proposal function information arity mismatch"
         );
         require(targets.length != 0, "Governor::propose: must provide actions");
-        require(
-            targets.length <= proposalMaxOperations,
-            "Governor::propose: too many actions"
-        );
+        require(targets.length <= proposalMaxOperations, "Governor::propose: too many actions");
 
         uint256 latestProposalId = latestProposalIds[msg.sender];
         if (latestProposalId != 0) {
@@ -321,7 +330,9 @@ contract PEACECOINDAO_GOVERNOR {
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                token.getPastVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold,
+                token.getPastVotes(proposal.proposer, sub256(block.number, 1)) +
+                    sbt.getPastVotes(proposal.proposer, sub256(block.number, 1)) <
+                proposalThreshold,
             "Governor::cancel: proposer above threshold"
         );
 
@@ -393,14 +404,12 @@ contract PEACECOINDAO_GOVERNOR {
     }
 
     function _castVote(address voter, uint256 proposalId, bool support) internal {
-        require(
-            state(proposalId) == ProposalState.Active,
-            "Governor::_castVote: voting is closed"
-        );
+        require(state(proposalId) == ProposalState.Active, "Governor::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
-        uint96 votes = token.getPastVotes(voter, proposal.startBlock);
+        uint96 votes = token.getPastVotes(voter, proposal.startBlock) +
+            sbt.getPastVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -435,10 +444,7 @@ contract PEACECOINDAO_GOVERNOR {
     }
 
     function __acceptAdmin() public {
-        require(
-            msg.sender == guardian,
-            "Governor::__acceptAdmin: sender must be gov guardian"
-        );
+        require(msg.sender == guardian, "Governor::__acceptAdmin: sender must be gov guardian");
         timelock.acceptAdmin();
     }
 
