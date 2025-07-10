@@ -19,31 +19,14 @@ contract PEACECOINDAO_SBTScript is Script {
         address deployerAddress = vm.addr(deployerPrivateKey);
         string memory name = "PEACECOIN DAO SBT";
         string memory symbol = "PCE_SBT";
-        string memory uri = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
 
         vm.roll(block.number + 1); // Wait for 1 block
-
-        // Metadata for SBT
-        string[8] memory tokenURIs = [
-            "QmbUVVQ88V4kTK15yEpfTv2Bm28Pmo1DPtusffeMNqrSxx",
-            "QmeRTdBRWeeP1Tpea8KMLC6zDh53boU7MJgqSdsnWGLFye",
-            "QmR2dLjCdD7wjyxSmWbWd7uVqBtNZ4C8iu51uxYpVp4Gyw",
-            "QmQT95WxczcqVaHkrtgeBfRgdikrVfAu1XPc6LnE2Jgw51",
-            "QmQhwbUsjoWCWRC4mpiMNjie8PFNzMyzPb32wvVbEVx2sb",
-            "QmQKdjT3PXnS3HqhcbYTfrP8cHNRGXQbRijL6d8fpK7EoA",
-            "QmPvFgQXCcQy8ZL52n8MKWKRuK8Emy1S1yprA3u25f4uLC",
-            "QmTu4k191oMPMKKj7VfZrLyamyoBXm56bhn4z5AMfnbEiw"
-        ];
 
         vm.roll(block.number + 1);
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
         peacecoinDaoSbt.initialize(uri, name, symbol);
-
-        for (uint256 i = 1; i <= tokenURIs.length; i++) {
-            peacecoinDaoSbt.setTokenURI(i, tokenURIs[i - 1], 10 * i);
-            peacecoinDaoSbt.mint(deployerAddress, i, 1);
-        }
 
         vm.roll(block.number + 1);
         peacecoinDaoSbt.delegate(deployerAddress);

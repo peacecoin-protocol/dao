@@ -12,7 +12,6 @@ contract DAOFactoryScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address deployerAddress = vm.addr(deployerPrivateKey);
         address timelockAddress = address(new Timelock());
         address governorAddress = address(new GovernorAlpha());
         address governanceTokenAddress = address(new PCECommunityGovToken());

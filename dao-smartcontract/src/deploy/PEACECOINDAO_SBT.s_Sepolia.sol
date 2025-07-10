@@ -16,12 +16,18 @@ contract PEACECOINDAO_SBTScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
-        address peacecoinDaoSbt = 0x9C2B5C19c56006773864E79b9007362F39e5b457;
+
+        string memory name = "PEACECOIN DAO SBT";
+        string memory symbol = "PCE_SBT";
+        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
+
+        address pce = 0x8253f538d2C5a011ee32098a539903992f61Dce9;
+
+        PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
+        peacecoinDaoSbt.initialize(uri, name, symbol);
 
         // Deploy Staking
         Staking staking = new Staking();
-
-        address pce = 0x9C2B5C19c56006773864E79b9007362F39e5b457;
 
         vm.roll(block.number + 1);
 

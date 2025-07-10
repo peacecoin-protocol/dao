@@ -15,9 +15,11 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     string public uri_;
     string public name;
     string public symbol;
+
+    uint256 public currentTokenId = 1;
     mapping(uint256 => string) public tokenURIs;
-    uint256 public currentTokenId = 0;
     mapping(address => bool) public minters;
+    mapping(uint256 => bool) public isRevoked;
 
     function initialize(
         string memory _uri,
@@ -46,13 +48,16 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     mapping(address => Checkpoints.Trace224) private _checkpoints;
 
     event SetTokenURI(uint256 indexed id, string uri);
+    event Revoked(uint256 indexed id, bool isRevoked);
 
     function uri(uint256 _id) public view override returns (string memory) {
         return string(abi.encodePacked(uri_, tokenURIs[_id]));
     }
 
     // ========== Admin ==========
-    function setTokenURI(uint256 id, string memory _tokenURI, uint256 weight) external onlyOwner {
+    function setTokenURI(uint256 id, string memory _tokenURI, uint256 weight) external {
+        // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
+
         tokenURIs[id] = _tokenURI;
         votingPowerPerId[id] = weight;
         _allTokenIds.add(id);
@@ -61,25 +66,42 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     }
 
     function mint(address to, uint256 id, uint256 amount) external {
-        require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
+        // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
 
-        currentTokenId++;
         require(id <= currentTokenId, "Invalid token ID");
 
-        _mint(to, id, amount, "");
-        _balances[to][id] += amount;
+        uint256 _tokenId;
+        if (id != 0) {
+            _tokenId = id;
+        } else {
+            _tokenId = currentTokenId;
+        }
+
+        _mint(to, _tokenId, amount, "");
+        _balances[to][_tokenId] += amount;
 
         address delegatee = _delegates[to];
-        if (delegatee != address(0) && votingPowerPerId[id] > 0) {
-            _moveVotes(address(0), delegatee, amount * votingPowerPerId[id]);
+        if (delegatee != address(0) && votingPowerPerId[_tokenId] > 0) {
+            _moveVotes(address(0), delegatee, amount * votingPowerPerId[_tokenId]);
         }
+
+        if (id == 0 || id == currentTokenId) {
+            currentTokenId++;
+        }
+    }
+
+    function revoke(uint256 id, bool isRevoked_) external {
+        isRevoked[id] = isRevoked_;
+        emit Revoked(id, isRevoked_);
     }
 
     function setMinter(address minter) external onlyOwner {
         minters[minter] = true;
     }
 
-    function burn(address from, uint256 id, uint256 amount) external onlyOwner {
+    function burn(address from, uint256 id, uint256 amount) external {
+        require(_balances[from][id] >= amount, "PEACECOINDAO_SBT: not enough balance");
+
         _burn(from, id, amount);
         _balances[from][id] -= amount;
 
@@ -127,6 +149,19 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
         // Fix: Checkpoints.Trace224 expects uint32 for key
         require(blockNumber <= type(uint32).max, "blockNumber too large");
         return _checkpoints[who].upperLookup(uint32(blockNumber));
+    }
+
+    function getAllTokenIds() external view returns (uint256[] memory) {
+        uint256 len = _allTokenIds.length();
+        uint256[] memory ids = new uint256[](len);
+        for (uint256 i = 0; i < len; i++) {
+            ids[i] = _allTokenIds.at(i);
+        }
+        return ids;
+    }
+
+    function getAllTokenLength() external view returns (uint256) {
+        return _allTokenIds.length();
     }
 
     // ========== Internal ==========
