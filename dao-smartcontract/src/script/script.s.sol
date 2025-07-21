@@ -79,12 +79,13 @@ contract script is Script {
         Campaigns campaigns = new Campaigns();
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), SBT(address(peacecoinDaoSbt)));
+        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
         vm.roll(block.number + 1);
         Campaigns.Campaign memory _campaign = Campaigns.Campaign({
+            sbtId: 1,
             title: "Airdrop Contributor NFTs",
             description: "We will airdrop Contributor NFTs to PEACECOIN Contributors",
             amount: 3,

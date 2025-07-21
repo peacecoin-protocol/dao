@@ -57,36 +57,29 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     // ========== Admin ==========
     function setTokenURI(uint256 id, string memory _tokenURI, uint256 weight) external {
         // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
+        require(id > 0, "PEACECOINDAO_SBT: id must be greater than 0");
 
         tokenURIs[id] = _tokenURI;
         votingPowerPerId[id] = weight;
         _allTokenIds.add(id);
+
+        if (id > currentTokenId) {
+            currentTokenId = id;
+        }
 
         emit SetTokenURI(id, _tokenURI);
     }
 
     function mint(address to, uint256 id, uint256 amount) external {
         // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
+        require(id > 0, "PEACECOINDAO_SBT: id must be greater than 0");
 
-        require(id <= currentTokenId, "Invalid token ID");
-
-        uint256 _tokenId;
-        if (id != 0) {
-            _tokenId = id;
-        } else {
-            _tokenId = currentTokenId;
-        }
-
-        _mint(to, _tokenId, amount, "");
-        _balances[to][_tokenId] += amount;
+        _mint(to, id, amount, "");
+        _balances[to][id] += amount;
 
         address delegatee = _delegates[to];
-        if (delegatee != address(0) && votingPowerPerId[_tokenId] > 0) {
-            _moveVotes(address(0), delegatee, amount * votingPowerPerId[_tokenId]);
-        }
-
-        if (id == 0 || id == currentTokenId) {
-            currentTokenId++;
+        if (delegatee != address(0) && votingPowerPerId[id] > 0) {
+            _moveVotes(address(0), delegatee, amount * votingPowerPerId[id]);
         }
     }
 

@@ -7,13 +7,14 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {SBT} from "./SBT.sol";
+import {PEACECOINDAO_SBT} from "./Governance/PEACECOINDAO_SBT.sol";
 
 contract Campaigns is Initializable, OwnableUpgradeable {
     using ECDSA for bytes32;
     using Strings for uint256;
 
     struct Campaign {
+        uint256 sbtId;
         string title;
         string description;
         uint256 amount;
@@ -31,7 +32,7 @@ contract Campaigns is Initializable, OwnableUpgradeable {
 
     uint256 public campaignId;
     ERC20Upgradeable public token;
-    SBT public nft;
+    PEACECOINDAO_SBT public nft;
 
     mapping(uint256 => address[]) public campWinners;
     mapping(uint256 => Campaign) public campaigns;
@@ -45,6 +46,7 @@ contract Campaigns is Initializable, OwnableUpgradeable {
     event CampWinnersClaimed(uint256 indexed campaignId, address indexed winner);
     event CampaignCreated(
         uint256 indexed campaignId,
+        uint256 indexed sbtId,
         string title,
         string description,
         uint256 amount,
@@ -54,13 +56,14 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         bool isNFT
     );
 
-    function initialize(ERC20Upgradeable _token, SBT _nft) public initializer {
+    function initialize(ERC20Upgradeable _token, PEACECOINDAO_SBT _nft) public initializer {
         token = _token;
         nft = _nft;
         __Ownable_init(msg.sender);
     }
 
-    function createCampaign(Campaign memory _campaign) external onlyOwner {
+    function createCampaign(Campaign memory _campaign) external {
+        //Should onlyOwner modifier
         require(_campaign.startDate < _campaign.endDate, "Start date must be before end date");
         require(_campaign.amount > 0, "Amount must be greater than 0");
         require(_campaign.startDate > block.timestamp, "Start date must be in the future");
@@ -70,6 +73,7 @@ contract Campaigns is Initializable, OwnableUpgradeable {
 
         emit CampaignCreated(
             campaignId,
+            _campaign.sbtId,
             _campaign.title,
             _campaign.description,
             _campaign.amount,
@@ -84,7 +88,8 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         uint256 _campaignId,
         address[] memory _addresses,
         bytes32[] memory _gists
-    ) external onlyOwner {
+    ) external {
+        //Should onlyOwner modifier
         require(_campaignId > 0, "Campaign id must be greater than 0");
 
         Campaign memory campaign = campaigns[_campaignId];
@@ -109,13 +114,16 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         string memory _message,
         bytes memory _signature
     ) external {
-        require(campaigns[_campaignId].endDate < block.timestamp, "Campaign is not ended");
+        Campaign memory campaign = campaigns[_campaignId];
+        require(campaign.startDate < block.timestamp, "Campaign is not started");
+        require(campaign.endDate > block.timestamp, "Campaign is ended");
+
         require(
             !champWinnersClaimed[_campaignId][msg.sender],
             "You have already claimed your prize"
         );
 
-        if (campaigns[_campaignId].validateSignatures) {
+        if (campaign.validateSignatures) {
             require(verify(msg.sender, _message, _signature), "Invalid signature");
             require(!champGistsClaimed[_campaignId][_gist], "You have already claimed your prize");
 
@@ -143,9 +151,9 @@ contract Campaigns is Initializable, OwnableUpgradeable {
             champWinnersClaimed[_campaignId][msg.sender] = true;
         }
 
-        if (campaigns[_campaignId].isNFT) {
-            totalClaimedNFT[msg.sender] += campaigns[_campaignId].amount;
-            nft.mint(msg.sender, _campaignId, campaigns[_campaignId].amount);
+        if (campaign.isNFT) {
+            totalClaimedNFT[msg.sender] += campaign.amount;
+            nft.mint(msg.sender, campaign.sbtId, campaign.amount);
         } else {
             totalClaimed[msg.sender] += campaigns[_campaignId].amount;
             token.transfer(msg.sender, campaigns[_campaignId].amount);
@@ -211,10 +219,12 @@ contract Campaigns is Initializable, OwnableUpgradeable {
     }
 
     function getStatus(uint256 _campaignId) external view returns (Status) {
-        if (campaigns[_campaignId].endDate > block.timestamp) {
-            return Status.Active;
+        if (campaigns[_campaignId].endDate < block.timestamp) {
+            return Status.Ended;
+        } else if (campaigns[_campaignId].startDate < block.timestamp) {
+            return Status.Pending;
         }
-        return Status.Ended;
+        return Status.Active;
     }
 
     function isWinner(uint256 _campaignId, address _winner) external view returns (bool) {

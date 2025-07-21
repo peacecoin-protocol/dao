@@ -42,7 +42,7 @@ contract PEACECOINDAO_SBTTest is Test {
         vm.prank(bob);
         sbt.delegate(alice);
         vm.roll(block.number + 1);
-        assertEq(sbt.getPastVotes(alice, block.number - 1), 20);
+        assertEq(sbt.getPastVotes(alice, block.number - 1), 10);
         assertEq(sbt.getPastVotes(bob, block.number - 1), 0);
     }
 }

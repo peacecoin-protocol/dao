@@ -12,6 +12,7 @@ import "../mocks/PCECommunityGovToken.sol";
 import "../Campaigns.sol";
 import "../SBT.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
+import "../Governance/PCE.sol";
 import {console} from "forge-std/console.sol";
 
 contract scriptSepolia is Script {
@@ -22,7 +23,13 @@ contract scriptSepolia is Script {
 
         uint256 _bountyAmount = 0;
 
-        address PCE_TOKEN = 0x8d4d8C9192C7df57840129D71c18ED49dda7Fe33;
+        // address PCE_TOKEN = 0x8d4d8C9192C7df57840129D71c18ED49dda7Fe33;
+        PCE pce = new PCE();
+        pce.initialize();
+        address PCE_TOKEN = address(pce);
+
+        pce.mint(deployerAddress, 1000000000000000000000000000000000000000);
+
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
 
@@ -39,7 +46,6 @@ contract scriptSepolia is Script {
         PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
-        // peacecoinDaoSbt.initialize("https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/");
 
         daoFactory.setImplementation(address(timelock), address(gov), address(peacecoinDaoSbt));
 
@@ -69,18 +75,12 @@ contract scriptSepolia is Script {
         vm.roll(block.number + 1); // Wait for 1 block
 
         // Metadata for SBT
-        string memory uri = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
         string memory name = "PCE Contributor NFT";
         string memory symbol = "PCE_CONTRIBUTOR";
-        string[8] memory tokenURIs = [
-            "QmbUVVQ88V4kTK15yEpfTv2Bm28Pmo1DPtusffeMNqrSxx",
-            "QmeRTdBRWeeP1Tpea8KMLC6zDh53boU7MJgqSdsnWGLFye",
-            "QmR2dLjCdD7wjyxSmWbWd7uVqBtNZ4C8iu51uxYpVp4Gyw",
-            "QmQT95WxczcqVaHkrtgeBfRgdikrVfAu1XPc6LnE2Jgw51",
-            "QmQhwbUsjoWCWRC4mpiMNjie8PFNzMyzPb32wvVbEVx2sb",
-            "QmQKdjT3PXnS3HqhcbYTfrP8cHNRGXQbRijL6d8fpK7EoA",
-            "QmPvFgQXCcQy8ZL52n8MKWKRuK8Emy1S1yprA3u25f4uLC",
-            "QmTu4k191oMPMKKj7VfZrLyamyoBXm56bhn4z5AMfnbEiw"
+        string[2] memory tokenURIs = [
+            "bafkreiexs3fw2ud7a6ckzzjitl3jmoi2t2moezncyoe3wvk2svmqn3f2jy",
+            "bafkreiezewcgdfxjii4nx5lul5x6wppgrquzogk3xzwlxubytsg7fpp234"
         ];
 
         peacecoinDaoSbt.initialize(uri, name, symbol);
@@ -92,25 +92,16 @@ contract scriptSepolia is Script {
 
         vm.roll(block.number + 1);
 
-        // SBT sbt = new SBT(name, symbol, uri);
-        // sbt.setMinter(address(this));
-
-        // for (uint256 i = 1; i <= tokenURIs.length; i++) {
-        //     sbt.setTokenURI(i, tokenURIs[i]);
-        // }
-
-        // vm.roll(block.number + 1);
-
         Campaigns campaigns = new Campaigns();
-        // sbt.setMinter(address(campaigns));
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), SBT(address(peacecoinDaoSbt)));
+        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
         vm.roll(block.number + 1);
         Campaigns.Campaign memory _campaign = Campaigns.Campaign({
+            sbtId: 1,
             title: "Airdrop Contributor NFTs",
             description: "We will airdrop Contributor NFTs to PEACECOIN Contributors",
             amount: 3,
@@ -127,10 +118,12 @@ contract scriptSepolia is Script {
 
         vm.roll(block.number + 1);
 
+        _campaign.sbtId = 2;
         _campaign.title = "Airdrop Contributor NFTs 2";
         _campaign.description = "We will airdrop Contributor NFTs to PEACECOIN Contributors 2";
         _campaign.amount = 5;
         _campaign.validateSignatures = true;
+        _campaign.isNFT = false;
 
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
