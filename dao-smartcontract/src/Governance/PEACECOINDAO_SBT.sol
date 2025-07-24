@@ -79,7 +79,8 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
 
         address delegatee = _delegates[to];
         if (delegatee != address(0) && votingPowerPerId[id] > 0) {
-            _moveVotes(address(0), delegatee, amount * votingPowerPerId[id]);
+            uint256 voteAmount = amount * votingPowerPerId[id];
+            _moveVotes(address(0), delegatee, voteAmount);
         }
     }
 
@@ -100,7 +101,8 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
 
         address delegatee = _delegates[from];
         if (delegatee != address(0) && votingPowerPerId[id] > 0) {
-            _moveVotes(delegatee, address(0), amount * votingPowerPerId[id]);
+            uint256 voteAmount = amount * votingPowerPerId[id];
+            _moveVotes(delegatee, address(0), voteAmount);
         }
     }
 
@@ -111,11 +113,21 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
 
         _delegates[msg.sender] = to;
 
+        uint256 totalVotes = _calculateTotalVotes(msg.sender);
+
+        if (totalVotes > 0) {
+            if (prev != address(0)) _moveVotes(prev, address(0), totalVotes);
+            _moveVotes(address(0), to, totalVotes);
+        }
+    }
+
+    function _calculateTotalVotes(address account) internal view returns (uint256) {
         uint256 totalVotes = 0;
         uint256 len = _allTokenIds.length();
+
         for (uint256 i = 0; i < len; i++) {
             uint256 id = _allTokenIds.at(i);
-            uint256 bal = _balances[msg.sender][id];
+            uint256 bal = _balances[account][id];
             uint256 w = votingPowerPerId[id];
 
             if (bal > 0 && w > 0) {
@@ -123,10 +135,7 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
             }
         }
 
-        if (totalVotes > 0) {
-            if (prev != address(0)) _moveVotes(prev, address(0), totalVotes);
-            _moveVotes(address(0), to, totalVotes);
-        }
+        return totalVotes;
     }
 
     function delegateOf(address who) external view returns (address) {
@@ -161,15 +170,16 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     function _moveVotes(address from, address to, uint256 amount) internal {
         if (amount == 0) return;
 
+        uint32 currentBlock = uint32(block.number);
+
         if (from != address(0)) {
-            uint256 old = _checkpoints[from].latest();
-            // Fix: block.number must be cast to uint32
-            _checkpoints[from].push(uint32(block.number), uint224(old - amount));
+            uint256 oldFrom = _checkpoints[from].latest();
+            _checkpoints[from].push(currentBlock, uint224(oldFrom - amount));
         }
+
         if (to != address(0)) {
-            uint256 old = _checkpoints[to].latest();
-            // Fix: block.number must be cast to uint32
-            _checkpoints[to].push(uint32(block.number), uint224(old + amount));
+            uint256 oldTo = _checkpoints[to].latest();
+            _checkpoints[to].push(currentBlock, uint224(oldTo + amount));
         }
     }
 }

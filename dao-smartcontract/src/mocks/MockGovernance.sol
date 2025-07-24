@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.20;
 
 contract MockGovernance {
     mapping(uint256 => uint8) public proposalStates;

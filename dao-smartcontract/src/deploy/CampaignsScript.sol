@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
@@ -52,7 +52,8 @@ contract CampaignsScript is Script {
             sbtId: 1,
             title: "Airdrop Contributor NFTs",
             description: "We will airdrop Contributor NFTs to PEACECOIN Contributors",
-            amount: 1,
+            claimAmount: 1,
+            totalAmount: 10,
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 86400,
             validateSignatures: false,
@@ -66,7 +67,8 @@ contract CampaignsScript is Script {
         _campaign.sbtId = 2;
         _campaign.title = "Airdrop Contributor NFTs 2";
         _campaign.description = "We will airdrop Contributor NFTs to PEACECOIN Contributors 2";
-        _campaign.amount = 1;
+        _campaign.claimAmount = 1;
+        _campaign.totalAmount = 10;
         _campaign.validateSignatures = true;
         _campaign.isNFT = true;
         campaigns.createCampaign(_campaign);

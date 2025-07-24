@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.20;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-
+import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import {PEACECOINDAO_SBT} from "./Governance/PEACECOINDAO_SBT.sol";
 
-contract Campaigns is Initializable, OwnableUpgradeable {
+contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeable {
     using ECDSA for bytes32;
     using Strings for uint256;
 
@@ -17,7 +17,8 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         uint256 sbtId;
         string title;
         string description;
-        uint256 amount;
+        uint256 claimAmount;
+        uint256 totalAmount;
         uint256 startDate;
         uint256 endDate;
         bool validateSignatures;
@@ -39,8 +40,7 @@ contract Campaigns is Initializable, OwnableUpgradeable {
     mapping(uint256 => mapping(address => bool)) public champWinnersClaimed;
     mapping(uint256 => mapping(bytes32 => bool)) public champGistsClaimed;
     mapping(uint256 => bytes32[]) public campGists;
-    mapping(address => uint256) public totalClaimed;
-    mapping(address => uint256) public totalClaimedNFT;
+    mapping(uint256 => uint256) public totalClaimed;
 
     event CampWinnersAdded(uint256 indexed campaignId, address[] winners);
     event CampWinnersClaimed(uint256 indexed campaignId, address indexed winner);
@@ -49,7 +49,8 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         uint256 indexed sbtId,
         string title,
         string description,
-        uint256 amount,
+        uint256 claimAmount,
+        uint256 totalAmount,
         uint256 startDate,
         uint256 endDate,
         bool validateSignatures,
@@ -65,18 +66,26 @@ contract Campaigns is Initializable, OwnableUpgradeable {
     function createCampaign(Campaign memory _campaign) external {
         //Should onlyOwner modifier
         require(_campaign.startDate < _campaign.endDate, "Start date must be before end date");
-        require(_campaign.amount > 0, "Amount must be greater than 0");
-        require(_campaign.startDate > block.timestamp, "Start date must be in the future");
+        require(_campaign.totalAmount > 0, "Amount must be greater than 0");
+        require(
+            _campaign.claimAmount <= _campaign.totalAmount,
+            "Claim amount must be less than total amount"
+        );
 
         campaignId++;
         campaigns[campaignId] = _campaign;
+
+        if (_campaign.isNFT) {
+            nft.mint(address(this), _campaign.sbtId, _campaign.totalAmount);
+        }
 
         emit CampaignCreated(
             campaignId,
             _campaign.sbtId,
             _campaign.title,
             _campaign.description,
-            _campaign.amount,
+            _campaign.claimAmount,
+            _campaign.totalAmount,
             _campaign.startDate,
             _campaign.endDate,
             _campaign.validateSignatures,
@@ -152,12 +161,18 @@ contract Campaigns is Initializable, OwnableUpgradeable {
         }
 
         if (campaign.isNFT) {
-            totalClaimedNFT[msg.sender] += campaign.amount;
-            nft.mint(msg.sender, campaign.sbtId, campaign.amount);
+            nft.safeTransferFrom(
+                address(this),
+                msg.sender,
+                campaign.sbtId,
+                campaign.claimAmount,
+                ""
+            );
         } else {
-            totalClaimed[msg.sender] += campaigns[_campaignId].amount;
-            token.transfer(msg.sender, campaigns[_campaignId].amount);
+            token.transfer(msg.sender, campaign.claimAmount);
         }
+
+        totalClaimed[_campaignId] += campaign.claimAmount;
 
         emit CampWinnersClaimed(_campaignId, msg.sender);
     }
@@ -234,5 +249,15 @@ contract Campaigns is Initializable, OwnableUpgradeable {
             }
         }
         return false;
+    }
+
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC1155Received.selector;
     }
 }

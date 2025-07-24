@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
@@ -42,7 +42,8 @@ contract CampaignsTest is Test {
             sbtId: 1,
             title: "Test Campaign",
             description: "Test Description",
-            amount: 3,
+            claimAmount: 3,
+            totalAmount: 10,
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: true,
@@ -54,7 +55,8 @@ contract CampaignsTest is Test {
             uint256 sbtId,
             string memory title,
             string memory description,
-            uint256 amount,
+            uint256 claimAmount,
+            uint256 totalAmount,
             uint256 startDate,
             uint256 endDate,
             bool validateSignatures,
@@ -64,7 +66,8 @@ contract CampaignsTest is Test {
         assertEq(sbtId, 1);
         assertEq(title, "Test Campaign");
         assertEq(description, "Test Description");
-        assertEq(amount, 3);
+        assertEq(claimAmount, 3);
+        assertEq(totalAmount, 10);
         assertGt(startDate, 0);
         assertGt(endDate, startDate);
         assertEq(validateSignatures, true);
@@ -82,7 +85,8 @@ contract CampaignsTest is Test {
                 sbtId: 1,
                 title: "Test Campaign",
                 description: "Test Description",
-                amount: 10e18,
+                claimAmount: 10e18,
+                totalAmount: 10e18,
                 startDate: block.timestamp + 100,
                 endDate: block.timestamp + 1000,
                 validateSignatures: true,
