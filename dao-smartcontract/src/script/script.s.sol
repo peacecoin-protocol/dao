@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../mocks/MockERC20.sol";
@@ -12,9 +12,19 @@ import "../mocks/PCECommunityGovToken.sol";
 import "../Campaigns.sol";
 import "../SBT.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
+import "../Governance/PEACECOINDAO_NFT.sol";
 import {console} from "forge-std/console.sol";
 
 contract script is Script {
+    address PCE_TOKEN = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
+    string uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
+    string name = "PCE Contributor NFT";
+    string symbol = "PCE_CONTRIBUTOR";
+    string daoName = "PCE DAO";
+    uint256 _votingDelay = 1;
+    uint256 _votingPeriod = 50; // 3 blocks
+    uint256 _proposalThreshold = 30;
+    uint256 _quorumVotes = 200;
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -22,7 +32,6 @@ contract script is Script {
 
         uint256 _bountyAmount = 0;
 
-        address PCE_TOKEN = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
 
@@ -48,11 +57,6 @@ contract script is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        string memory daoName = "PCE DAO";
-        uint256 _votingDelay = 1;
-        uint256 _votingPeriod = 50; // 3 blocks
-        uint256 _proposalThreshold = 30;
-        uint256 _quorumVotes = 200;
         gov.initialize(
             daoName,
             address(peacecoinDaoSbt),
@@ -67,50 +71,33 @@ contract script is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        // Metadata for SBT
-        string memory uri = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
-        string memory name = "PCE Contributor NFT";
-        string memory symbol = "PCE_CONTRIBUTOR";
-        string[8] memory tokenURIs = [
-            "QmbUVVQ88V4kTK15yEpfTv2Bm28Pmo1DPtusffeMNqrSxx",
-            "QmeRTdBRWeeP1Tpea8KMLC6zDh53boU7MJgqSdsnWGLFye",
-            "QmR2dLjCdD7wjyxSmWbWd7uVqBtNZ4C8iu51uxYpVp4Gyw",
-            "QmQT95WxczcqVaHkrtgeBfRgdikrVfAu1XPc6LnE2Jgw51",
-            "QmQhwbUsjoWCWRC4mpiMNjie8PFNzMyzPb32wvVbEVx2sb",
-            "QmQKdjT3PXnS3HqhcbYTfrP8cHNRGXQbRijL6d8fpK7EoA",
-            "QmPvFgQXCcQy8ZL52n8MKWKRuK8Emy1S1yprA3u25f4uLC",
-            "QmTu4k191oMPMKKj7VfZrLyamyoBXm56bhn4z5AMfnbEiw"
-        ];
-
         peacecoinDaoSbt.initialize(uri, name, symbol);
 
-        for (uint256 i = 1; i <= tokenURIs.length; i++) {
-            peacecoinDaoSbt.setTokenURI(i, tokenURIs[i - 1], 10 * i);
-            peacecoinDaoSbt.mint(deployerAddress, i, 1);
-        }
+        PEACECOINDAO_NFT peacecoinDaoNft = new PEACECOINDAO_NFT();
+        peacecoinDaoNft.initialize(uri, name, symbol);
 
         vm.roll(block.number + 1);
 
         Campaigns campaigns = new Campaigns();
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), SBT(address(peacecoinDaoSbt)));
+        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt, peacecoinDaoNft);
 
-        ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
+        // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
         vm.roll(block.number + 1);
         Campaigns.Campaign memory _campaign = Campaigns.Campaign({
+            sbtId: 1,
             title: "Airdrop Contributor NFTs",
             description: "We will airdrop Contributor NFTs to PEACECOIN Contributors",
-            amount: 3,
+            claimAmount: 3,
+            totalAmount: 10,
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: false,
-            isNFT: true
+            tokenType: Campaigns.TokenType.NFT
         });
 
-        campaigns.createCampaign(_campaign);
-        campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
 
@@ -118,7 +105,8 @@ contract script is Script {
 
         _campaign.title = "Airdrop Contributor NFTs 2";
         _campaign.description = "We will airdrop Contributor NFTs to PEACECOIN Contributors 2";
-        _campaign.amount = 5;
+        _campaign.claimAmount = 5;
+        _campaign.totalAmount = 10;
         _campaign.validateSignatures = true;
 
         campaigns.createCampaign(_campaign);
@@ -159,5 +147,6 @@ contract script is Script {
         console.log("PCE Community Gov Token: ", address(pceCommunityGovToken));
         console.log("Campaigns: ", address(campaigns));
         console.log("SBT: ", address(peacecoinDaoSbt));
+        console.log("NFT: ", address(peacecoinDaoNft));
     }
 }

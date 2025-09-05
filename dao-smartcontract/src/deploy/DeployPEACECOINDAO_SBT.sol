@@ -2,15 +2,16 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
-import "../SBT.sol";
+import "../Governance/PEACECOINDAO_SBT.sol";
 
-contract SBTScript is Script {
+contract DeployPEACECOINDAO_SBT is Script {
     function run() external {
         string memory baseUri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        new SBT("SBT", "SBT", baseUri);
+        PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
+        peacecoinDaoSbt.initialize(baseUri, "PEACECOIN DAO SBT", "PCE_SBT");
         vm.stopBroadcast();
     }
 }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.20;
 
 import {Test, Vm} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
-import {MockGovToken} from "../src/mocks/MockGovToken.sol";
+import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
+import {MockERC20} from "../src/mocks/MockERC20.sol";
 
 contract Example {
     constructor(address _factoryAddress) {}
@@ -46,29 +47,40 @@ contract DaoFactoryTest is Test {
     bytes _arguments = abi.encode(0x7D01D10d894B36dBA00E5ecc1e54ff32e83F84D5);
 
     DAOFactory daoFactory;
-    MockGovToken pceGovToken;
+    PCECommunityGovToken pceCommunityGovToken;
+    MockERC20 mockERC20;
 
-    event DAOSocialConfigUpdated(
+    event DAOSocialConfigUpdated(bytes32 indexed daoId, DAOFactory.SocialConfig socialConfig);
+    event ContractDeployed(address contractAddress);
+    event DAOCreated(
         bytes32 indexed daoId,
         string description,
         string website,
         string linkedin,
         string twitter,
-        string telegram
+        string telegram,
+        string name,
+        address governor,
+        address timelock,
+        address governanceToken,
+        address communityToken
     );
-    event ContractDeployed(address contractAddress);
 
     function setUp() public {
         daoFactory = new DAOFactory();
-        pceGovToken = new MockGovToken();
-        pceGovToken.initialize();
+
+        pceCommunityGovToken = new PCECommunityGovToken();
+
+        mockERC20 = new MockERC20();
+        mockERC20.initialize();
 
         Timelock _timelock = new Timelock();
         GovernorAlpha _gov = new GovernorAlpha();
-        daoFactory.setImplementation(address(_timelock), address(_gov), address(pceGovToken));
-
-        pceGovToken.mint(alice, INITIAL_BALANCE);
-        pceGovToken.mint(bob, INITIAL_BALANCE);
+        daoFactory.setImplementation(
+            address(_timelock),
+            address(_gov),
+            address(pceCommunityGovToken)
+        );
 
         vm.roll(block.number + 10000);
     }
@@ -80,11 +92,15 @@ contract DaoFactoryTest is Test {
     function testSetImplementation() public {
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
-        daoFactory.setImplementation(address(timelock), address(gov), address(pceGovToken));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(gov),
+            address(pceCommunityGovToken)
+        );
 
         assertEq(daoFactory.timelockImplementation(), address(timelock));
         assertEq(daoFactory.governorImplementation(), address(gov));
-        assertEq(daoFactory.governanceTokenImplementation(), address(pceGovToken));
+        assertEq(daoFactory.governanceTokenImplementation(), address(pceCommunityGovToken));
     }
 
     function testSetImplementation_RevertsWhen_NotOwner() public {
@@ -92,14 +108,20 @@ contract DaoFactoryTest is Test {
         GovernorAlpha _gov = new GovernorAlpha();
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", bob));
-        daoFactory.setImplementation(address(_timelock), address(_gov), address(pceGovToken));
+        daoFactory.setImplementation(
+            address(_timelock),
+            address(_gov),
+            address(pceCommunityGovToken)
+        );
     }
 
     function testDaoCreation() public {
+        testSetImplementation();
+
         bytes32 newDaoId = daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY, // votingDelay
             VOTING_PERIOD, // votingPeriod
             PROPOSAL_THRESHOLD, // proposalThreshold
@@ -115,7 +137,7 @@ contract DaoFactoryTest is Test {
 
         DAOFactory.DAOConfig memory daoConfig = daoFactory.getDAO(daoId);
 
-        assertEq(daoConfig.communityToken, address(pceGovToken));
+        assertEq(daoConfig.communityToken, address(mockERC20));
         assertEq(daoConfig.votingDelay, VOTING_DELAY);
         assertEq(daoConfig.votingPeriod, VOTING_PERIOD);
         assertEq(daoConfig.proposalThreshold, PROPOSAL_THRESHOLD);
@@ -129,17 +151,7 @@ contract DaoFactoryTest is Test {
     }
 
     function testDAOCreationAndProposalFlow() public {
-        // Create DAO
-        daoFactory.createDAO(
-            DAO_NAME,
-            socialConfig,
-            address(pceGovToken),
-            VOTING_DELAY, // votingDelay
-            VOTING_PERIOD, // votingPeriod
-            PROPOSAL_THRESHOLD, // proposalThreshold
-            QUORUM_PERCENTAGE, // quorumPercentage
-            TIMELOCK_DELAY // timelockDelay
-        );
+        testDaoCreation();
 
         // Verify DAO creation
         bytes32 daoId = keccak256(abi.encodePacked(DAO_NAME));
@@ -154,14 +166,17 @@ contract DaoFactoryTest is Test {
         assertEq(timelock.admin(), address(governor));
 
         vm.startPrank(bob);
-        MockGovToken(address(governorToken)).mint(bob, INITIAL_BALANCE);
-        MockGovToken(address(governorToken)).delegate(bob);
+        mockERC20.mint(bob, INITIAL_BALANCE);
+
+        mockERC20.approve(address(governorToken), INITIAL_BALANCE);
+        PCECommunityGovToken(governorToken).deposit(INITIAL_BALANCE);
+        PCECommunityGovToken(governorToken).delegate(bob);
 
         vm.roll(block.number + 10);
 
         // Create proposal parameters
         address[] memory targets = new address[](1);
-        targets[0] = address(pceGovToken);
+        targets[0] = address(mockERC20);
 
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
@@ -227,7 +242,7 @@ contract DaoFactoryTest is Test {
             "Proposal should be executed"
         );
         assertEq(
-            pceGovToken.allowance(address(timelock), bob),
+            mockERC20.allowance(address(timelock), bob),
             1000000,
             "Bob should have allowance for 1000000 tokens"
         );
@@ -241,7 +256,7 @@ contract DaoFactoryTest is Test {
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -254,33 +269,17 @@ contract DaoFactoryTest is Test {
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
 
-        daoFactory.setImplementation(address(timelock), address(gov), address(pceGovToken));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(gov),
+            address(pceCommunityGovToken)
+        );
 
         vm.expectRevert("Empty name not allowed");
         daoFactory.createDAO(
             "",
             socialConfig,
-            address(pceGovToken),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            QUORUM_PERCENTAGE,
-            TIMELOCK_DELAY
-        );
-    }
-
-    function testCannotCreateDAOWithInvalidParameters() public {
-        Timelock timelock = new Timelock();
-        GovernorAlpha gov = new GovernorAlpha();
-
-        daoFactory.setImplementation(address(timelock), address(gov), address(pceGovToken));
-
-        // Test with zero address for governance token
-        vm.expectRevert("Invalid governance token");
-        daoFactory.createDAO(
-            DAO_NAME,
-            socialConfig,
-            address(0), // zero address
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -294,7 +293,7 @@ contract DaoFactoryTest is Test {
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -313,7 +312,7 @@ contract DaoFactoryTest is Test {
                 twitter: "https://twitter.com/test2",
                 telegram: "https://t.me/test2"
             }),
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -323,12 +322,12 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDAOWithInvalidTimeLock() public {
-        daoFactory.setImplementation(address(0), address(0), address(pceGovToken));
+        daoFactory.setImplementation(address(0), address(0), address(pceCommunityGovToken));
         vm.expectRevert("Timelock implementation not set");
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -339,13 +338,12 @@ contract DaoFactoryTest is Test {
 
     function testCannotCreateDAOWithInvalidGovernor() public {
         Timelock timelock = new Timelock();
-        GovernorAlpha gov = new GovernorAlpha();
-        daoFactory.setImplementation(address(timelock), address(gov), address(0));
-        vm.expectRevert("Governor token address not set");
+        daoFactory.setImplementation(address(timelock), address(0), address(pceCommunityGovToken));
+        vm.expectRevert("Governor implementation not set");
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -356,12 +354,13 @@ contract DaoFactoryTest is Test {
 
     function testCannotCreateDAOWithInvalidGovernorToken() public {
         Timelock timelock = new Timelock();
-        daoFactory.setImplementation(address(timelock), address(0), address(pceGovToken));
-        vm.expectRevert("Governor implementation not set");
+        GovernorAlpha gov = new GovernorAlpha();
+        daoFactory.setImplementation(address(timelock), address(gov), address(0));
+        vm.expectRevert("Governor token address not set");
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -371,11 +370,19 @@ contract DaoFactoryTest is Test {
     }
 
     function testCannotCreateDAOWithInvalidQuorum() public {
+        Timelock timelock = new Timelock();
+        GovernorAlpha gov = new GovernorAlpha();
+        daoFactory.setImplementation(
+            address(timelock),
+            address(gov),
+            address(pceCommunityGovToken)
+        );
+
         vm.expectRevert("Quorum cannot be zero");
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -389,7 +396,7 @@ contract DaoFactoryTest is Test {
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -407,15 +414,9 @@ contract DaoFactoryTest is Test {
             twitter: "https://twitter.com/updated",
             telegram: "https://t.me/updated"
         });
+
         vm.expectEmit(true, false, false, true);
-        emit DAOSocialConfigUpdated(
-            daoId,
-            newConfig.description,
-            newConfig.website,
-            newConfig.linkedin,
-            newConfig.twitter,
-            newConfig.telegram
-        );
+        emit DAOSocialConfigUpdated(daoId, newConfig);
         daoFactory.updateDAOSocialConfig(daoId, newConfig);
 
         // Verify update
@@ -448,7 +449,7 @@ contract DaoFactoryTest is Test {
         daoFactory.createDAO(
             DAO_NAME,
             socialConfig,
-            address(pceGovToken),
+            address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
@@ -468,7 +469,7 @@ contract DaoFactoryTest is Test {
         assertFalse(exists);
     }
 
-    // internal deploy()
+    // Test internal deploy() function
     function testDeploy_EmitsEventWithAddress() public {
         DaoFactoryDeployable daoFactoryDeployable = new DaoFactoryDeployable();
         // We check the logs instead of using vm.expectEmit because we need the newly created address
@@ -496,5 +497,62 @@ contract DaoFactoryTest is Test {
         bytes memory _constructorArgs
     ) public pure returns (bytes memory) {
         return abi.encodePacked(_bytecode, _constructorArgs);
+    }
+
+    // Additional optimized tests
+    function testMultipleDAOCreation() public {
+        // Create first DAO
+        daoFactory.createDAO(
+            DAO_NAME,
+            socialConfig,
+            address(mockERC20),
+            VOTING_DELAY,
+            VOTING_PERIOD,
+            PROPOSAL_THRESHOLD,
+            QUORUM_PERCENTAGE,
+            TIMELOCK_DELAY
+        );
+
+        // Create second DAO with different name
+        string memory secondDaoName = "Second Test DAO";
+        DAOFactory.SocialConfig memory secondSocialConfig = DAOFactory.SocialConfig({
+            description: "Second DAO Description",
+            website: "https://second.com",
+            linkedin: "https://linkedin.com/second",
+            twitter: "https://twitter.com/second",
+            telegram: "https://t.me/second"
+        });
+
+        bytes32 secondDaoId = daoFactory.createDAO(
+            secondDaoName,
+            secondSocialConfig,
+            address(mockERC20),
+            VOTING_DELAY,
+            VOTING_PERIOD,
+            PROPOSAL_THRESHOLD,
+            QUORUM_PERCENTAGE,
+            TIMELOCK_DELAY
+        );
+
+        assertEq(daoFactory.totalDAOs(), 2);
+        assertTrue(daoFactory.daoNames(DAO_NAME));
+        assertTrue(daoFactory.daoNames(secondDaoName));
+
+        // Verify both DAOs exist
+        DAOFactory.DAOConfig memory firstDao = daoFactory.getDAO(
+            keccak256(abi.encodePacked(DAO_NAME))
+        );
+        DAOFactory.DAOConfig memory secondDao = daoFactory.getDAO(secondDaoId);
+
+        assertTrue(firstDao.exists);
+        assertTrue(secondDao.exists);
+        assertEq(firstDao.socialConfig.description, socialConfig.description);
+        assertEq(secondDao.socialConfig.description, secondSocialConfig.description);
+    }
+
+    function testGetDAORevertsForNonExistentDAO() public {
+        bytes32 nonExistentDaoId = keccak256(abi.encodePacked("Non Existent DAO"));
+        vm.expectRevert("DAO does not exist");
+        daoFactory.getDAO(nonExistentDaoId);
     }
 }

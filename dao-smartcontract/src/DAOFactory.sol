@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -16,6 +16,7 @@ contract DAOFactory is Ownable {
     }
 
     struct DAOConfig {
+        address creator;
         address governor;
         address timelock;
         address governanceToken;
@@ -26,6 +27,14 @@ contract DAOFactory is Ownable {
         uint256 quorum;
         SocialConfig socialConfig;
         bool exists;
+    }
+
+    struct GovernorConfig {
+        string name;
+        address governor;
+        address timelock;
+        address governanceToken;
+        address communityToken;
     }
 
     // Mapping from DAO ID to its configuration
@@ -43,16 +52,8 @@ contract DAOFactory is Ownable {
 
     event DAOCreated(
         bytes32 indexed daoId,
-        string description,
-        string website,
-        string linkedin,
-        string twitter,
-        string telegram,
-        string name,
-        address indexed governor,
-        address indexed timelock,
-        address governanceToken,
-        address communityToken
+        SocialConfig socialConfig,
+        GovernorConfig governorConfig
     );
 
     constructor() Ownable(msg.sender) {}
@@ -77,11 +78,8 @@ contract DAOFactory is Ownable {
         uint256 quorum,
         uint256 timelockDelay
     ) external returns (bytes32) {
-        require(communityToken != address(0), "Invalid governance token");
-        require(
-            IGovernanceToken(communityToken).owner() == msg.sender,
-            "Invalid community token owner"
-        );
+        require(msg.sender == owner(), "Invalid community token owner");
+        require(communityToken != address(0), "Invalid community token");
         require(bytes(daoName).length > 0, "Empty name not allowed");
         require(!daoNames[daoName], "DAO name already exists");
 
@@ -96,7 +94,7 @@ contract DAOFactory is Ownable {
         // Deploy Governance Token
         require(governanceTokenImplementation != address(0), "Governor token address not set");
         address governanceTokenAddress = governanceTokenImplementation.clone();
-        IGovernanceToken(governanceTokenAddress).initialize();
+        IGovernanceToken(governanceTokenAddress).initialize(communityToken);
 
         // Deploy Governor
         require(quorum > 0, "Quorum cannot be zero");
@@ -118,6 +116,7 @@ contract DAOFactory is Ownable {
 
         // Store DAO configuration
         daos[daoId] = DAOConfig({
+            creator: msg.sender,
             governor: governorAddress,
             timelock: timelockAddress,
             communityToken: communityToken,
@@ -132,19 +131,19 @@ contract DAOFactory is Ownable {
 
         daoNames[daoName] = true;
         totalDAOs++;
+        string memory _daoName = daoName;
+        address _communityToken = communityToken;
 
         emit DAOCreated(
             daoId,
-            socialConfig.description,
-            socialConfig.website,
-            socialConfig.linkedin,
-            socialConfig.twitter,
-            socialConfig.telegram,
-            daoName,
-            governorAddress,
-            timelockAddress,
-            governanceTokenAddress,
-            communityToken
+            socialConfig,
+            GovernorConfig({
+                name: _daoName,
+                governor: governorAddress,
+                timelock: timelockAddress,
+                governanceToken: governanceTokenAddress,
+                communityToken: _communityToken
+            })
         );
 
         return daoId;
@@ -174,29 +173,15 @@ contract DAOFactory is Ownable {
 
         daos[daoId].socialConfig = newConfig;
 
-        emit DAOSocialConfigUpdated(
-            daoId,
-            newConfig.description,
-            newConfig.website,
-            newConfig.linkedin,
-            newConfig.twitter,
-            newConfig.telegram
-        );
+        emit DAOSocialConfigUpdated(daoId, newConfig);
     }
 
-    event DAOSocialConfigUpdated(
-        bytes32 indexed daoId,
-        string description,
-        string website,
-        string linkedin,
-        string twitter,
-        string telegram
-    );
+    event DAOSocialConfigUpdated(bytes32 indexed daoId, SocialConfig socialConfig);
 }
 
 interface IGovernanceToken {
     function owner() external view returns (address);
-    function initialize() external;
+    function initialize(address _communityToken) external;
 }
 
 interface ITimelock {
