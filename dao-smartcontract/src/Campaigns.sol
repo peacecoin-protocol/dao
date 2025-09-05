@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -8,10 +8,17 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import {PEACECOINDAO_SBT} from "./Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "./Governance/PEACECOINDAO_NFT.sol";
 
 contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeable {
     using ECDSA for bytes32;
     using Strings for uint256;
+
+    enum TokenType {
+        PCE,
+        SBT,
+        NFT
+    }
 
     struct Campaign {
         uint256 sbtId;
@@ -22,7 +29,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         uint256 startDate;
         uint256 endDate;
         bool validateSignatures;
-        bool isNFT;
+        TokenType tokenType;
     }
 
     enum Status {
@@ -33,7 +40,8 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
 
     uint256 public campaignId;
     ERC20Upgradeable public token;
-    PEACECOINDAO_SBT public nft;
+    PEACECOINDAO_SBT public sbt;
+    PEACECOINDAO_NFT public nft;
 
     mapping(uint256 => address[]) public campWinners;
     mapping(uint256 => Campaign) public campaigns;
@@ -54,12 +62,17 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         uint256 startDate,
         uint256 endDate,
         bool validateSignatures,
-        bool isNFT
+        TokenType tokenType
     );
 
-    function initialize(ERC20Upgradeable _token, PEACECOINDAO_SBT _nft) public initializer {
+    function initialize(
+        ERC20Upgradeable _token,
+        PEACECOINDAO_SBT _sbt,
+        PEACECOINDAO_NFT _nft
+    ) public initializer {
         token = _token;
         nft = _nft;
+        sbt = _sbt;
         __Ownable_init(msg.sender);
     }
 
@@ -75,8 +88,10 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         campaignId++;
         campaigns[campaignId] = _campaign;
 
-        if (_campaign.isNFT) {
+        if (_campaign.tokenType == TokenType.NFT) {
             nft.mint(address(this), _campaign.sbtId, _campaign.totalAmount);
+        } else if (_campaign.tokenType == TokenType.PCE) {
+            token.transfer(address(this), _campaign.totalAmount);
         }
 
         emit CampaignCreated(
@@ -89,7 +104,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
             _campaign.startDate,
             _campaign.endDate,
             _campaign.validateSignatures,
-            _campaign.isNFT
+            _campaign.tokenType
         );
     }
 
@@ -160,7 +175,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
             champWinnersClaimed[_campaignId][msg.sender] = true;
         }
 
-        if (campaign.isNFT) {
+        if (campaign.tokenType == TokenType.NFT) {
             nft.safeTransferFrom(
                 address(this),
                 msg.sender,
@@ -168,7 +183,9 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
                 campaign.claimAmount,
                 ""
             );
-        } else {
+        } else if (campaign.tokenType == TokenType.SBT) {
+            sbt.mint(msg.sender, campaign.sbtId, campaign.claimAmount);
+        } else if (campaign.tokenType == TokenType.PCE) {
             token.transfer(msg.sender, campaign.claimAmount);
         }
 

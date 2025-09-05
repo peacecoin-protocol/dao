@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 contract GovernorAlpha {
     /// @notice The name of this contract
@@ -24,6 +24,16 @@ contract GovernorAlpha {
     uint256 public proposalCount;
 
     bool public initialized;
+
+    struct SocialConfig {
+        string description;
+        string website;
+        string linkedin;
+        string twitter;
+        string telegram;
+    }
+
+    SocialConfig public socialConfig;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -423,6 +433,34 @@ contract GovernorAlpha {
         quorumVotes = quorumVotes_;
         proposalThreshold = proposalThreshold_;
         proposalMaxOperations = proposalMaxOperations_;
+    }
+
+    event SocialConfigUpdated(
+        string description,
+        string website,
+        string linkedin,
+        string twitter,
+        string telegram
+    );
+
+    function updateSocialConfig(
+        string memory description,
+        string memory website,
+        string memory linkedin,
+        string memory twitter,
+        string memory telegram
+    ) public {
+        socialConfig.description = description;
+        socialConfig.website = website;
+        socialConfig.linkedin = linkedin;
+        socialConfig.twitter = twitter;
+        socialConfig.telegram = telegram;
+
+        emit SocialConfigUpdated(description, website, linkedin, twitter, telegram);
+    }
+
+    function getSocialConfig() public view returns (SocialConfig memory) {
+        return socialConfig;
     }
 
     function __acceptAdmin() public {

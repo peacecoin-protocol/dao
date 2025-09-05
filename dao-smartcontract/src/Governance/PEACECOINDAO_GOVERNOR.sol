@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import {SBTInterface} from "../interfaces/SBTInterface.sol";
 
@@ -29,6 +29,16 @@ contract PEACECOINDAO_GOVERNOR {
     uint256 public proposalCount;
 
     bool public initialized;
+
+    struct SocialConfig {
+        string description;
+        string website;
+        string linkedin;
+        string twitter;
+        string telegram;
+    }
+
+    SocialConfig public socialConfig;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -120,6 +130,14 @@ contract PEACECOINDAO_GOVERNOR {
     event ProposalMaxOperationsSet(
         uint256 oldProposalMaxOperations,
         uint256 newProposalMaxOperations
+    );
+
+    event SocialConfigUpdated(
+        string description,
+        string website,
+        string linkedin,
+        string twitter,
+        string telegram
     );
 
     function initialize(
@@ -441,6 +459,26 @@ contract PEACECOINDAO_GOVERNOR {
         emit QuorumVotesSet(quorumVotes, quorumVotes_);
         emit ProposalThresholdSet(proposalThreshold, proposalThreshold_);
         emit ProposalMaxOperationsSet(proposalMaxOperations, proposalMaxOperations_);
+    }
+
+    function updateSocialConfig(
+        string memory description,
+        string memory website,
+        string memory linkedin,
+        string memory twitter,
+        string memory telegram
+    ) public {
+        socialConfig.description = description;
+        socialConfig.website = website;
+        socialConfig.linkedin = linkedin;
+        socialConfig.twitter = twitter;
+        socialConfig.telegram = telegram;
+
+        emit SocialConfigUpdated(description, website, linkedin, twitter, telegram);
+    }
+
+    function getSocialConfig() public view returns (SocialConfig memory) {
+        return socialConfig;
     }
 
     function __acceptAdmin() public {

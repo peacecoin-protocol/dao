@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../mocks/MockERC20.sol";
@@ -13,9 +13,20 @@ import "../Campaigns.sol";
 import "../SBT.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
 import "../Governance/PCE.sol";
+import "../Governance/PEACECOINDAO_NFT.sol";
 import {console} from "forge-std/console.sol";
 
 contract scriptSepolia is Script {
+    // Metadata for SBT
+    string uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
+    string name = "PCE Contributor NFT";
+    string symbol = "PCE_CONTRIBUTOR";
+    string daoName = "PCE DAO";
+    uint256 _votingDelay = 1;
+    uint256 _votingPeriod = 50; // 3 blocks
+    uint256 _proposalThreshold = 30;
+    uint256 _quorumVotes = 200;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -55,11 +66,6 @@ contract scriptSepolia is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        string memory daoName = "PCE DAO";
-        uint256 _votingDelay = 1;
-        uint256 _votingPeriod = 50; // 3 blocks
-        uint256 _proposalThreshold = 30;
-        uint256 _quorumVotes = 200;
         gov.initialize(
             daoName,
             address(peacecoinDaoSbt),
@@ -74,13 +80,8 @@ contract scriptSepolia is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        // Metadata for SBT
-        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
-        string memory name = "PCE Contributor NFT";
-        string memory symbol = "PCE_CONTRIBUTOR";
-        string[2] memory tokenURIs = [
-            "bafkreiexs3fw2ud7a6ckzzjitl3jmoi2t2moezncyoe3wvk2svmqn3f2jy",
-            "bafkreiezewcgdfxjii4nx5lul5x6wppgrquzogk3xzwlxubytsg7fpp234"
+        string[1] memory tokenURIs = [
+            "bafkreidebene2ene6elg6xzsxvmqe7ifurvwzhdjtoycpysksmltksch64"
         ];
 
         peacecoinDaoSbt.initialize(uri, name, symbol);
@@ -95,7 +96,10 @@ contract scriptSepolia is Script {
         Campaigns campaigns = new Campaigns();
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt);
+        PEACECOINDAO_NFT peacecoinDaoNft = new PEACECOINDAO_NFT();
+        peacecoinDaoNft.initialize(uri, name, symbol);
+
+        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt, peacecoinDaoNft);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
@@ -109,7 +113,7 @@ contract scriptSepolia is Script {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: false,
-            isNFT: true
+            tokenType: Campaigns.TokenType.NFT
         });
 
         campaigns.createCampaign(_campaign);
@@ -125,7 +129,7 @@ contract scriptSepolia is Script {
         _campaign.claimAmount = 5;
         _campaign.totalAmount = 10;
         _campaign.validateSignatures = true;
-        _campaign.isNFT = false;
+        _campaign.tokenType = Campaigns.TokenType.SBT;
 
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);

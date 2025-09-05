@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "forge-std/console.sol";
 
-contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
+contract PEACECOINDAO_NFT is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     using Checkpoints for Checkpoints.Trace224;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -56,8 +56,8 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
 
     // ========== Admin ==========
     function setTokenURI(uint256 id, string memory _tokenURI, uint256 weight) external {
-        // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
-        require(id > 0, "PEACECOINDAO_SBT: id must be greater than 0");
+        // require(minters[msg.sender], "PEACECOINDAO_NFT: not a minter");
+        require(id > 0, "PEACECOINDAO_NFT: id must be greater than 0");
 
         tokenURIs[id] = _tokenURI;
         votingPowerPerId[id] = weight;
@@ -71,8 +71,8 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     }
 
     function mint(address to, uint256 id, uint256 amount) external {
-        // require(minters[msg.sender], "PEACECOINDAO_SBT: not a minter");
-        require(id > 0, "PEACECOINDAO_SBT: id must be greater than 0");
+        // require(minters[msg.sender], "PEACECOINDAO_NFT: not a minter");
+        require(id > 0, "PEACECOINDAO_NFT: id must be greater than 0");
 
         _mint(to, id, amount, "");
         _balances[to][id] += amount;
@@ -94,7 +94,7 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
     }
 
     function burn(address from, uint256 id, uint256 amount) external {
-        require(_balances[from][id] >= amount, "PEACECOINDAO_SBT: not enough balance");
+        require(_balances[from][id] >= amount, "PEACECOINDAO_NFT: not enough balance");
 
         _burn(from, id, amount);
         _balances[from][id] -= amount;
@@ -181,33 +181,5 @@ contract PEACECOINDAO_SBT is Initializable, OwnableUpgradeable, ERC1155Upgradeab
             uint256 oldTo = _checkpoints[to].latest();
             _checkpoints[to].push(currentBlock, uint224(oldTo + amount));
         }
-    }
-
-    /**
-     * @dev Override to prevent transfers - SBTs are non-transferable
-     * @notice This function always reverts as SBTs cannot be transferred
-     */
-    function safeTransferFrom(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes memory
-    ) public pure override {
-        revert("SBT: non-transferable");
-    }
-
-    /**
-     * @dev Override to prevent batch transfers - SBTs are non-transferable
-     * @notice This function always reverts as SBTs cannot be transferred
-     */
-    function safeBatchTransferFrom(
-        address,
-        address,
-        uint256[] memory,
-        uint256[] memory,
-        bytes memory
-    ) public pure override {
-        revert("SBT: non-transferable");
     }
 }

@@ -7,11 +7,13 @@ import {Campaigns} from "../src/Campaigns.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {console} from "forge-std/console.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
 contract CampaignsTest is Test {
     using Strings for uint256;
     Campaigns public campaigns;
     MockERC20 public token;
-    PEACECOINDAO_SBT public nft;
+    PEACECOINDAO_NFT public nft;
+    PEACECOINDAO_SBT public sbt;
     address public alice = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address public bob = makeAddr("Bob");
     address public charlie = makeAddr("Charlie");
@@ -19,9 +21,16 @@ contract CampaignsTest is Test {
 
     function setUp() public {
         token = new MockERC20();
-        nft = new PEACECOINDAO_SBT();
+        nft = new PEACECOINDAO_NFT();
         nft.initialize(
-            "https://orange-elegant-takin-78.mypinata.cloud/ipfs/",
+            "https://peacecoin-dao.mypinata.cloud/ipfs/",
+            "PEACECOIN DAO SBT",
+            "PCE_SBT"
+        );
+
+        sbt = new PEACECOINDAO_SBT();
+        sbt.initialize(
+            "https://peacecoin-dao.mypinata.cloud/ipfs/",
             "PEACECOIN DAO SBT",
             "PCE_SBT"
         );
@@ -32,7 +41,7 @@ contract CampaignsTest is Test {
         // Set Campaigns as minter for NFT
         nft.setMinter(address(campaigns));
 
-        campaigns.initialize(token, nft);
+        campaigns.initialize(token, sbt, nft);
 
         token.mint(address(campaigns), 1000e18);
     }
@@ -47,7 +56,7 @@ contract CampaignsTest is Test {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: true,
-            isNFT: true
+            tokenType: Campaigns.TokenType.NFT
         });
         campaigns.createCampaign(campaign);
 
@@ -60,7 +69,7 @@ contract CampaignsTest is Test {
             uint256 startDate,
             uint256 endDate,
             bool validateSignatures,
-            bool isNFT
+            Campaigns.TokenType tokenType
         ) = campaigns.campaigns(1);
 
         assertEq(sbtId, 1);
@@ -71,7 +80,6 @@ contract CampaignsTest is Test {
         assertGt(startDate, 0);
         assertGt(endDate, startDate);
         assertEq(validateSignatures, true);
-        assertEq(isNFT, true);
         assertEq(campaigns.campaignId(), 1);
     }
 
@@ -90,7 +98,7 @@ contract CampaignsTest is Test {
                 startDate: block.timestamp + 100,
                 endDate: block.timestamp + 1000,
                 validateSignatures: true,
-                isNFT: true
+                tokenType: Campaigns.TokenType.PCE
             })
         );
     }

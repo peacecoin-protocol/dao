@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../mocks/MockERC20.sol";
@@ -12,9 +12,19 @@ import "../mocks/PCECommunityGovToken.sol";
 import "../Campaigns.sol";
 import "../SBT.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
+import "../Governance/PEACECOINDAO_NFT.sol";
 import {console} from "forge-std/console.sol";
 
 contract script is Script {
+    address PCE_TOKEN = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
+    string uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
+    string name = "PCE Contributor NFT";
+    string symbol = "PCE_CONTRIBUTOR";
+    string daoName = "PCE DAO";
+    uint256 _votingDelay = 1;
+    uint256 _votingPeriod = 50; // 3 blocks
+    uint256 _proposalThreshold = 30;
+    uint256 _quorumVotes = 200;
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -22,7 +32,6 @@ contract script is Script {
 
         uint256 _bountyAmount = 0;
 
-        address PCE_TOKEN = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
 
@@ -48,11 +57,6 @@ contract script is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        string memory daoName = "PCE DAO";
-        uint256 _votingDelay = 1;
-        uint256 _votingPeriod = 50; // 3 blocks
-        uint256 _proposalThreshold = 30;
-        uint256 _quorumVotes = 200;
         gov.initialize(
             daoName,
             address(peacecoinDaoSbt),
@@ -67,19 +71,17 @@ contract script is Script {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
-        // Metadata for SBT
-        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
-        string memory name = "PCE Contributor NFT";
-        string memory symbol = "PCE_CONTRIBUTOR";
-
         peacecoinDaoSbt.initialize(uri, name, symbol);
+
+        PEACECOINDAO_NFT peacecoinDaoNft = new PEACECOINDAO_NFT();
+        peacecoinDaoNft.initialize(uri, name, symbol);
 
         vm.roll(block.number + 1);
 
         Campaigns campaigns = new Campaigns();
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt);
+        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt, peacecoinDaoNft);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
@@ -93,11 +95,9 @@ contract script is Script {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: false,
-            isNFT: true
+            tokenType: Campaigns.TokenType.NFT
         });
 
-        campaigns.createCampaign(_campaign);
-        campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
 
@@ -147,5 +147,6 @@ contract script is Script {
         console.log("PCE Community Gov Token: ", address(pceCommunityGovToken));
         console.log("Campaigns: ", address(campaigns));
         console.log("SBT: ", address(peacecoinDaoSbt));
+        console.log("NFT: ", address(peacecoinDaoNft));
     }
 }

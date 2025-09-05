@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
@@ -11,19 +11,26 @@ import "../Governance/WPCE.sol";
 import "../Governance/PCE.sol";
 
 contract PEACECOINDAO_SBTScript is Script {
+    uint256 _rewardPerBlock = 1e18;
+    string name = "PEACECOIN DAO SBT";
+    string symbol = "PCE_SBT";
+    string uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
+
+    // Deploy Governor
+    string daoName = "PEACECOIN DAO";
+    uint256 _votingDelay = 1;
+    uint256 _votingPeriod = 10; // 1 week
+    uint256 _proposalThreshold = 10_000 * 1e18; // 10,000 PCE
+    uint256 _quorumVotes = 100_000 * 1e18; // 100,000 PCE
+    uint256 _timelockDelay = 1 days;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        uint256 _rewardPerBlock = 1e18;
         address deployerAddress = vm.addr(deployerPrivateKey);
-        string memory name = "PEACECOIN DAO SBT";
-        string memory symbol = "PCE_SBT";
-        string memory uri = "https://orange-elegant-takin-78.mypinata.cloud/ipfs/";
 
         vm.roll(block.number + 1); // Wait for 1 block
-
-        vm.roll(block.number + 1);
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
         peacecoinDaoSbt.initialize(uri, name, symbol);
@@ -58,34 +65,27 @@ contract PEACECOINDAO_SBTScript is Script {
         pce.approve(address(staking), _amount);
         staking.stake(_amount);
 
-        vm.roll(block.number + 1);
-
         wPCE.delegate(deployerAddress);
 
         vm.roll(block.number + 1);
 
-        // Deploy Governor
-        string memory daoName = "PEACECOIN DAO";
-        uint256 _votingDelay = 1;
-        uint256 _votingPeriod = 10; // 1 week
-        uint256 _proposalThreshold = 10_000 * 1e18; // 10,000 PCE
-        uint256 _quorumVotes = 100_000 * 1e18; // 100,000 PCE
-        uint256 _timelockDelay = 1 days;
+        address _peacecoinDaoSbt = address(peacecoinDaoSbt);
 
         PEACECOINDAO_GOVERNOR governor = new PEACECOINDAO_GOVERNOR();
         Timelock timelock = new Timelock();
+        address _deployerAddress = deployerAddress;
 
-        timelock.initialize(deployerAddress, _timelockDelay);
+        timelock.initialize(_deployerAddress, _timelockDelay);
         governor.initialize(
             daoName,
             address(wPCE),
-            address(peacecoinDaoSbt),
+            address(_peacecoinDaoSbt),
             address(timelock),
             _votingDelay,
             _votingPeriod,
             _proposalThreshold,
             _quorumVotes,
-            deployerAddress
+            _deployerAddress
         );
         timelock.setPendingAdmin(address(governor));
         governor.__acceptAdmin();
