@@ -15,7 +15,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
     using Strings for uint256;
 
     enum TokenType {
-        PCE,
+        ERC20,
         SBT,
         NFT
     }
@@ -30,6 +30,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         uint256 endDate;
         bool validateSignatures;
         TokenType tokenType;
+        address token;
     }
 
     enum Status {
@@ -39,14 +40,13 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
     }
 
     uint256 public campaignId;
-    ERC20Upgradeable public token;
     PEACECOINDAO_SBT public sbt;
     PEACECOINDAO_NFT public nft;
 
     mapping(uint256 => address[]) public campWinners;
     mapping(uint256 => Campaign) public campaigns;
-    mapping(uint256 => mapping(address => bool)) public champWinnersClaimed;
-    mapping(uint256 => mapping(bytes32 => bool)) public champGistsClaimed;
+    mapping(uint256 => mapping(address => bool)) public campWinnersClaimed;
+    mapping(uint256 => mapping(bytes32 => bool)) public campGistsClaimed;
     mapping(uint256 => bytes32[]) public campGists;
     mapping(uint256 => uint256) public totalClaimed;
 
@@ -62,15 +62,11 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         uint256 startDate,
         uint256 endDate,
         bool validateSignatures,
-        TokenType tokenType
+        TokenType tokenType,
+        address token
     );
 
-    function initialize(
-        ERC20Upgradeable _token,
-        PEACECOINDAO_SBT _sbt,
-        PEACECOINDAO_NFT _nft
-    ) public initializer {
-        token = _token;
+    function initialize(PEACECOINDAO_SBT _sbt, PEACECOINDAO_NFT _nft) public initializer {
         nft = _nft;
         sbt = _sbt;
         __Ownable_init(msg.sender);
@@ -90,8 +86,12 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
 
         if (_campaign.tokenType == TokenType.NFT) {
             nft.mint(address(this), _campaign.sbtId, _campaign.totalAmount);
-        } else if (_campaign.tokenType == TokenType.PCE) {
-            token.transfer(address(this), _campaign.totalAmount);
+        } else if (_campaign.tokenType == TokenType.ERC20) {
+            ERC20Upgradeable(_campaign.token).transferFrom(
+                msg.sender,
+                address(this),
+                _campaign.totalAmount
+            );
         }
 
         emit CampaignCreated(
@@ -104,7 +104,8 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
             _campaign.startDate,
             _campaign.endDate,
             _campaign.validateSignatures,
-            _campaign.tokenType
+            _campaign.tokenType,
+            _campaign.token
         );
     }
 
@@ -141,15 +142,19 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
         Campaign memory campaign = campaigns[_campaignId];
         require(campaign.startDate < block.timestamp, "Campaign is not started");
         require(campaign.endDate > block.timestamp, "Campaign is ended");
+        require(
+            campaign.totalAmount > totalClaimed[_campaignId] + campaign.claimAmount,
+            "Campaign is ended"
+        );
 
         require(
-            !champWinnersClaimed[_campaignId][msg.sender],
+            !campWinnersClaimed[_campaignId][msg.sender],
             "You have already claimed your prize"
         );
 
         if (campaign.validateSignatures) {
             require(verify(msg.sender, _message, _signature), "Invalid signature");
-            require(!champGistsClaimed[_campaignId][_gist], "You have already claimed your prize");
+            require(!campGistsClaimed[_campaignId][_gist], "You have already claimed your prize");
 
             bool isWhitelisted = false;
             for (uint256 i = 0; i < campGists[_campaignId].length; i++) {
@@ -159,8 +164,8 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
                 }
             }
             require(isWhitelisted, "You are not whitelisted");
-            champGistsClaimed[_campaignId][_gist] = true;
-            champWinnersClaimed[_campaignId][msg.sender] = true;
+            campGistsClaimed[_campaignId][_gist] = true;
+            campWinnersClaimed[_campaignId][msg.sender] = true;
         } else {
             require(campWinners[_campaignId].length > 0, "Campaign has no winners");
 
@@ -172,7 +177,7 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
                 }
             }
             require(_isWinner, "You are not a winner");
-            champWinnersClaimed[_campaignId][msg.sender] = true;
+            campWinnersClaimed[_campaignId][msg.sender] = true;
         }
 
         if (campaign.tokenType == TokenType.NFT) {
@@ -185,8 +190,8 @@ contract Campaigns is Initializable, OwnableUpgradeable, ERC1155HolderUpgradeabl
             );
         } else if (campaign.tokenType == TokenType.SBT) {
             sbt.mint(msg.sender, campaign.sbtId, campaign.claimAmount);
-        } else if (campaign.tokenType == TokenType.PCE) {
-            token.transfer(msg.sender, campaign.claimAmount);
+        } else if (campaign.tokenType == TokenType.ERC20) {
+            ERC20Upgradeable(campaign.token).transfer(msg.sender, campaign.claimAmount);
         }
 
         totalClaimed[_campaignId] += campaign.claimAmount;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
@@ -20,7 +20,6 @@ contract CampaignsTest is Test {
     bytes32 public gist = keccak256(abi.encodePacked("testGist"));
 
     function setUp() public {
-        token = new MockERC20();
         nft = new PEACECOINDAO_NFT();
         nft.initialize(
             "https://peacecoin-dao.mypinata.cloud/ipfs/",
@@ -41,7 +40,7 @@ contract CampaignsTest is Test {
         // Set Campaigns as minter for NFT
         nft.setMinter(address(campaigns));
 
-        campaigns.initialize(token, sbt, nft);
+        campaigns.initialize(sbt, nft);
 
         token.mint(address(campaigns), 1000e18);
     }
@@ -56,7 +55,8 @@ contract CampaignsTest is Test {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: true,
-            tokenType: Campaigns.TokenType.NFT
+            tokenType: Campaigns.TokenType.NFT,
+            token: address(token)
         });
         campaigns.createCampaign(campaign);
 
@@ -69,7 +69,8 @@ contract CampaignsTest is Test {
             uint256 startDate,
             uint256 endDate,
             bool validateSignatures,
-            Campaigns.TokenType tokenType
+            ,
+            address _token
         ) = campaigns.campaigns(1);
 
         assertEq(sbtId, 1);
@@ -81,6 +82,7 @@ contract CampaignsTest is Test {
         assertGt(endDate, startDate);
         assertEq(validateSignatures, true);
         assertEq(campaigns.campaignId(), 1);
+        assertEq(_token, address(token));
     }
 
     function test_createCampaign_shouldRevertIfNotOwner() public {
@@ -98,7 +100,8 @@ contract CampaignsTest is Test {
                 startDate: block.timestamp + 100,
                 endDate: block.timestamp + 1000,
                 validateSignatures: true,
-                tokenType: Campaigns.TokenType.PCE
+                tokenType: Campaigns.TokenType.ERC20,
+                token: address(token)
             })
         );
     }

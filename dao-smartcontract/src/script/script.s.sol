@@ -81,7 +81,7 @@ contract script is Script {
         Campaigns campaigns = new Campaigns();
         peacecoinDaoSbt.setMinter(address(campaigns));
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt, peacecoinDaoNft);
+        campaigns.initialize(peacecoinDaoSbt, peacecoinDaoNft);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
@@ -95,7 +95,8 @@ contract script is Script {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: false,
-            tokenType: Campaigns.TokenType.NFT
+            tokenType: Campaigns.TokenType.NFT,
+            token: address(PCE_TOKEN)
         });
 
         campaigns.createCampaign(_campaign);
@@ -108,9 +109,8 @@ contract script is Script {
         _campaign.claimAmount = 5;
         _campaign.totalAmount = 10;
         _campaign.validateSignatures = true;
+        _campaign.token = address(PCE_TOKEN);
 
-        campaigns.createCampaign(_campaign);
-        campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
 
         address[] memory winners = new address[](3);
