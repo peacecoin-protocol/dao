@@ -77,6 +77,6 @@ contract CampaignsScript is Script {
         console.log("Campaigns deployed at", address(campaigns));
         console.log("SBT deployed at", address(sbt));
         console.log("NFT deployed at", address(nft));
-        // vm.stopBroadcast();
+        vm.stopBroadcast();
     }
 }
