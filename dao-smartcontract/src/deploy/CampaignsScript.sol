@@ -8,47 +8,29 @@ import "../mocks/PCEGovTokenTest.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
 import "../Governance/PEACECOINDAO_NFT.sol";
 import "../Governance/PCE.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 contract CampaignsScript is Script {
+    // PCE pce = PCE(0x951E69b565924c0b846Ed0E779f190c53d29F62e);
+    string uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
+    string name = "PEACECOIN DAO SBT";
+    string symbol = "PCE_SBT";
+
+    PEACECOINDAO_SBT public sbt;
+    PEACECOINDAO_NFT public nft;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        // PCE pce = new PCE();
-        address pce = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
-        string memory uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
-        string memory name = "PEACECOIN DAO SBT";
-        string memory symbol = "PCE_SBT";
-        string[1] memory tokenURIs = [
-            "bafkreibvgbpgvojcekxyhcdm5o27z7mj5wmwkmqxcrprfd2a4txvb6wsvm"
-        ];
+        address deployerAddress = vm.addr(deployerPrivateKey);
+        PCE pce = new PCE();
 
-        PEACECOINDAO_SBT sbt = new PEACECOINDAO_SBT();
-        sbt.initialize(uri, name, symbol);
-
-        PEACECOINDAO_NFT nft = new PEACECOINDAO_NFT();
-        nft.initialize(uri, name, symbol);
-
-        vm.roll(block.number + 1);
-
-        for (uint256 i = 1; i <= tokenURIs.length; i++) {
-            sbt.setTokenURI(i, tokenURIs[i - 1], 10 * i);
-            vm.roll(block.number + 1);
-        }
-
-        for (uint256 i = 1; i <= tokenURIs.length; i++) {
-            nft.setTokenURI(i, tokenURIs[i - 1], 10 * i);
-            vm.roll(block.number + 1);
-        }
-
-        sbt.mint(msg.sender, 1, 1);
+        sbt = PEACECOINDAO_SBT(0x27E2A35C5f7fEa1BD9d90e61Ded262781b0045A3);
+        nft = PEACECOINDAO_NFT(0x76a3eD980e49AEB2785F0Eb914688FB273857EAF);
 
         Campaigns campaigns = new Campaigns();
-        campaigns.initialize(ERC20Upgradeable(address(pce)), sbt, nft);
-
-        sbt.setMinter(address(campaigns));
-
-        vm.roll(block.number + 1);
+        campaigns.initialize(sbt, nft);
 
         Campaigns.Campaign memory _campaign = Campaigns.Campaign({
             sbtId: 1,
@@ -59,7 +41,8 @@ contract CampaignsScript is Script {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 86400,
             validateSignatures: false,
-            tokenType: Campaigns.TokenType.NFT
+            tokenType: Campaigns.TokenType.NFT,
+            token: address(pce)
         });
 
         campaigns.createCampaign(_campaign);
@@ -67,12 +50,28 @@ contract CampaignsScript is Script {
         vm.roll(block.number + 1);
 
         _campaign.sbtId = 2;
-        _campaign.title = "Airdrop Contributor NFTs 2";
-        _campaign.description = "We will airdrop Contributor NFTs to PEACECOIN Contributors 2";
-        _campaign.claimAmount = 1;
-        _campaign.totalAmount = 10;
+        _campaign.title = "Airdrop Contributor SBTs 2";
+        _campaign.description = "We will airdrop Contributor SBT to PEACECOIN Contributors 2";
         _campaign.validateSignatures = true;
         _campaign.tokenType = Campaigns.TokenType.SBT;
+        _campaign.token = address(pce);
+
+        vm.roll(block.number + 1);
+        campaigns.createCampaign(_campaign);
+
+        pce.mint(deployerAddress, 1000 ether);
+        pce.approve(address(campaigns), 1000 ether);
+
+        _campaign.sbtId = 3;
+        _campaign.title = "Airdrop Contributor Token 3";
+        _campaign.description = "We will airdrop Contributor Token to PEACECOIN Contributors 3";
+        _campaign.claimAmount = 10 ether;
+        _campaign.totalAmount = 100 ether;
+        _campaign.validateSignatures = true;
+        _campaign.tokenType = Campaigns.TokenType.ERC20;
+        _campaign.token = address(pce);
+
+        vm.roll(block.number + 1);
         campaigns.createCampaign(_campaign);
 
         console.log("Campaigns deployed at", address(campaigns));

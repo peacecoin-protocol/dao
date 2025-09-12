@@ -39,7 +39,7 @@ contract scriptSepolia is Script {
         pce.initialize();
         address PCE_TOKEN = address(pce);
 
-        pce.mint(deployerAddress, 1000000000000000000000000000000000000000);
+        pce.mint(deployerAddress, 10000 ether);
 
         Timelock timelock = new Timelock();
         GovernorAlpha gov = new GovernorAlpha();
@@ -99,7 +99,7 @@ contract scriptSepolia is Script {
         PEACECOINDAO_NFT peacecoinDaoNft = new PEACECOINDAO_NFT();
         peacecoinDaoNft.initialize(uri, name, symbol);
 
-        campaigns.initialize(ERC20Upgradeable(PCE_TOKEN), peacecoinDaoSbt, peacecoinDaoNft);
+        campaigns.initialize(peacecoinDaoSbt, peacecoinDaoNft);
 
         // ERC20Upgradeable(PCE_TOKEN).transfer(address(campaigns), 10000e18);
 
@@ -113,12 +113,10 @@ contract scriptSepolia is Script {
             startDate: block.timestamp + 100,
             endDate: block.timestamp + 1000,
             validateSignatures: false,
-            tokenType: Campaigns.TokenType.NFT
+            tokenType: Campaigns.TokenType.NFT,
+            token: address(PCE_TOKEN)
         });
 
-        campaigns.createCampaign(_campaign);
-        campaigns.createCampaign(_campaign);
-        campaigns.createCampaign(_campaign);
         campaigns.createCampaign(_campaign);
 
         vm.roll(block.number + 1);
