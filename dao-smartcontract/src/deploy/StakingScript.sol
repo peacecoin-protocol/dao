@@ -17,7 +17,7 @@ contract StakingScript is Script {
         WPCE wpce = new WPCE();
         wpce.initialize();
 
-        uint256 rewardPerBlock = 1e18;
+        uint256 rewardPerBlock = 0.0001 ether;
 
         Staking staking = new Staking();
         wpce.addMinter(address(staking));
@@ -26,5 +26,6 @@ contract StakingScript is Script {
 
         console.log("Staking address:", address(staking));
         console.log("Deployer address:", deployerAddress);
+        console.log("WPCE address:", address(wpce));
     }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {Test, Vm} from "forge-std/Test.sol";
 import {ContractFactory} from "../src/ContractFactory.sol";
+import {IErrors} from "../src/interfaces/IErrors.sol";
 import "forge-std/console.sol";
 
 contract Example {
@@ -28,7 +29,7 @@ contract ContractFactoryTest is Test {
 
     function testDeploy() public {
         vm.prank(bob);
-        vm.expectRevert("Ownable Error");
+        vm.expectRevert(IErrors.PermissionDenied.selector);
 
         contractFactory.deploy(getBytecodeWithConstructorArgs(bytecode, _arguments));
 
@@ -54,7 +55,7 @@ contract ContractFactoryTest is Test {
 
     function testDeploy_Reverts_WhenByteCodeIsInvalid() public {
         vm.prank(alice);
-        vm.expectRevert("Contract deployment failed");
+        vm.expectRevert(IErrors.ContractDeploymentFailed.selector);
         contractFactory.deploy(bytes("Invalid EVM bytecode"));
     }
 

@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Bounty} from "../src/Bounty.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockGovernance} from "../src/mocks/MockGovernance.sol";
+import {IErrors} from "../src/interfaces/IErrors.sol";
 
 contract BountyTest is Test {
     Bounty public bounty;
@@ -70,7 +71,7 @@ contract BountyTest is Test {
     }
 
     function test_SetContributor_RevertWhen_AddressIsZero() public {
-        vm.expectRevert("Invalid contributor");
+        vm.expectRevert(IErrors.InvalidContributor.selector);
         bounty.setContributor(address(0), true);
     }
 
@@ -125,7 +126,7 @@ contract BountyTest is Test {
 
     function test_AddContributorBounty_RevertWhen_AddressIsZero() public {
         uint256 amount = 50e18;
-        vm.expectRevert("Invalid contributor");
+        vm.expectRevert(IErrors.InvalidContributor.selector);
         bounty.addContributorBounty(address(0), amount);
     }
 
@@ -205,17 +206,17 @@ contract BountyTest is Test {
         governance.setProposalState(proposalId, uint8(3)); // Pending state
 
         vm.prank(user1);
-        vm.expectRevert("Invalid proposal state");
+        vm.expectRevert(IErrors.InvalidProposalState.selector);
         bounty.addProposalBounty(proposalId, amount);
     }
 
     function test_RevertWhen_AddingZeroBounty() public {
         vm.prank(user1);
-        vm.expectRevert("Amount must be greater than 0");
+        vm.expectRevert(IErrors.ZeroAmount.selector);
         bounty.addContributorBounty(user2, 0);
 
         vm.prank(user1);
-        vm.expectRevert("Amount must be greater than 0");
+        vm.expectRevert(IErrors.ZeroAmount.selector);
         bounty.addProposalBounty(0, 0);
     }
 
@@ -224,13 +225,13 @@ contract BountyTest is Test {
         bounty.addContributorBounty(user1, amount);
 
         vm.prank(user2);
-        vm.expectRevert("Nothing to withdraw");
+        vm.expectRevert(IErrors.NothingToWithdraw.selector);
         bounty.claimContributorBounty();
     }
 
     function test_RevertWhen_ClaimingProposalBountyWithoutValidProposal() public {
         vm.prank(user1);
-        vm.expectRevert("Nothing to withdraw");
+        vm.expectRevert(IErrors.NothingToWithdraw.selector);
         bounty.claimProposalBounty();
     }
 

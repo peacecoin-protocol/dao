@@ -3,46 +3,69 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import "forge-std/console.sol";
+import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {IErrors} from "../src/interfaces/IErrors.sol";
 
-contract PEACECOINDAO_SBTTest is Test {
-    PEACECOINDAO_SBT public sbt;
+contract PEACECOINDAO_SBTTest is Test, DeployDAOFactory {
+    PEACECOINDAO_SBT public token;
 
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
+    address public daoFactory;
+
+    string constant DAO_NAME = "Test DAO";
+    string constant DAO_DESCRIPTION = "Test DAO";
+    string constant TOKEN_NAME = "Test Token";
+    string constant TOKEN_SYMBOL = "TEST_Token";
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
 
     function setUp() public {
-        sbt = new PEACECOINDAO_SBT();
-        sbt.initialize(
-            "PEACECOIN DAO SBT",
-            "PCE_SBT",
-            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
-        );
-        sbt.setTokenURI(1, "https://peacecoin.io/sbt/1", 10);
+        (daoFactory, , , , ) = deployDAOFactory();
+
+        token = new PEACECOINDAO_SBT();
+        token.initialize(TOKEN_NAME, TOKEN_SYMBOL, URI, daoFactory);
+
+        IAccessControl(daoFactory).grantRole(keccak256("DAO_MANAGER_ROLE"), address(this));
+        token.setMinter(bob);
     }
 
-    function test_owner() public view {
-        assertEq(address(sbt.owner()), address(this));
-    }
-
-    function test_Mint() public {
-        sbt.mint(alice, 1, 1);
-        assertEq(sbt.balanceOf(alice, 1), 1);
-        assertEq(sbt.votingPowerPerId(1), 10);
+    function test_createToken() public {
+        token.createToken();
+        assertEq(token.numberOfTokens(), 1);
 
         vm.prank(alice);
-        sbt.delegate(alice);
-        vm.roll(block.number + 1);
-        assertEq(sbt.getPastVotes(alice, block.number - 1), 10);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
+        token.createToken();
+    }
 
-        sbt.mint(bob, 1, 1);
-        assertEq(sbt.balanceOf(bob, 1), 1);
-        assertEq(sbt.votingPowerPerId(1), 10);
+    function test_mint() public {
+        test_createToken();
 
         vm.prank(bob);
-        sbt.delegate(alice);
-        vm.roll(block.number + 1);
-        assertEq(sbt.getPastVotes(alice, block.number - 1), 20);
-        assertEq(sbt.getPastVotes(bob, block.number - 1), 0);
+        token.mint(alice, 1, 1);
+        assertEq(token.balanceOf(alice, 1), 1);
+    }
+
+    function test_transferFrom() public {
+        test_mint();
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.NonTransferable.selector));
+        token.safeTransferFrom(alice, bob, 1, 1, "");
+    }
+
+    function test_safeBatchTransferFrom() public {
+        test_mint();
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = 1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1;
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.NonTransferable.selector));
+        token.safeBatchTransferFrom(alice, bob, ids, amounts, "");
     }
 }
