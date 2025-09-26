@@ -9,8 +9,9 @@ import "../mocks/PCEGovTokenTest.sol";
 import "../Staking.sol";
 import "../Governance/WPCE.sol";
 import "../Governance/PCE.sol";
-
-contract PEACECOINDAO_SBTScript is Script {
+import {DeployDAOFactory} from "./DeployDAOFactory.sol";
+import {console} from "forge-std/console.sol";
+contract PEACECOINDAO_SBTScript is Script, DeployDAOFactory {
     uint256 _rewardPerBlock = 1e18;
     string name = "PEACECOIN DAO SBT";
     string symbol = "PCE_SBT";
@@ -30,10 +31,12 @@ contract PEACECOINDAO_SBTScript is Script {
 
         address deployerAddress = vm.addr(deployerPrivateKey);
 
+        (address daoFactory, , , , ) = deployDAOFactory();
+
         vm.roll(block.number + 1); // Wait for 1 block
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
-        peacecoinDaoSbt.initialize(uri, name, symbol);
+        peacecoinDaoSbt.initialize(uri, name, symbol, daoFactory);
 
         vm.roll(block.number + 1);
         peacecoinDaoSbt.delegate(deployerAddress);

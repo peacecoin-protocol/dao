@@ -3,14 +3,15 @@ pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import {DAOFactory} from "../DAOFactory.sol";
+import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 import {PCECommunityGovToken} from "../mocks/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../Governance/GovernorAlpha.sol";
 import {Timelock} from "../Governance/Timelock.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract DAOFactoryScript is Script {
-    DAOFactory.SocialConfig socialConfig =
-        DAOFactory.SocialConfig({
+    IDAOFactory.SocialConfig socialConfig =
+        IDAOFactory.SocialConfig({
             description: "Test Description",
             website: "https://test.com",
             linkedin: "https://linkedin.com/test",
@@ -37,8 +38,8 @@ contract DAOFactoryScript is Script {
         uint256 VOTING_DELAY = 10;
         uint256 VOTING_PERIOD = 100;
         uint256 PROPOSAL_THRESHOLD = 1000;
-        uint256 QUORUM_PERCENTAGE = 400;
         uint256 TIMELOCK_DELAY = 100;
+        uint256 QUORUM_VOTES = 1000;
         string memory DAO_NAME = "Test DAO";
 
         daoFactory.createDAO(
@@ -48,8 +49,8 @@ contract DAOFactoryScript is Script {
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
-            QUORUM_PERCENTAGE,
-            TIMELOCK_DELAY
+            TIMELOCK_DELAY,
+            QUORUM_VOTES
         );
 
         vm.stopBroadcast();
