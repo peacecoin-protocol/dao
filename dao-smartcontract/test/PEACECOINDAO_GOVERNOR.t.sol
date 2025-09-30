@@ -5,12 +5,17 @@ import {Test} from "forge-std/Test.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_GOVERNOR} from "../src/Governance/PEACECOINDAO_GOVERNOR.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
+import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {IErrors} from "../src/interfaces/IErrors.sol";
+import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 
-contract PEACECOINDAO_GOVERNOR_TEST is Test {
+contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address guardian = makeAddr("guardian");
 
+    MockGovToken govToken;
     PEACECOINDAO_SBT sbt;
     PEACECOINDAO_GOVERNOR gov;
     Timelock timelock;
@@ -41,26 +46,20 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
     event ProposalQueued(uint256 id, uint256 eta);
     event ProposalExecuted(uint256 id);
 
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(guardian, "guardian");
 
-        sbt = new PEACECOINDAO_SBT();
-        sbt.initialize(
-            "PEACECOIN DAO SBT",
-            "PCE_SBT",
-            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
-        );
+        (address daoFactory, , , , ) = deployDAOFactory();
 
-        sbt.setTokenURI(1, "https://peacecoin.io/sbt/1", 10);
-        sbt.setTokenURI(2, "https://peacecoin.io/sbt/2", 10);
-        sbt.setTokenURI(3, "https://peacecoin.io/sbt/3", 10);
-        sbt.setTokenURI(4, "https://peacecoin.io/sbt/4", 10);
-        sbt.setTokenURI(5, "https://peacecoin.io/sbt/5", 10);
-        sbt.setTokenURI(6, "https://peacecoin.io/sbt/6", 10);
-        sbt.setTokenURI(7, "https://peacecoin.io/sbt/7", 10);
-        sbt.setTokenURI(8, "https://peacecoin.io/sbt/8", 10);
+        govToken = new MockGovToken();
+        govToken.initialize();
+
+        sbt = new PEACECOINDAO_SBT();
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
@@ -69,7 +68,7 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
         gov = new PEACECOINDAO_GOVERNOR();
         gov.initialize(
             "PEACECOIN DAO",
-            address(sbt),
+            address(govToken),
             address(sbt),
             address(timelock),
             VOTING_DELAY,
@@ -78,6 +77,11 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
             QUORUM_VOTES,
             guardian
         );
+
+        sbt.setMinter(address(this));
+
+        IAccessControl(daoFactory).grantRole(keccak256("DAO_MANAGER_ROLE"), address(this));
+        sbt.createToken();
 
         sbt.mint(guardian, 1, 1);
         sbt.mint(alice, 1, 1);
@@ -122,7 +126,7 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
         description = "Transfer SBT";
     }
 
-    function _createProposal() private returns (uint256 proposalId) {
+    function test_createProposal() private returns (uint256 proposalId) {
         (
             address[] memory targets,
             uint256[] memory values,
@@ -184,11 +188,16 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
         vm.expectRevert("Governor::propose: proposer votes below proposal threshold");
         gov.propose(targets, values, signatures, data, description);
 
+        sbt.delegate(address(this));
+
+        govToken.mint(address(this), 10 ether);
+        govToken.delegate(address(this));
+        vm.roll(block.number + 10);
+
         bytes[] memory inv_data = new bytes[](2);
         inv_data[0] = new bytes(1);
         inv_data[1] = new bytes(2);
 
-        vm.startPrank(alice);
         vm.expectRevert("Governor::propose: proposal function information arity mismatch");
         gov.propose(targets, values, signatures, inv_data, description);
 
@@ -214,7 +223,7 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
         vm.expectEmit(true, true, true, true);
         emit ProposalCreated(
             PROPOSAL_ID,
-            alice,
+            address(this),
             targets,
             values,
             signatures,
@@ -226,15 +235,13 @@ contract PEACECOINDAO_GOVERNOR_TEST is Test {
         gov.propose(targets, values, signatures, data, description);
 
         assertEq(gov.proposalCount(), 1);
-        assertEq(gov.latestProposalIds(alice), 1);
+        assertEq(gov.latestProposalIds(address(this)), 1);
 
         // Can't create new proposal if user has active/pending proposal
         vm.expectRevert(
             "Governor::propose: one live proposal per proposer, found an already pending proposal"
         );
         gov.propose(targets, values, signatures, data, description);
-
-        vm.stopPrank();
     }
 
     function test__acceptAdmin() public {

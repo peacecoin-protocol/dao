@@ -7,8 +7,9 @@ import "../Governance/PEACECOINDAO_GOVERNOR.sol";
 import "../Governance/Timelock.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
 import {console} from "forge-std/console.sol";
+import {DeployDAOFactory} from "./DeployDAOFactory.sol";
 
-contract PEACECOINDAOScript is Script {
+contract PEACECOINDAOScript is Script, DeployDAOFactory {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -25,11 +26,14 @@ contract PEACECOINDAOScript is Script {
         uint256 _quorumVotes = 1000e18; // 1000 PCE
         uint256 _timelockDelay = 1 days;
 
+        (address daoFactory, , , , ) = deployDAOFactory();
+
         PEACECOINDAO_SBT sbt = new PEACECOINDAO_SBT();
         sbt.initialize(
             "PEACECOIN DAO SBT",
             "PCE_SBT",
-            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/"
+            "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/",
+            daoFactory
         );
 
         PEACECOINDAO_GOVERNOR governor = new PEACECOINDAO_GOVERNOR();

@@ -1,73 +1,119 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
+import {IErrors} from "./interfaces/IErrors.sol";
 
-contract DAOFactory is Ownable {
+/**
+ * @title DAOFactory
+ * @dev Factory contract for creating and managing DAOs
+ * @notice This contract allows authorized users to create new DAOs with governance tokens and timelock controllers
+ * @author Your Name
+ */
+contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IErrors {
     using Clones for address;
 
-    struct SocialConfig {
-        string description;
-        string website;
-        string linkedin;
-        string twitter;
-        string telegram;
-    }
+    // ============ Constants ============
+    bytes32 public constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    struct DAOConfig {
-        address creator;
-        address governor;
-        address timelock;
-        address governanceToken;
-        address communityToken;
-        uint256 votingDelay;
-        uint256 votingPeriod;
-        uint256 proposalThreshold;
-        uint256 quorum;
-        SocialConfig socialConfig;
-        bool exists;
-    }
+    // Maximum values for safety
+    uint256 public constant MAX_VOTING_DELAY = 30 days;
+    uint256 public constant MAX_VOTING_PERIOD = 30 days;
+    uint256 public constant MAX_TIMELOCK_DELAY = 30 days;
 
-    struct GovernorConfig {
-        string name;
-        address governor;
-        address timelock;
-        address governanceToken;
-        address communityToken;
-    }
+    // ============ State Variables ============
+    /// @notice Mapping from DAO ID to its configuration
+    mapping(bytes32 => address) public timelock;
 
-    // Mapping from DAO ID to its configuration
-    mapping(bytes32 => DAOConfig) public daos;
-    // Mapping to track DAO names to prevent duplicates
+    /// @notice Mapping to track DAO names to prevent duplicates
     mapping(string => bool) public daoNames;
-    // Counter for total DAOs
+
+    /// @notice Counter for total DAOs created
     uint256 public totalDAOs;
 
+    /// @notice Implementation addresses for cloning
     address public timelockImplementation;
     address public governorImplementation;
     address public governanceTokenImplementation;
 
-    event ContractDeployed(address contractAddress);
+    // ============ Events ============
+    event ContractDeployed(address indexed contractAddress);
+    event DAOCreated(bytes32 indexed daoId, string indexed daoName, address indexed creator);
 
-    event DAOCreated(
-        bytes32 indexed daoId,
-        SocialConfig socialConfig,
-        GovernorConfig governorConfig
+    event ImplementationUpdated(
+        address indexed timelockImplementation,
+        address indexed governorImplementation,
+        address indexed governanceTokenImplementation
     );
 
-    constructor() Ownable(msg.sender) {}
+    // ============ Modifiers ============
+    modifier validDAO(bytes32 daoId) {
+        if (timelock[daoId] == address(0)) revert DAODoesNotExist();
+        _;
+    }
 
+    modifier validImplementation() {
+        if (timelockImplementation == address(0)) revert TimelockImplementationNotSet();
+        if (governorImplementation == address(0)) revert GovernorImplementationNotSet();
+        if (governanceTokenImplementation == address(0))
+            revert GovernanceTokenImplementationNotSet();
+        _;
+    }
+
+    // ============ Constructor ============
+    constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+    }
+
+    // ============ External Functions ============
+
+    /**
+     * @notice Set implementation addresses for DAO components
+     * @dev Only callable by the contract owner
+     * @param _timelockImplementation Address of the timelock implementation
+     * @param _governorImplementation Address of the governor implementation
+     * @param _governanceTokenImplementation Address of the governance token implementation
+     */
     function setImplementation(
         address _timelockImplementation,
         address _governorImplementation,
         address _governanceTokenImplementation
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_timelockImplementation == address(0)) revert TimelockImplementationNotSet();
+        if (_governorImplementation == address(0)) revert GovernorImplementationNotSet();
+        if (_governanceTokenImplementation == address(0))
+            revert GovernanceTokenImplementationNotSet();
+
         timelockImplementation = _timelockImplementation;
         governorImplementation = _governorImplementation;
         governanceTokenImplementation = _governanceTokenImplementation;
+
+        emit ImplementationUpdated(
+            _timelockImplementation,
+            _governorImplementation,
+            _governanceTokenImplementation
+        );
     }
 
+    /**
+     * @notice Create a new DAO with governance infrastructure
+     * @dev Creates timelock, governance token, and governor contracts
+     * @param daoName Name of the DAO (must be unique)
+     * @param socialConfig Social media and description configuration
+     * @param communityToken Address of the community token
+     * @param votingDelay Delay before voting starts on a proposal
+     * @param votingPeriod Duration of voting on a proposal
+     * @param proposalThreshold Minimum tokens required to create a proposal
+     * @param timelockDelay Delay for timelock execution
+     * @return daoId Unique identifier for the created DAO
+     */
     function createDAO(
         string memory daoName,
         SocialConfig memory socialConfig,
@@ -75,111 +121,175 @@ contract DAOFactory is Ownable {
         uint256 votingDelay,
         uint256 votingPeriod,
         uint256 proposalThreshold,
-        uint256 quorum,
-        uint256 timelockDelay
-    ) external returns (bytes32) {
-        require(msg.sender == owner(), "Invalid community token owner");
-        require(communityToken != address(0), "Invalid community token");
-        require(bytes(daoName).length > 0, "Empty name not allowed");
-        require(!daoNames[daoName], "DAO name already exists");
-
-        bytes32 daoId = keccak256(abi.encodePacked(daoName));
-        require(!daos[daoId].exists, "DAO already exists");
-
-        // Deploy Timelock
-        require(timelockImplementation != address(0), "Timelock implementation not set");
-        address timelockAddress = timelockImplementation.clone();
-        ITimelock(timelockAddress).initialize(address(this), timelockDelay);
-
-        // Deploy Governance Token
-        require(governanceTokenImplementation != address(0), "Governor token address not set");
-        address governanceTokenAddress = governanceTokenImplementation.clone();
-        IGovernanceToken(governanceTokenAddress).initialize(communityToken);
-
-        // Deploy Governor
-        require(quorum > 0, "Quorum cannot be zero");
-
-        require(governorImplementation != address(0), "Governor implementation not set");
-        address governorAddress = governorImplementation.clone();
-        ICommunityGovernance(governorAddress).initialize(
+        uint256 timelockDelay,
+        uint256 quorumVotes
+    ) external override nonReentrant whenNotPaused validImplementation returns (bytes32) {
+        // Input validation
+        _validateCreateDAOInputs(
             daoName,
-            governanceTokenAddress,
-            address(timelockAddress),
+            communityToken,
             votingDelay,
             votingPeriod,
-            proposalThreshold,
-            quorum
+            timelockDelay,
+            quorumVotes,
+            msg.sender
+        );
+        // Local variables for gas optimization
+        string memory _daoName = daoName;
+        uint256 _votingDelay = votingDelay;
+        uint256 _votingPeriod = votingPeriod;
+        uint256 _proposalThreshold = proposalThreshold;
+        uint256 _quorumVotes = quorumVotes;
+        address _communityToken = communityToken;
+        SocialConfig memory _socialConfig = socialConfig;
+
+        // Check if DAO already exists
+        bytes32 daoId = keccak256(abi.encodePacked(_daoName));
+        if (timelock[daoId] != address(0)) revert DAOAlreadyExists();
+
+        // Deploy contracts
+        address timelockAddress = _deployTimelock(timelockDelay);
+        address governanceTokenAddress = _deployGovernanceToken(_communityToken);
+        address governorAddress = _deployGovernor(
+            _daoName,
+            governanceTokenAddress,
+            timelockAddress,
+            _votingDelay,
+            _votingPeriod,
+            _proposalThreshold,
+            _quorumVotes
         );
 
+        // Store DAO address
+        timelock[daoId] = timelockAddress;
+
+        // Set up governance hierarchy
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
         ICommunityGovernance(governorAddress).__acceptAdmin();
 
-        // Store DAO configuration
-        daos[daoId] = DAOConfig({
-            creator: msg.sender,
-            governor: governorAddress,
-            timelock: timelockAddress,
-            communityToken: communityToken,
-            governanceToken: governanceTokenAddress,
-            votingDelay: votingDelay,
-            votingPeriod: votingPeriod,
-            proposalThreshold: proposalThreshold,
-            quorum: quorum,
-            socialConfig: socialConfig,
-            exists: true
-        });
+        // Grant DAO manager role
+        _grantRole(DAO_MANAGER_ROLE, msg.sender);
 
-        daoNames[daoName] = true;
-        totalDAOs++;
-        string memory _daoName = daoName;
-        address _communityToken = communityToken;
-
-        emit DAOCreated(
-            daoId,
-            socialConfig,
-            GovernorConfig({
-                name: _daoName,
-                governor: governorAddress,
-                timelock: timelockAddress,
-                governanceToken: governanceTokenAddress,
-                communityToken: _communityToken
-            })
-        );
+        // Emit events
+        emit DAOCreated(daoId, _daoName, msg.sender);
 
         return daoId;
     }
 
-    function getDAO(bytes32 daoId) external view returns (DAOConfig memory) {
-        require(daos[daoId].exists, "DAO does not exist");
-        return daos[daoId];
+    /**
+     * @notice Get DAO configuration by ID
+     * @param daoId Unique identifier of the DAO
+     * @return DAO configuration struct
+     */
+    function getDAOAddress(bytes32 daoId) external view validDAO(daoId) returns (address) {
+        return timelock[daoId];
     }
 
+    /**
+     * @notice Check if a DAO exists
+     * @param daoId Unique identifier of the DAO
+     * @return True if DAO exists, false otherwise
+     */
     function isDaoExists(bytes32 daoId) external view returns (bool) {
-        return daos[daoId].exists;
+        return timelock[daoId] != address(0);
     }
 
-    function deploy(bytes memory bytecode) internal returns (address deployedAddress) {
-        // Create a new contract using assembly
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            deployedAddress := create(0, add(bytecode, 0x20), mload(bytecode))
-        }
-        require(deployedAddress != address(0), "Contract deployment failed");
-        emit ContractDeployed(deployedAddress);
+    /**
+     * @notice Pause the contract
+     * @dev Only callable by pausers
+     */
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
     }
 
-    function updateDAOSocialConfig(bytes32 daoId, SocialConfig memory newConfig) external {
-        require(daos[daoId].exists, "DAO does not exist");
-
-        daos[daoId].socialConfig = newConfig;
-
-        emit DAOSocialConfigUpdated(daoId, newConfig);
+    /**
+     * @notice Unpause the contract
+     * @dev Only callable by pausers
+     */
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
-    event DAOSocialConfigUpdated(bytes32 indexed daoId, SocialConfig socialConfig);
+    // ============ Internal Functions ============
+
+    /**
+     * @notice Validate inputs for DAO creation
+     */
+    function _validateCreateDAOInputs(
+        string memory daoName,
+        address communityToken,
+        uint256 votingDelay,
+        uint256 votingPeriod,
+        uint256 timelockDelay,
+        uint256 quorumVotes,
+        address creator
+    ) internal view {
+        if (communityToken == address(0)) revert InvalidAddress();
+        if (creator != IToken(communityToken).owner()) revert InvalidCommunityTokenOwner();
+        if (bytes(daoName).length == 0) revert InvalidName();
+        if (daoNames[daoName]) revert DAONameAlreadyExists();
+        if (votingDelay > MAX_VOTING_DELAY) revert InvalidVotingDelay();
+        if (votingPeriod > MAX_VOTING_PERIOD) revert InvalidVotingPeriod();
+        if (timelockDelay > MAX_TIMELOCK_DELAY) revert InvalidTimelockDelay();
+        if (quorumVotes == 0) revert InvalidQuorumVotes();
+    }
+
+    /**
+     * @notice Deploy timelock contract
+     */
+    function _deployTimelock(uint256 timelockDelay) internal returns (address) {
+        address timelockAddress = timelockImplementation.clone();
+        if (timelockAddress == address(0)) revert ContractDeploymentFailed();
+
+        ITimelock(timelockAddress).initialize(address(this), timelockDelay);
+        emit ContractDeployed(timelockAddress);
+        return timelockAddress;
+    }
+
+    /**
+     * @notice Deploy governance token contract
+     */
+    function _deployGovernanceToken(address communityToken) internal returns (address) {
+        address governanceTokenAddress = governanceTokenImplementation.clone();
+        if (governanceTokenAddress == address(0)) revert ContractDeploymentFailed();
+
+        IToken(governanceTokenAddress).initialize(communityToken);
+        emit ContractDeployed(governanceTokenAddress);
+        return governanceTokenAddress;
+    }
+
+    /**
+     * @notice Deploy governor contract
+     */
+    function _deployGovernor(
+        string memory daoName,
+        address governanceTokenAddress,
+        address timelockAddress,
+        uint256 votingDelay,
+        uint256 votingPeriod,
+        uint256 proposalThreshold,
+        uint256 quorumVotes
+    ) internal returns (address) {
+        address governorAddress = governorImplementation.clone();
+        if (governorAddress == address(0)) revert ContractDeploymentFailed();
+
+        ICommunityGovernance(governorAddress).initialize(
+            daoName,
+            governanceTokenAddress,
+            timelockAddress,
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            quorumVotes
+        );
+        emit ContractDeployed(governorAddress);
+        return governorAddress;
+    }
 }
 
-interface IGovernanceToken {
+// ============ Interfaces ============
+
+interface IToken {
     function owner() external view returns (address);
     function initialize(address _communityToken) external;
 }

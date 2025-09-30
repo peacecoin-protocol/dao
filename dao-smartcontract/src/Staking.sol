@@ -3,10 +3,19 @@
 pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IWPCE.sol";
+import "./interfaces/IErrors.sol";
 
-contract Staking is OwnableUpgradeable {
+/**
+ * @title Staking
+ * @dev Contract for staking PCE tokens and earning rewards
+ * @notice This contract allows users to stake PCE tokens and receive wPCE tokens in return
+ * @author Your Name
+ */
+contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
+    // ============ State Variables ============
     IERC20 public pce;
     IWPCE public wPCE;
     uint256 public lastUpdateBlock;
@@ -32,12 +41,20 @@ contract Staking is OwnableUpgradeable {
         _;
     }
 
+    /**
+     * @notice Initialize the Staking contract
+     * @dev Sets up the PCE and wPCE contracts and initializes parent contracts
+     * @param _rewardPerBlock Reward amount per block
+     * @param _pce Address of the PCE token contract
+     * @param _wPCE Address of the wPCE token contract
+     */
     function initialize(uint256 _rewardPerBlock, address _pce, address _wPCE) external initializer {
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
 
-        require(_pce != address(0), "Invalid PCE address");
-        require(_wPCE != address(0), "Invalid WPCE address");
-        require(_rewardPerBlock > 0, "Reward per block must be greater than 0");
+        if (_pce == address(0)) revert InvalidAddress();
+        if (_wPCE == address(0)) revert InvalidAddress();
+        if (_rewardPerBlock == 0) revert InvalidRewardPerBlock();
 
         lastUpdateBlock = block.number;
         rewardPerBlock = _rewardPerBlock;
@@ -46,59 +63,91 @@ contract Staking is OwnableUpgradeable {
         wPCE = IWPCE(_wPCE);
     }
 
-    function stake(uint256 _amountPEACECOIN) external updateRewardPool {
-        require(_amountPEACECOIN > 0, "Staking: cant stake 0 tokens");
+    /**
+     * @notice Stake PCE tokens
+     * @dev Stakes PCE tokens and mints wPCE tokens in return
+     * @param _amountPEACECOIN Amount of PCE tokens to stake
+     */
+    function stake(uint256 _amountPEACECOIN) external updateRewardPool nonReentrant {
+        if (_amountPEACECOIN == 0) revert ZeroAmount();
 
         // Transfer tokens first
         pce.transferFrom(_msgSender(), address(this), _amountPEACECOIN);
 
-        // Update totalPool before conversion calculation
-        totalPool = totalPool + _amountPEACECOIN;
-
         uint256 amountxPEACECOIN = _convertToWPEACECOIN(_amountPEACECOIN);
+
+        // Unchecked addition for gas optimization (safe due to previous checks)
+        unchecked {
+            totalPool += _amountPEACECOIN;
+        }
+
         wPCE.mint(_msgSender(), amountxPEACECOIN);
 
         emit StakedPEACECOIN(_amountPEACECOIN, amountxPEACECOIN, _msgSender());
     }
 
-    function withdraw(uint256 _amountxPEACECOIN) external updateRewardPool {
-        require(
-            wPCE.balanceOf(_msgSender()) >= _amountxPEACECOIN,
-            "Withdraw: not enough xPEACECOIN tokens to withdraw"
-        );
+    /**
+     * @notice Withdraw staked PCE tokens
+     * @dev Burns wPCE tokens and returns PCE tokens
+     * @param _amountxPEACECOIN Amount of wPCE tokens to burn
+     */
+    function withdraw(uint256 _amountxPEACECOIN) external updateRewardPool nonReentrant {
+        if (wPCE.balanceOf(_msgSender()) < _amountxPEACECOIN) revert InsufficientBalance();
 
         uint256 amountPEACECOIN = _convertToPEACECOIN(_amountxPEACECOIN);
-        require(amountPEACECOIN > 0, "Withdraw: calculated amount is 0");
+        if (amountPEACECOIN == 0) revert ZeroAmount();
 
         wPCE.burn(_msgSender(), _amountxPEACECOIN);
 
-        totalPool = totalPool - amountPEACECOIN;
-        require(
-            pce.balanceOf(address(this)) >= amountPEACECOIN,
-            "Withdraw: failed to transfer PEACECOIN tokens"
-        );
+        // Unchecked subtraction for gas optimization (safe due to previous checks)
+        unchecked {
+            totalPool -= amountPEACECOIN;
+        }
+
+        if (pce.balanceOf(address(this)) < amountPEACECOIN) revert InsufficientBalance();
         pce.transfer(_msgSender(), amountPEACECOIN);
 
         emit WithdrawnPEACECOIN(amountPEACECOIN, _amountxPEACECOIN, _msgSender());
     }
 
+    /**
+     * @notice Calculate staking reward for a given amount
+     * @dev Returns the PCE equivalent for a given wPCE amount
+     * @param _amount Amount of wPCE tokens
+     * @return PCE equivalent amount
+     */
     function stakingReward(uint256 _amount) public view returns (uint256) {
         return _convertToPEACECOIN(_amount);
     }
 
+    /**
+     * @notice Get staked PCE amount for an address
+     * @dev Returns the PCE equivalent of staked tokens for an address
+     * @param _address Address to check
+     * @return Staked PCE amount
+     */
     function getStakedPEACECOIN(address _address) public view returns (uint256) {
         uint256 balance = wPCE.balanceOf(_address);
         return balance > 0 ? _convertToPEACECOIN(balance) : 0;
     }
 
+    /**
+     * @notice Set reward per block
+     * @dev Only callable by the contract owner
+     * @param _amount New reward per block amount
+     */
     function setRewardPerBlock(uint256 _amount) external onlyOwner updateRewardPool {
         rewardPerBlock = _amount;
     }
 
+    /**
+     * @notice Revoke unused reward pool tokens
+     * @dev Only callable by the contract owner
+     */
     function revokeUnusedRewardPool() external onlyOwner updateRewardPool {
         uint256 contractBalance = pce.balanceOf(address(this));
 
-        require(contractBalance > totalPool, "There are no unused tokens to revoke");
+        if (contractBalance <= totalPool) revert NoUnusedTokens();
 
         uint256 unusedTokens = contractBalance - totalPool;
 

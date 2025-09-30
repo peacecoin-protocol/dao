@@ -23,7 +23,7 @@ jobs:
         run: forge install
 
       - name: Run coverage
-        run: forge coverage --skip 'src/mocks/**' --skip 'src/script/**' --skip 'src/deploy/**' --ir-minimum --report lcov  > lcov.info
+        run: forge coverage --skip 'src/mocks/**' --skip 'src/script/**' --skip 'src/deploy/**' --skip 'test/**'
 
       - name: Upload filtered coverage to Codecov
         uses: codecov/codecov-action@v5

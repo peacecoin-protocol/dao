@@ -9,8 +9,9 @@ import "../mocks/PCEGovTokenTest.sol";
 import "../Staking.sol";
 import "../Governance/WPCE.sol";
 import "../Governance/PCE.sol";
+import {DeployDAOFactory} from "./DeployDAOFactory.sol";
 
-contract PEACECOINDAO_SBTScript is Script {
+contract PEACECOINDAO_SBTScript is Script, DeployDAOFactory {
     // Deploy Governor
     string daoName = "PEACECOIN DAO";
     uint256 _votingDelay = 1;
@@ -24,6 +25,7 @@ contract PEACECOINDAO_SBTScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
+        (address daoFactory, , , , ) = deployDAOFactory();
 
         string memory name = "PEACECOIN DAO SBT";
         string memory symbol = "PCE_SBT";
@@ -32,7 +34,7 @@ contract PEACECOINDAO_SBTScript is Script {
         address pce = 0x8253f538d2C5a011ee32098a539903992f61Dce9;
 
         PEACECOINDAO_SBT peacecoinDaoSbt = new PEACECOINDAO_SBT();
-        peacecoinDaoSbt.initialize(uri, name, symbol);
+        peacecoinDaoSbt.initialize(uri, name, symbol, daoFactory);
 
         // Deploy Staking
         Staking staking = new Staking();
