@@ -29,7 +29,10 @@ contract CampaignsTest is Test, DeployDAOFactory {
     string public uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
     string public name = "PEACECOIN DAO SBT";
     string public symbol = "PCE_SBT";
-
+    string public TOKEN_URI = "test-uri";
+    uint256 public VOTING_POWER = 100;
+    string public DAO_NAME = "Test DAO";
+    bytes32 public daoId = keccak256(abi.encodePacked(DAO_NAME));
     string public _title = "Test Campaign";
     string public _description = "Test Description";
 
@@ -51,7 +54,7 @@ contract CampaignsTest is Test, DeployDAOFactory {
         });
 
     function setUp() public {
-        (address daoFactory, , , , ) = deployDAOFactory();
+        (address daoFactory, , , , , , ) = deployDAOFactory();
 
         nft = new PEACECOINDAO_NFT();
         nft.initialize(name, symbol, uri, daoFactory);
@@ -82,7 +85,8 @@ contract CampaignsTest is Test, DeployDAOFactory {
     function test_createCampaign() public {
         // Create Token & Create Campaign
         vm.startPrank(daoManager);
-        nft.createToken();
+        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        vm.roll(block.number + 1);
         campaigns.createCampaign(_campaign);
         vm.stopPrank();
 

@@ -20,9 +20,13 @@ contract PEACECOINDAO_NFTTest is Test, DeployDAOFactory {
     string constant TOKEN_SYMBOL = "TEST_SBT";
     string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
     bytes32 public DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    string constant TOKEN_URI = "test-uri";
+    uint256 constant VOTING_POWER = 100;
+
+    bytes32 public daoId = keccak256(abi.encodePacked(DAO_NAME));
 
     function setUp() public {
-        (daoFactory, , , , ) = deployDAOFactory();
+        (daoFactory, , , , , , ) = deployDAOFactory();
 
         token = new PEACECOINDAO_NFT();
         token.initialize(TOKEN_NAME, TOKEN_SYMBOL, URI, daoFactory);
@@ -32,12 +36,12 @@ contract PEACECOINDAO_NFTTest is Test, DeployDAOFactory {
     }
 
     function test_createToken() public {
-        token.createToken();
+        token.createToken(TOKEN_URI, VOTING_POWER, daoId);
         assertEq(token.numberOfTokens(), 1);
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        token.createToken();
+        token.createToken(TOKEN_URI, VOTING_POWER, daoId);
     }
 
     function test_mint() public {
@@ -54,24 +58,8 @@ contract PEACECOINDAO_NFTTest is Test, DeployDAOFactory {
         token.mint(alice, 2, 1);
     }
 
-    function test_setTokenURI() public {
-        test_createToken();
-
-        token.setTokenURI(1, "test-uri", 100);
-        assertEq(token.getTokenWeight(1), 100);
-        assertEq(token.uri(1), string(abi.encodePacked(URI, "test-uri")));
-
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        token.setTokenURI(1, "test-uri", 100);
-
-        vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidTokenId.selector));
-        token.setTokenURI(2, "test-uri", 100);
-    }
-
     function test_delegation() public {
         test_mint();
-        token.setTokenURI(1, "test-uri", 100);
 
         vm.prank(alice);
         token.delegate(bob);
@@ -92,7 +80,6 @@ contract PEACECOINDAO_NFTTest is Test, DeployDAOFactory {
 
     function test_batchMint() public {
         test_createToken();
-        token.setTokenURI(1, "test-uri", 50);
 
         address[] memory recipients = new address[](2);
         recipients[0] = alice;
@@ -121,7 +108,6 @@ contract PEACECOINDAO_NFTTest is Test, DeployDAOFactory {
 
     function test_votingPower() public {
         test_mint();
-        token.setTokenURI(1, "test-uri", 100);
 
         assertEq(token.getTotalVotingPower(alice), 100);
     }

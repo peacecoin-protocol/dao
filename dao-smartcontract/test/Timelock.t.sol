@@ -6,6 +6,10 @@ import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {console} from "forge-std/console.sol";
+import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
     function getBlockTimestampPublic() public view returns (uint256) {
@@ -13,18 +17,28 @@ contract PublicTimelock is Timelock {
     }
 }
 
-contract TimelockTest is Test {
+contract TimelockTest is Test, DeployDAOFactory {
     address alice = makeAddr("alice"); // admin
     address bob = makeAddr("bob");
 
     MockGovToken pceToken;
+    PEACECOINDAO_SBT sbt;
+    PEACECOINDAO_NFT nft;
     GovernorAlpha gov;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
     uint256 constant VOTING_PERIOD = 1 days;
     uint256 constant PROPOSAL_THRESHOLD = 100e18;
     uint256 constant QUORUM_VOTES = 1000e18;
-
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "PEACECOIN DAO",
+            website: "https://peacecoin.com",
+            linkedin: "https://linkedin.com/peacecoin",
+            twitter: "https://twitter.com/peacecoin",
+            telegram: "https://t.me/peacecoin"
+        });
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
@@ -56,8 +70,17 @@ contract TimelockTest is Test {
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
+
+        (address daoFactory, , , , , , ) = deployDAOFactory();
+
         pceToken = new MockGovToken();
         pceToken.initialize();
+
+        sbt = new PEACECOINDAO_SBT();
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
+
+        nft = new PEACECOINDAO_NFT();
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, daoFactory);
 
         timelock = new Timelock();
         timelock.initialize(alice, 2 hours);
@@ -66,11 +89,15 @@ contract TimelockTest is Test {
         gov.initialize(
             "PCE DAO",
             address(pceToken),
+            address(sbt),
+            address(nft),
             address(timelock),
             1,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
-            QUORUM_VOTES
+            QUORUM_VOTES,
+            address(this),
+            SOCIAL_CONFIG
         );
         pceToken.mint(address(this), INITIAL_AMOUNT);
 

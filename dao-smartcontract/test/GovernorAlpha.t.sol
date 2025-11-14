@@ -5,15 +5,32 @@ import {Test} from "forge-std/Test.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
+import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
-contract GovernorAlphaTest is Test {
+contract GovernorAlphaTest is Test, DeployDAOFactory {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address guardian = address(this);
 
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "PEACECOIN DAO",
+            website: "https://peacecoin.com",
+            linkedin: "https://linkedin.com/peacecoin",
+            twitter: "https://twitter.com/peacecoin",
+            telegram: "https://t.me/peacecoin"
+        });
     MockGovToken pceToken;
+    PEACECOINDAO_SBT sbt;
+    PEACECOINDAO_NFT nft;
+
     GovernorAlpha gov;
     Timelock timelock;
+
     uint256 constant INITIAL_BALANCE = 50000e18;
     uint256 constant TIME_LOCK_DELAY = 10 minutes;
     uint256 constant VOTING_DELAY = 1;
@@ -46,8 +63,16 @@ contract GovernorAlphaTest is Test {
         vm.label(bob, "bob");
         vm.label(guardian, "guardian");
 
+        (address daoFactory, , , , , , ) = deployDAOFactory();
+
         pceToken = new MockGovToken();
         pceToken.initialize();
+
+        sbt = new PEACECOINDAO_SBT();
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
+
+        nft = new PEACECOINDAO_NFT();
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, daoFactory);
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
@@ -57,11 +82,15 @@ contract GovernorAlphaTest is Test {
         gov.initialize(
             "PCE DAO",
             address(pceToken),
+            address(sbt),
+            address(nft),
             address(timelock),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
-            QUORUM_VOTES
+            QUORUM_VOTES,
+            guardian,
+            SOCIAL_CONFIG
         );
 
         pceToken.mint(guardian, INITIAL_BALANCE);

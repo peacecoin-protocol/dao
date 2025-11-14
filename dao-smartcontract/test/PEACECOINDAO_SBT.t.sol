@@ -19,9 +19,12 @@ contract PEACECOINDAO_SBTTest is Test, DeployDAOFactory {
     string constant TOKEN_NAME = "Test Token";
     string constant TOKEN_SYMBOL = "TEST_Token";
     string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    string public TOKEN_URI = "test-uri";
+    uint256 public VOTING_POWER = 100;
+    bytes32 public daoId = keccak256(abi.encodePacked(DAO_NAME));
 
     function setUp() public {
-        (daoFactory, , , , ) = deployDAOFactory();
+        (daoFactory, , , , , , ) = deployDAOFactory();
 
         token = new PEACECOINDAO_SBT();
         token.initialize(TOKEN_NAME, TOKEN_SYMBOL, URI, daoFactory);
@@ -31,12 +34,12 @@ contract PEACECOINDAO_SBTTest is Test, DeployDAOFactory {
     }
 
     function test_createToken() public {
-        token.createToken();
+        token.createToken(TOKEN_URI, VOTING_POWER, daoId);
         assertEq(token.numberOfTokens(), 1);
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        token.createToken();
+        token.createToken(TOKEN_URI, VOTING_POWER, daoId);
     }
 
     function test_mint() public {

@@ -124,16 +124,6 @@ contract Campaigns is
     function createCampaign(Campaign memory _campaign) external onlyDAOManager {
         if (_campaign.tokenType == TokenType.ERC20) {
             require(ITokens(address(_campaign.token)).owner() == msg.sender, PermissionDenied());
-        } else if (_campaign.tokenType == TokenType.NFT) {
-            require(
-                ITokens(address(nft)).creators(_campaign.sbtId) == msg.sender,
-                PermissionDenied()
-            );
-        } else {
-            require(
-                ITokens(address(sbt)).creators(_campaign.sbtId) == msg.sender,
-                PermissionDenied()
-            );
         }
 
         if (_campaign.startDate >= _campaign.endDate) revert IErrors.InvalidStartDate();

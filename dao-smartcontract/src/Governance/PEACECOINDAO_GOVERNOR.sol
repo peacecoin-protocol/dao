@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {SBTInterface} from "../interfaces/SBTInterface.sol";
+import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 
 contract PEACECOINDAO_GOVERNOR {
     /// @notice The name of this contract
@@ -17,28 +18,23 @@ contract PEACECOINDAO_GOVERNOR {
     TimelockInterface public timelock;
 
     /// @notice The address of the PCE governance token
-    GovInterface public token;
+    GovernorTokenInterface public token;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
 
+    /// @notice The address of the NFT
+    GovernorTokenInterface public nft;
+
     /// @notice The address of the SBT
-    SBTInterface public sbt;
+    GovernorTokenInterface public sbt;
 
     /// @notice The total number of proposals
     uint256 public proposalCount;
 
     bool public initialized;
 
-    struct SocialConfig {
-        string description;
-        string website;
-        string linkedin;
-        string twitter;
-        string telegram;
-    }
-
-    SocialConfig public socialConfig;
+    IDAOFactory.SocialConfig public socialConfig;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -144,19 +140,22 @@ contract PEACECOINDAO_GOVERNOR {
         string memory daoName,
         address _token,
         address _sbt,
+        address _nft,
         address _timelock,
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _proposalThreshold,
         uint256 _quorumVotes,
-        address _guardian
+        address _guardian,
+        IDAOFactory.SocialConfig memory _socialConfig
     ) external {
         require(!initialized, "Governor::initialize: already initialized");
         initialized = true;
 
         name = daoName;
-        token = GovInterface(address(_token));
-        sbt = SBTInterface(_sbt);
+        token = GovernorTokenInterface(address(_token));
+        sbt = GovernorTokenInterface(_sbt);
+        nft = GovernorTokenInterface(_nft);
         timelock = TimelockInterface(_timelock);
         votingDelay = _votingDelay;
         votingPeriod = _votingPeriod;
@@ -164,6 +163,7 @@ contract PEACECOINDAO_GOVERNOR {
         quorumVotes = _quorumVotes;
         guardian = _guardian;
         proposalMaxOperations = 10;
+        socialConfig = _socialConfig;
     }
 
     function propose(
@@ -174,9 +174,7 @@ contract PEACECOINDAO_GOVERNOR {
         string memory description
     ) public returns (uint256) {
         require(
-            token.getPastVotes(msg.sender, sub256(block.number, 1)) +
-                sbt.getPastVotes(msg.sender, sub256(block.number, 1)) >
-                proposalThreshold,
+            getPastVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold,
             "Governor::propose: proposer votes below proposal threshold"
         );
         require(
@@ -348,9 +346,7 @@ contract PEACECOINDAO_GOVERNOR {
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                token.getPastVotes(proposal.proposer, sub256(block.number, 1)) +
-                    sbt.getPastVotes(proposal.proposer, sub256(block.number, 1)) <
-                proposalThreshold,
+                getPastVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold,
             "Governor::cancel: proposer above threshold"
         );
 
@@ -426,8 +422,7 @@ contract PEACECOINDAO_GOVERNOR {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
-        uint96 votes = token.getPastVotes(voter, proposal.startBlock) +
-            sbt.getPastVotes(voter, proposal.startBlock);
+        uint96 votes = getPastVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -461,6 +456,22 @@ contract PEACECOINDAO_GOVERNOR {
         emit ProposalMaxOperationsSet(proposalMaxOperations, proposalMaxOperations_);
     }
 
+    function updateSocialConfig(IDAOFactory.SocialConfig memory _socialConfig) public {
+        require(
+            msg.sender == guardian || msg.sender == address(timelock),
+            "Governor::updateSocialConfig: sender must be gov guardian or timelock"
+        );
+
+        socialConfig = _socialConfig;
+        emit SocialConfigUpdated(
+            _socialConfig.description,
+            _socialConfig.website,
+            _socialConfig.linkedin,
+            _socialConfig.twitter,
+            _socialConfig.telegram
+        );
+    }
+
     function updateSocialConfig(
         string memory description,
         string memory website,
@@ -477,7 +488,7 @@ contract PEACECOINDAO_GOVERNOR {
         emit SocialConfigUpdated(description, website, linkedin, twitter, telegram);
     }
 
-    function getSocialConfig() public view returns (SocialConfig memory) {
+    function getSocialConfig() public view returns (IDAOFactory.SocialConfig memory) {
         return socialConfig;
     }
 
@@ -517,6 +528,18 @@ contract PEACECOINDAO_GOVERNOR {
             abi.encode(newPendingAdmin),
             eta
         );
+    }
+
+    function getPastVotes(address account, uint256 blockNumber) public view returns (uint96) {
+        return
+            token.getPastVotes(account, blockNumber) +
+                sbt.getPastVotes(account, blockNumber) +
+                nft.getPastVotes(account, blockNumber) >
+                type(uint96).max
+                ? type(uint96).max
+                : token.getPastVotes(account, blockNumber) +
+                    sbt.getPastVotes(account, blockNumber) +
+                    nft.getPastVotes(account, blockNumber);
     }
 
     function add256(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -567,6 +590,6 @@ interface TimelockInterface {
     ) external payable returns (bytes memory);
 }
 
-interface GovInterface {
+interface GovernorTokenInterface {
     function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
 }

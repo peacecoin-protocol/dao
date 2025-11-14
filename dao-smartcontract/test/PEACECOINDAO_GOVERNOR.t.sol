@@ -3,12 +3,14 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {PEACECOINDAO_GOVERNOR} from "../src/Governance/PEACECOINDAO_GOVERNOR.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
     address alice = makeAddr("alice");
@@ -17,6 +19,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
 
     MockGovToken govToken;
     PEACECOINDAO_SBT sbt;
+    PEACECOINDAO_NFT nft;
     PEACECOINDAO_GOVERNOR gov;
     Timelock timelock;
     uint256 constant INITIAL_BALANCE = 50000e18;
@@ -28,6 +31,10 @@ contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
     uint256 constant PROPOSAL_MAX_OPERATIONS = 10;
     uint256 constant EXECUTE_TRANSFER_VALUE = 1;
     uint256 constant PROPOSAL_ID = 1;
+    string public TOKEN_URI = "test-uri";
+    uint256 public VOTING_POWER = 100;
+    string public DAO_NAME = "Test DAO";
+    bytes32 public daoId = keccak256(abi.encodePacked(DAO_NAME));
 
     event ProposalCreated(
         uint256 id,
@@ -47,19 +54,30 @@ contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
     event ProposalExecuted(uint256 id);
 
     string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "PEACECOIN DAO",
+            website: "https://peacecoin.com",
+            linkedin: "https://linkedin.com/peacecoin",
+            twitter: "https://twitter.com/peacecoin",
+            telegram: "https://t.me/peacecoin"
+        });
 
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(guardian, "guardian");
 
-        (address daoFactory, , , , ) = deployDAOFactory();
+        (address daoFactory, , , , , , ) = deployDAOFactory();
 
         govToken = new MockGovToken();
         govToken.initialize();
 
         sbt = new PEACECOINDAO_SBT();
         sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
+
+        nft = new PEACECOINDAO_NFT();
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, daoFactory);
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
@@ -70,18 +88,21 @@ contract PEACECOINDAO_GOVERNORTEST is Test, DeployDAOFactory {
             "PEACECOIN DAO",
             address(govToken),
             address(sbt),
+            address(nft),
             address(timelock),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
             QUORUM_VOTES,
-            guardian
+            guardian,
+            SOCIAL_CONFIG
         );
 
         sbt.setMinter(address(this));
 
         IAccessControl(daoFactory).grantRole(keccak256("DAO_MANAGER_ROLE"), address(this));
-        sbt.createToken();
+        sbt.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        vm.roll(block.number + 1);
 
         sbt.mint(guardian, 1, 1);
         sbt.mint(alice, 1, 1);
