@@ -53,4 +53,5 @@ interface IErrors {
     error InsufficientBalance();
     error TransferFailed();
     error NoUnusedTokens();
+    error InvalidCreator();
 }

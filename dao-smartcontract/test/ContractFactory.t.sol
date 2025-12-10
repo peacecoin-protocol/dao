@@ -4,7 +4,6 @@ pragma solidity ^0.8.30;
 import {Test, Vm} from "forge-std/Test.sol";
 import {ContractFactory} from "../src/ContractFactory.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
-import "forge-std/console.sol";
 
 contract Example {
     constructor(address _factoryAddress) {}
@@ -46,6 +45,7 @@ contract ContractFactoryTest is Test {
             getBytecodeWithConstructorArgs(bytecode, _arguments)
         );
 
+        // Assert: Verify event was emitted with correct address
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = logs[0].topics[0];
         address contractAddressFromLog = abi.decode(logs[0].data, (address));
@@ -53,7 +53,12 @@ contract ContractFactoryTest is Test {
         assertEq(contractAddressFromLog, deployedAddress);
     }
 
-    function testDeploy_Reverts_WhenByteCodeIsInvalid() public {
+    /**
+     * @notice Tests that deployment reverts with invalid bytecode
+     * @dev Verifies that invalid bytecode causes deployment to fail
+     */
+    function test_deploy_RevertsWhen_InvalidBytecode() public {
+        // Act & Assert: Invalid bytecode should cause revert
         vm.prank(alice);
         vm.expectRevert(IErrors.ContractDeploymentFailed.selector);
         contractFactory.deploy(bytes("Invalid EVM bytecode"));

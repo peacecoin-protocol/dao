@@ -10,8 +10,6 @@ contract PCECommunityGovTokenScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address deployerAddress = vm.addr(deployerPrivateKey);
-
         PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
         pceCommunityGovToken.initialize(communityToken);
         vm.stopBroadcast();

@@ -38,7 +38,7 @@ contract DaoFactoryTest is Test {
 
     function setUp() public {
         vm.prank(defaultAdmin);
-        daoFactory = new DAOFactory();
+        daoFactory = new DAOFactory(address(0), address(0));
 
         vm.startPrank(nonDefaultAdmin);
         timelock = new Timelock();
