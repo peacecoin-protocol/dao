@@ -55,15 +55,15 @@ contract PEACECOINDAO_GOVERNOR {
         uint256 startBlock;
         /// @notice The block at which voting ends: votes must be cast prior to this block
         uint256 endBlock;
-        /// @notice Current number of votes in favor of this proposal
-        uint256 forVotes;
-        /// @notice Current number of votes in opposition to this proposal
-        uint256 againstVotes;
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
         /// @notice Flag marking whether the proposal has been executed
         bool executed;
         string description;
+        /// @notice Array of answer options for the proposal (prediction market style)
+        string[] answers;
+        /// @notice Total votes cast for each answer (indexed by answer index)
+        mapping(uint256 => uint256) answerVotes;
         /// @notice Receipts of ballots for the entire set of voters
         mapping(address => Receipt) receipts;
     }
@@ -72,8 +72,8 @@ contract PEACECOINDAO_GOVERNOR {
     struct Receipt {
         /// @notice Whether or not a vote has been cast
         bool hasVoted;
-        /// @notice Whether or not the voter supports the proposal
-        bool support;
+        /// @notice The answer index the voter voted for (0-based index)
+        uint256 answerIndex;
         /// @notice The number of votes the voter had, which were cast
         uint96 votes;
     }
@@ -106,11 +106,12 @@ contract PEACECOINDAO_GOVERNOR {
         bytes[] calldatas,
         uint256 startBlock,
         uint256 endBlock,
-        string description
+        string description,
+        string[] answers
     );
 
     /// @notice An event emitted when a vote has been cast on a proposal
-    event VoteCast(address voter, uint256 proposalId, bool support, uint256 votes);
+    event VoteCast(address voter, uint256 proposalId, uint256 answerIndex, uint256 votes);
 
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint256 id);
@@ -171,7 +172,8 @@ contract PEACECOINDAO_GOVERNOR {
         uint256[] memory values,
         string[] memory signatures,
         bytes[] memory calldatas,
-        string memory description
+        string memory description,
+        string[] memory answers
     ) public returns (uint256) {
         require(
             getPastVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold,
@@ -185,6 +187,7 @@ contract PEACECOINDAO_GOVERNOR {
         );
         require(targets.length != 0, "Governor::propose: must provide actions");
         require(targets.length <= proposalMaxOperations, "Governor::propose: too many actions");
+        require(answers.length >= 2, "Governor::propose: must provide at least 2 answers");
 
         uint256 latestProposalId = latestProposalIds[msg.sender];
         if (latestProposalId != 0) {
@@ -216,11 +219,10 @@ contract PEACECOINDAO_GOVERNOR {
         newProposal.calldatas = calldatas;
         newProposal.startBlock = startBlock;
         newProposal.endBlock = endBlock;
-        newProposal.forVotes = 0;
-        newProposal.againstVotes = 0;
         newProposal.canceled = false;
         newProposal.executed = false;
         newProposal.description = description;
+        newProposal.answers = answers;
 
         latestProposalIds[newProposal.proposer] = newProposal.id;
 
@@ -233,7 +235,8 @@ contract PEACECOINDAO_GOVERNOR {
             calldatas,
             startBlock,
             endBlock,
-            description
+            description,
+            answers
         );
         return newProposal.id;
     }
@@ -396,45 +399,55 @@ contract PEACECOINDAO_GOVERNOR {
             return ProposalState.Pending;
         } else if (block.number <= proposal.endBlock) {
             return ProposalState.Active;
-        } else if (proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes) {
-            return ProposalState.Defeated;
-        } else if (proposal.eta == 0) {
-            return ProposalState.Succeeded;
-        } else if (proposal.executed) {
-            return ProposalState.Executed;
-        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
-            return ProposalState.Expired;
         } else {
-            return ProposalState.Queued;
+            // Calculate total votes and winning answer
+            uint256 totalVotes = getTotalVotes(proposalId);
+            uint256 winningAnswerVotes = getWinningAnswerVotes(proposalId);
+
+            // Check if quorum is met and if there's a winning answer
+            if (totalVotes < quorumVotes || winningAnswerVotes == 0) {
+                return ProposalState.Defeated;
+            } else if (proposal.eta == 0) {
+                return ProposalState.Succeeded;
+            } else if (proposal.executed) {
+                return ProposalState.Executed;
+            } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+                return ProposalState.Expired;
+            } else {
+                return ProposalState.Queued;
+            }
         }
     }
 
-    function castVote(uint256 proposalId, bool support) public {
-        return _castVote(msg.sender, proposalId, support);
+    /// @notice Cast a vote on a proposal by selecting an answer index (prediction market style)
+    /// @param proposalId The id of the proposal to vote on
+    /// @param answerIndex The index of the answer to vote for (0-based)
+    function castVote(uint256 proposalId, uint256 answerIndex) public {
+        return _castVote(msg.sender, proposalId, answerIndex);
     }
 
     function proposer(uint256 proposalId) public view returns (address) {
         return proposals[proposalId].proposer;
     }
 
-    function _castVote(address voter, uint256 proposalId, bool support) internal {
+    function _castVote(address voter, uint256 proposalId, uint256 answerIndex) internal {
         require(state(proposalId) == ProposalState.Active, "Governor::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
+        require(answerIndex < proposal.answers.length, "Governor::_castVote: invalid answer index");
+
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
+
         uint96 votes = getPastVotes(voter, proposal.startBlock);
 
-        if (support) {
-            proposal.forVotes = add256(proposal.forVotes, votes);
-        } else {
-            proposal.againstVotes = add256(proposal.againstVotes, votes);
-        }
+        // Update vote count for the selected answer
+        proposal.answerVotes[answerIndex] = add256(proposal.answerVotes[answerIndex], votes);
 
         receipt.hasVoted = true;
-        receipt.support = support;
+        receipt.answerIndex = answerIndex;
         receipt.votes = votes;
 
-        emit VoteCast(voter, proposalId, support, votes);
+        emit VoteCast(voter, proposalId, answerIndex, votes);
     }
 
     function updateGovernanceParameters(
@@ -559,6 +572,75 @@ contract PEACECOINDAO_GOVERNOR {
             chainId := chainid()
         }
         return chainId;
+    }
+
+    /// @notice Get the answers for a proposal
+    /// @param proposalId The id of the proposal
+    /// @return Array of answer strings
+    function getProposalAnswers(uint256 proposalId) public view returns (string[] memory) {
+        return proposals[proposalId].answers;
+    }
+
+    /// @notice Get the vote count for a specific answer
+    /// @param proposalId The id of the proposal
+    /// @param answerIndex The index of the answer (0-based)
+    /// @return The number of votes for that answer
+    function getAnswerVotes(uint256 proposalId, uint256 answerIndex) public view returns (uint256) {
+        return proposals[proposalId].answerVotes[answerIndex];
+    }
+
+    /// @notice Get vote counts for all answers
+    /// @param proposalId The id of the proposal
+    /// @return Array of vote counts corresponding to each answer
+    function getAllAnswerVotes(uint256 proposalId) public view returns (uint256[] memory) {
+        Proposal storage proposal = proposals[proposalId];
+        uint256[] memory votes = new uint256[](proposal.answers.length);
+        for (uint256 i = 0; i < proposal.answers.length; i++) {
+            votes[i] = proposal.answerVotes[i];
+        }
+        return votes;
+    }
+
+    /// @notice Get the total votes cast across all answers
+    /// @param proposalId The id of the proposal
+    /// @return Total votes cast
+    function getTotalVotes(uint256 proposalId) public view returns (uint256) {
+        Proposal storage proposal = proposals[proposalId];
+        uint256 total = 0;
+        for (uint256 i = 0; i < proposal.answers.length; i++) {
+            total = add256(total, proposal.answerVotes[i]);
+        }
+        return total;
+    }
+
+    /// @notice Get the vote count for the winning answer (answer with most votes)
+    /// @param proposalId The id of the proposal
+    /// @return The vote count of the winning answer
+    function getWinningAnswerVotes(uint256 proposalId) public view returns (uint256) {
+        Proposal storage proposal = proposals[proposalId];
+        uint256 maxVotes = 0;
+        for (uint256 i = 0; i < proposal.answers.length; i++) {
+            if (proposal.answerVotes[i] > maxVotes) {
+                maxVotes = proposal.answerVotes[i];
+            }
+        }
+        return maxVotes;
+    }
+
+    /// @notice Get the index of the winning answer (answer with most votes)
+    /// @param proposalId The id of the proposal
+    /// @return The index of the winning answer, or the first answer if there's a tie
+    function getWinningAnswerIndex(uint256 proposalId) public view returns (uint256) {
+        Proposal storage proposal = proposals[proposalId];
+        uint256 maxVotes = 0;
+        uint256 winningIndex = 0;
+        for (uint256 i = 0; i < proposal.answers.length; i++) {
+            if (proposal.answerVotes[i] > maxVotes) {
+                maxVotes = proposal.answerVotes[i];
+                winningIndex = i;
+            }
+        }
+        return winningIndex;
     }
 }
 

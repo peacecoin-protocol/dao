@@ -27,6 +27,7 @@ contract TimelockTest is Test, DeployDAOFactory {
     GovernorAlpha gov;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
+    uint256 constant VOTING_DELAY = 1;
     uint256 constant VOTING_PERIOD = 1 days;
     uint256 constant PROPOSAL_THRESHOLD = 100e18;
     uint256 constant QUORUM_VOTES = 1000e18;
@@ -92,7 +93,7 @@ contract TimelockTest is Test, DeployDAOFactory {
             address(sbt),
             address(nft),
             address(timelock),
-            1,
+            VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
             QUORUM_VOTES,
