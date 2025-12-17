@@ -7,10 +7,10 @@ import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
-import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
+import {DAOFactory} from "../src/DAOFactory.sol";
 
-contract GovernorAlphaTest is Test, DeployDAOFactory {
+contract GovernorAlphaTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address guardian = address(this);
@@ -24,7 +24,7 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
             twitter: "https://twitter.com/peacecoin",
             telegram: "https://t.me/peacecoin"
         });
-    MockGovToken pceToken;
+    MockGovToken governanceToken;
     PEACECOINDAO_SBT sbt;
     PEACECOINDAO_NFT nft;
 
@@ -46,16 +46,16 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
         vm.label(bob, "bob");
         vm.label(guardian, "guardian");
 
-        (address daoFactory, , , , , , ) = deployDAOFactory();
-
-        pceToken = new MockGovToken();
-        pceToken.initialize();
+        governanceToken = new MockGovToken();
+        governanceToken.initialize();
 
         sbt = new PEACECOINDAO_SBT();
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
-
         nft = new PEACECOINDAO_NFT();
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, daoFactory);
+
+        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
+
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
@@ -64,7 +64,7 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
         gov = new GovernorAlpha();
         gov.initialize(
             "PCE DAO",
-            address(pceToken),
+            address(governanceToken),
             address(sbt),
             address(nft),
             address(timelock),
@@ -76,19 +76,21 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
             SOCIAL_CONFIG
         );
 
-        pceToken.mint(guardian, INITIAL_BALANCE);
-        pceToken.mint(alice, INITIAL_BALANCE);
-        pceToken.mint(bob, INITIAL_BALANCE);
-        pceToken.mint(address(timelock), INITIAL_BALANCE);
+        daoFactory.setImplementation(address(timelock), address(gov), address(governanceToken));
+
+        governanceToken.mint(guardian, INITIAL_BALANCE);
+        governanceToken.mint(alice, INITIAL_BALANCE);
+        governanceToken.mint(bob, INITIAL_BALANCE);
+        governanceToken.mint(address(timelock), INITIAL_BALANCE);
 
         vm.prank(alice);
-        pceToken.delegate(alice);
+        governanceToken.delegate(alice);
 
         vm.prank(bob);
-        pceToken.delegate(alice);
+        governanceToken.delegate(alice);
 
         vm.prank(guardian);
-        pceToken.delegate(guardian);
+        governanceToken.delegate(guardian);
     }
 
     // ============ Helper Methods ============
@@ -113,7 +115,7 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
         )
     {
         targets = new address[](1);
-        targets[0] = address(pceToken);
+        targets[0] = address(governanceToken);
 
         values = new uint256[](1);
         values[0] = 0;
@@ -311,7 +313,7 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
     function test_getReceipt() public {
         _createProposal();
 
-        uint256 aliceVotes = pceToken.getPastVotes(alice, block.number - 1);
+        uint256 aliceVotes = governanceToken.getPastVotes(alice, block.number - 1);
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, true);
@@ -409,8 +411,11 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
 
         skip(timelock.delay() * 2);
         gov.execute(PROPOSAL_ID);
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(alice));
-        assertEq(INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(address(timelock)));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(alice));
+        assertEq(
+            INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE,
+            governanceToken.balanceOf(address(timelock))
+        );
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Executed));
     }
 
@@ -708,11 +713,11 @@ contract GovernorAlphaTest is Test, DeployDAOFactory {
 
         gov.batchExecute(proposalIds);
 
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(alice));
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(bob));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(alice));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(bob));
         assertEq(
             INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE * 2,
-            pceToken.balanceOf(address(timelock))
+            governanceToken.balanceOf(address(timelock))
         );
         assertEq(uint256(gov.state(proposalIdOne)), uint256(GovernorAlpha.ProposalState.Executed));
         assertEq(uint256(gov.state(proposalIdTwo)), uint256(GovernorAlpha.ProposalState.Executed));

@@ -15,7 +15,7 @@ import {PEACECOINDAO_NFT} from "../Governance/PEACECOINDAO_NFT.sol";
 contract DeployDAOFactory is Script {
     function deployDAOFactory()
         public
-        returns (address, address, address, address, address, address, address)
+        returns (address, address, address, address, address, address)
     {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -54,7 +54,6 @@ contract DeployDAOFactory is Script {
             address(daoFactory),
             address(timelockAddress),
             address(governorAddress),
-            address(governanceTokenAddress),
             address(mockERC20),
             address(peacecoinDaoSbt),
             address(peacecoinDaoNft)

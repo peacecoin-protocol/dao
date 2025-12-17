@@ -160,7 +160,6 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
     /// @return signatures Array of function signatures to call
     /// @return data Array of calldata for each action
     /// @return description Human-readable description of the proposal
-    /// @return answers Array of answer options for the proposal (prediction market style)
     function _buildProposalParams()
         private
         view
@@ -169,8 +168,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             uint256[] memory values,
             string[] memory signatures,
             bytes[] memory data,
-            string memory description,
-            string[] memory answers
+            string memory description
         )
     {
         targets = new address[](1);
@@ -186,10 +184,6 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
         data[0] = abi.encode(alice, EXECUTE_TRANSFER_VALUE);
 
         description = "Transfer PCE";
-
-        answers = new string[](2);
-        answers[0] = "Yes";
-        answers[1] = "No";
     }
 
     /// @notice Creates a proposal using standard parameters
@@ -200,18 +194,10 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             uint256[] memory values,
             string[] memory signatures,
             bytes[] memory data,
-            string memory description,
-            string[] memory answers
+            string memory description
         ) = _buildProposalParams();
 
-        proposalId = _createProposalWithParams(
-            targets,
-            values,
-            signatures,
-            data,
-            description,
-            answers
-        );
+        proposalId = _createProposalWithParams(targets, values, signatures, data, description);
     }
 
     /// @notice Creates a proposal with custom parameters
@@ -220,18 +206,16 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
     /// @param signatures Array of function signatures to call
     /// @param data Array of calldata for each action
     /// @param description Human-readable description of the proposal
-    /// @param answers Array of answer options for the proposal
     /// @return proposalId The ID of the newly created proposal
     function _createProposalWithParams(
         address[] memory targets,
         uint256[] memory values,
         string[] memory signatures,
         bytes[] memory data,
-        string memory description,
-        string[] memory answers
+        string memory description
     ) private returns (uint256 proposalId) {
         vm.prank(alice);
-        proposalId = gov.propose(targets, values, signatures, data, description, answers);
+        proposalId = gov.propose(targets, values, signatures, data, description);
     }
 
     // ============================================================================
@@ -285,13 +269,12 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             uint256[] memory values,
             string[] memory signatures,
             bytes[] memory data,
-            string memory description,
-            string[] memory answers
+            string memory description
         ) = _buildProposalParams();
 
         // Test: Proposal should revert if proposer doesn't meet threshold
         vm.expectRevert("Governor::propose: proposer votes below proposal threshold");
-        gov.propose(targets, values, signatures, data, description, answers);
+        gov.propose(targets, values, signatures, data, description);
 
         // Setup: Delegate SBT and mint tokens to meet threshold
         sbt.delegate(address(this));
@@ -305,7 +288,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
         invalidData[1] = new bytes(2);
 
         vm.expectRevert("Governor::propose: proposal function information arity mismatch");
-        gov.propose(targets, values, signatures, invalidData, description, answers);
+        gov.propose(targets, values, signatures, invalidData, description);
 
         // Test: Proposal should revert with empty actions array
         vm.expectRevert("Governor::propose: must provide actions");
@@ -314,8 +297,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             new uint256[](0),
             new string[](0),
             new bytes[](0),
-            description,
-            answers
+            description
         );
 
         // Test: Proposal should revert when exceeding max operations limit
@@ -325,19 +307,12 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             new uint256[](11),
             new string[](11),
             new bytes[](11),
-            description,
-            answers
+            description
         );
-
-        // Test: Proposal should revert with less than 2 answer options
-        string[] memory singleAnswer = new string[](1);
-        singleAnswer[0] = "Yes";
-        vm.expectRevert("Governor::propose: must provide at least 2 answers");
-        gov.propose(targets, values, signatures, data, description, singleAnswer);
 
         // Test: Successful proposal creation
         vm.prank(alice);
-        gov.propose(targets, values, signatures, data, description, answers);
+        gov.propose(targets, values, signatures, data, description);
 
         assertEq(gov.proposalCount(), 1, "Proposal count should be 1");
         assertEq(
@@ -346,18 +321,12 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             "Alice's latest proposal ID should be 1"
         );
 
-        // Verify: Proposal answers are correctly stored
-        string[] memory storedAnswers = gov.getProposalAnswers(PROPOSAL_ID);
-        assertEq(storedAnswers.length, 2, "Should have 2 answer options");
-        assertEq(storedAnswers[0], "Yes", "First answer should be 'Yes'");
-        assertEq(storedAnswers[1], "No", "Second answer should be 'No'");
-
         // Test: Cannot create new proposal if user has active/pending proposal
         vm.prank(alice);
         vm.expectRevert(
             "Governor::propose: one live proposal per proposer, found an already pending proposal"
         );
-        gov.propose(targets, values, signatures, data, description, answers);
+        gov.propose(targets, values, signatures, data, description);
     }
 
     // ============================================================================
@@ -433,14 +402,29 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             "Proposal should be in Active state"
         );
 
-        // Test: Voting with invalid answer index should revert
+        // Test: Successful vote in favor
         vm.prank(alice);
-        vm.expectRevert("Governor::_castVote: invalid answer index");
-        gov.castVote(proposalId, 10); // Invalid index (only 0 and 1 are valid)
+        gov.castVote(proposalId, true);
 
-        // Test: Successful vote with valid answer index
+        // Verify receipt
+        PEACECOINDAO_GOVERNOR.Receipt memory receipt = gov.getReceipt(proposalId, alice);
+        assertTrue(receipt.hasVoted, "Receipt should show vote was cast");
+        assertTrue(receipt.support, "Receipt should show support is true");
+        assertGt(receipt.votes, 0, "Receipt should show votes were cast");
+
+        // Test: Cannot vote twice
         vm.prank(alice);
-        gov.castVote(proposalId, 0);
+        vm.expectRevert("Governor::_castVote: voter already voted");
+        gov.castVote(proposalId, false);
+
+        // Test: Vote against (with different voter)
+        vm.prank(bob);
+        gov.castVote(proposalId, false);
+
+        // Verify receipt
+        receipt = gov.getReceipt(proposalId, bob);
+        assertTrue(receipt.hasVoted, "Receipt should show vote was cast");
+        assertFalse(receipt.support, "Receipt should show support is false");
     }
 
     /// @notice Tests proposal state transitions through the entire lifecycle
@@ -462,37 +446,46 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             "Proposal should be Active after voting delay"
         );
 
-        // Calculate current voting power
-        uint96 aliceVotes = gov.getPastVotes(alice, block.number - 1);
-        uint96 bobVotes = gov.getPastVotes(bob, block.number - 1);
-        uint96 guardianVotes = gov.getPastVotes(guardian, block.number - 1);
+        // Get the proposal's start block
+        uint256 startBlock = block.number - 1;
+
+        // Calculate voting power at the proposal's start block
+        uint96 aliceVotes = gov.getPastVotes(alice, startBlock);
+        uint96 bobVotes = gov.getPastVotes(bob, startBlock);
+        uint96 guardianVotes = gov.getPastVotes(guardian, startBlock);
 
         // Ensure quorum can be met by minting additional tokens if needed
         if (aliceVotes + bobVotes + guardianVotes < QUORUM_VOTES) {
             govToken.mint(alice, QUORUM_VOTES * 1e18);
+            vm.prank(alice);
             govToken.delegate(alice);
             vm.roll(block.number + 1);
-            aliceVotes = gov.getPastVotes(alice, block.number - 1);
+            // Recalculate after minting
+            startBlock = block.number + VOTING_DELAY;
+            aliceVotes = gov.getPastVotes(alice, startBlock);
         }
 
-        // Cast vote
+        // Cast vote in favor
         vm.prank(alice);
-        gov.castVote(proposalId, 0);
+        gov.castVote(proposalId, true);
 
         // Move past voting period
         vm.roll(block.number + VOTING_PERIOD + 1);
 
         // Verify final state based on quorum
-        uint256 totalVotes = gov.getTotalVotes(proposalId);
-        if (totalVotes >= QUORUM_VOTES) {
+        // The state function checks: forVotes > againstVotes && forVotes >= quorumVotes
+        PEACECOINDAO_GOVERNOR.ProposalState currentState = gov.state(proposalId);
+
+        // Since alice voted in favor and we ensured quorum can be met, check the state
+        if (aliceVotes >= QUORUM_VOTES) {
             assertEq(
-                uint256(gov.state(proposalId)),
+                uint256(currentState),
                 uint256(PEACECOINDAO_GOVERNOR.ProposalState.Succeeded),
                 "Proposal should be Succeeded if quorum is met"
             );
         } else {
             assertEq(
-                uint256(gov.state(proposalId)),
+                uint256(currentState),
                 uint256(PEACECOINDAO_GOVERNOR.ProposalState.Defeated),
                 "Proposal should be Defeated if quorum is not met"
             );
@@ -513,7 +506,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
         vm.roll(block.number + VOTING_DELAY + 1);
 
         vm.prank(alice);
-        gov.castVote(proposalId, 0);
+        gov.castVote(proposalId, true);
 
         // Move past voting period to allow queuing
         vm.roll(block.number + VOTING_PERIOD + 1);
@@ -552,7 +545,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
         vm.roll(block.number + VOTING_DELAY + 1);
 
         vm.prank(alice);
-        gov.castVote(proposalId1, 0);
+        gov.castVote(proposalId1, true);
 
         // Move past voting period for proposal 1
         vm.roll(block.number + VOTING_PERIOD + 1);
@@ -563,8 +556,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             uint256[] memory values,
             string[] memory signatures,
             bytes[] memory data,
-            string memory description,
-            string[] memory answers
+            string memory description
         ) = _buildProposalParams();
 
         data[0] = abi.encode(bob, EXECUTE_TRANSFER_VALUE);
@@ -575,15 +567,14 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
             values,
             signatures,
             data,
-            description,
-            answers
+            description
         );
 
         // Move to voting period and vote for proposal 2
         vm.roll(block.number + VOTING_DELAY + 2);
 
         vm.prank(alice);
-        gov.castVote(proposalId2, 0);
+        gov.castVote(proposalId2, true);
 
         // Move past voting period for proposal 2
         vm.roll(block.number + VOTING_PERIOD + 2);
@@ -738,7 +729,7 @@ contract PEACECOINDAO_GOVERNORTEST is Test {
         vm.roll(block.number + VOTING_DELAY + 1);
 
         vm.prank(alice);
-        gov.castVote(proposalId, 0);
+        gov.castVote(proposalId, true);
 
         // Move past voting period
         vm.roll(block.number + VOTING_PERIOD + 1);

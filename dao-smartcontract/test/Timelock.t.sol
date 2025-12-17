@@ -8,7 +8,7 @@ import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {console} from "forge-std/console.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
-import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {DAOFactory} from "../src/DAOFactory.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
@@ -17,14 +17,14 @@ contract PublicTimelock is Timelock {
     }
 }
 
-contract TimelockTest is Test, DeployDAOFactory {
+contract TimelockTest is Test {
     address alice = makeAddr("alice"); // admin
     address bob = makeAddr("bob");
 
-    MockGovToken pceToken;
+    MockGovToken governanceToken;
     PEACECOINDAO_SBT sbt;
     PEACECOINDAO_NFT nft;
-    GovernorAlpha gov;
+    GovernorAlpha governor;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
     uint256 constant VOTING_DELAY = 1;
@@ -72,24 +72,24 @@ contract TimelockTest is Test, DeployDAOFactory {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
 
-        (address daoFactory, , , , , , ) = deployDAOFactory();
-
-        pceToken = new MockGovToken();
-        pceToken.initialize();
+        governanceToken = new MockGovToken();
+        governanceToken.initialize();
 
         sbt = new PEACECOINDAO_SBT();
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, daoFactory);
-
         nft = new PEACECOINDAO_NFT();
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, daoFactory);
+
+        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
+
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
 
         timelock = new Timelock();
         timelock.initialize(alice, 2 hours);
 
-        gov = new GovernorAlpha();
-        gov.initialize(
+        governor = new GovernorAlpha();
+        governor.initialize(
             "PCE DAO",
-            address(pceToken),
+            address(governanceToken),
             address(sbt),
             address(nft),
             address(timelock),
@@ -100,9 +100,15 @@ contract TimelockTest is Test, DeployDAOFactory {
             address(this),
             SOCIAL_CONFIG
         );
-        pceToken.mint(address(this), INITIAL_AMOUNT);
+        governanceToken.mint(address(this), INITIAL_AMOUNT);
 
-        assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(governor),
+            address(governanceToken)
+        );
+
+        assertEq(governanceToken.totalSupply(), governanceToken.balanceOf(address(this)));
     }
 
     // Helper functions
@@ -148,7 +154,7 @@ contract TimelockTest is Test, DeployDAOFactory {
         timelock.setPendingAdmin(address(0));
 
         vm.expectRevert("Timelock::setPendingAdmin: First call must come from admin.");
-        timelock.setPendingAdmin(address(gov));
+        timelock.setPendingAdmin(address(governor));
 
         vm.prank(alice);
         vm.expectEmit(true, false, false, false);

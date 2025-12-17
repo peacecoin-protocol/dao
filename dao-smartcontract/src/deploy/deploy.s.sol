@@ -45,7 +45,6 @@ contract deploy is Script, DeployDAOFactory {
             address daoFactory,
             address timelockAddress,
             address governorAddress,
-            address governanceTokenAddress,
             address mockERC20Address,
             address peacecoinDaoSbt,
             address peacecoinDaoNft
@@ -79,6 +78,8 @@ contract deploy is Script, DeployDAOFactory {
         Timelock timelock = Timelock(timelockAddress);
         timelock.initialize(deployerAddress, 1 minutes);
 
+        address _deployerAddress = deployerAddress;
+
         vm.roll(block.number + 1); // Wait for 1 block
 
         GovernorAlpha governor = GovernorAlpha(governorAddress);
@@ -92,7 +93,7 @@ contract deploy is Script, DeployDAOFactory {
             _votingPeriod,
             _proposalThreshold,
             _quorumVotes,
-            deployerAddress,
+            _deployerAddress,
             SOCIAL_CONFIG
         );
         timelock.setPendingAdmin(address(governor));
@@ -100,6 +101,7 @@ contract deploy is Script, DeployDAOFactory {
 
         vm.roll(block.number + 1); // Wait for 1 block
 
+        address _daoFactory = daoFactory;
         // DAOFactory(daoFactory).createDAO(
         //     daoName,
         //     SOCIAL_CONFIG,
@@ -124,7 +126,7 @@ contract deploy is Script, DeployDAOFactory {
         PEACECOINDAO_SBT(peacecoinDaoSbt).setMinter(address(campaigns));
 
         campaigns.initialize(
-            address(daoFactory),
+            _daoFactory,
             PEACECOINDAO_SBT(address(peacecoinDaoSbt)),
             PEACECOINDAO_NFT(address(peacecoinDaoNft))
         );
@@ -180,5 +182,6 @@ contract deploy is Script, DeployDAOFactory {
         console.log("PCE Community Gov Token: ", address(pceCommunityGovToken));
         console.log("SBT: ", address(peacecoinDaoSbt));
         console.log("NFT: ", address(peacecoinDaoNft));
+        console.log("DAO Factory: ", _daoFactory);
     }
 }
