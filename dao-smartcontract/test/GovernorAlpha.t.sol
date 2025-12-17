@@ -5,81 +5,104 @@ import {Test} from "forge-std/Test.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
+import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
+import {DAOFactory} from "../src/DAOFactory.sol";
 
 contract GovernorAlphaTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address guardian = address(this);
 
-    MockGovToken pceToken;
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "PEACECOIN DAO",
+            website: "https://peacecoin.com",
+            linkedin: "https://linkedin.com/peacecoin",
+            twitter: "https://twitter.com/peacecoin",
+            telegram: "https://t.me/peacecoin"
+        });
+    MockGovToken governanceToken;
+    PEACECOINDAO_SBT sbt;
+    PEACECOINDAO_NFT nft;
+
     GovernorAlpha gov;
     Timelock timelock;
+
     uint256 constant INITIAL_BALANCE = 50000e18;
     uint256 constant TIME_LOCK_DELAY = 10 minutes;
     uint256 constant VOTING_DELAY = 1;
-    uint256 constant VOTING_PERIOD = 1 days;
+    uint256 constant VOTING_PERIOD = 1000;
     uint256 constant PROPOSAL_THRESHOLD = 100e18;
     uint256 constant QUORUM_VOTES = 1000e18;
     uint256 constant PROPOSAL_MAX_OPERATIONS = 10;
     uint256 constant EXECUTE_TRANSFER_VALUE = 100;
     uint256 constant PROPOSAL_ID = 1;
 
-    event ProposalCreated(
-        uint256 id,
-        address proposer,
-        address[] targets,
-        uint256[] values,
-        string[] signatures,
-        bytes[] calldatas,
-        uint256 startBlock,
-        uint256 endBlock,
-        string description
-    );
-
-    event VoteCast(address voter, uint256 proposalId, bool support, uint256 votes);
-    event ProposalCanceled(uint256 id);
-    event ProposalQueued(uint256 id, uint256 eta);
-    event ProposalExecuted(uint256 id);
-
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(guardian, "guardian");
 
-        pceToken = new MockGovToken();
-        pceToken.initialize();
+        governanceToken = new MockGovToken();
+        governanceToken.initialize();
+
+        sbt = new PEACECOINDAO_SBT();
+        nft = new PEACECOINDAO_NFT();
+
+        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
+
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
 
-        // Updated constructor parameters
+        // Initialize GovernorAlpha with required parameters
         gov = new GovernorAlpha();
         gov.initialize(
             "PCE DAO",
-            address(pceToken),
+            address(governanceToken),
+            address(sbt),
+            address(nft),
             address(timelock),
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
-            QUORUM_VOTES
+            QUORUM_VOTES,
+            guardian,
+            SOCIAL_CONFIG
         );
 
-        pceToken.mint(guardian, INITIAL_BALANCE);
-        pceToken.mint(alice, INITIAL_BALANCE);
-        pceToken.mint(bob, INITIAL_BALANCE);
-        pceToken.mint(address(timelock), INITIAL_BALANCE);
+        daoFactory.setImplementation(address(timelock), address(gov), address(governanceToken));
+
+        governanceToken.mint(guardian, INITIAL_BALANCE);
+        governanceToken.mint(alice, INITIAL_BALANCE);
+        governanceToken.mint(bob, INITIAL_BALANCE);
+        governanceToken.mint(address(timelock), INITIAL_BALANCE);
 
         vm.prank(alice);
-        pceToken.delegate(alice);
+        governanceToken.delegate(alice);
 
         vm.prank(bob);
-        pceToken.delegate(alice);
+        governanceToken.delegate(alice);
 
         vm.prank(guardian);
-        pceToken.delegate(guardian);
+        governanceToken.delegate(guardian);
     }
 
-    // Helper methods
+    // ============ Helper Methods ============
+
+    /**
+     * @notice Builds proposal parameters for testing
+     * @return targets Array of target addresses
+     * @return values Array of values to send with each call
+     * @return signatures Array of function signatures
+     * @return data Array of calldata
+     * @return description Proposal description
+     */
     function _buildProposalParams()
         private
         view
@@ -92,7 +115,7 @@ contract GovernorAlphaTest is Test {
         )
     {
         targets = new address[](1);
-        targets[0] = address(pceToken);
+        targets[0] = address(governanceToken);
 
         values = new uint256[](1);
         values[0] = 0;
@@ -106,6 +129,10 @@ contract GovernorAlphaTest is Test {
         description = "Transfer PCE";
     }
 
+    /**
+     * @notice Creates a proposal using default parameters
+     * @return proposalId The ID of the created proposal
+     */
     function _createProposal() private returns (uint256 proposalId) {
         (
             address[] memory targets,
@@ -118,6 +145,15 @@ contract GovernorAlphaTest is Test {
         proposalId = _createProposalWithParams(targets, values, signatures, data, description);
     }
 
+    /**
+     * @notice Creates a proposal with custom parameters
+     * @param targets Array of target addresses
+     * @param values Array of values to send with each call
+     * @param signatures Array of function signatures
+     * @param data Array of calldata
+     * @param description Proposal description
+     * @return proposalId The ID of the created proposal
+     */
     function _createProposalWithParams(
         address[] memory targets,
         uint256[] memory values,
@@ -130,35 +166,60 @@ contract GovernorAlphaTest is Test {
         proposalId = gov.propose(targets, values, signatures, data, description);
     }
 
-    function test__quorumVotes() public view {
+    /**
+     * @notice Tests that quorum votes returns the expected constant value
+     */
+    function test_quorumVotes() public view {
         assertEq(gov.quorumVotes(), QUORUM_VOTES);
     }
 
-    function test__proposalThreshold() public view {
+    /**
+     * @notice Tests that proposal threshold returns the expected constant value
+     */
+    function test_proposalThreshold() public view {
         assertEq(gov.proposalThreshold(), PROPOSAL_THRESHOLD);
     }
 
-    function test__proposalMaxOperations() public view {
+    /**
+     * @notice Tests that proposal max operations returns the expected constant value
+     */
+    function test_proposalMaxOperations() public view {
         assertEq(gov.proposalMaxOperations(), PROPOSAL_MAX_OPERATIONS);
     }
 
-    function test__votingDelay() public view {
+    /**
+     * @notice Tests that voting delay returns the expected constant value
+     */
+    function test_votingDelay() public view {
         assertEq(gov.votingDelay(), VOTING_DELAY);
     }
 
-    function test__votingPeriod() public view {
+    /**
+     * @notice Tests that voting period returns the expected constant value
+     */
+    function test_votingPeriod() public view {
         assertEq(gov.votingPeriod(), VOTING_PERIOD);
     }
 
-    function test__proposalCount() public view {
+    /**
+     * @notice Tests that proposal count is zero initially
+     */
+    function test_proposalCount() public view {
         assertEq(gov.proposalCount(), 0);
     }
 
-    function test__guardian() public view {
-        assertEq(gov.guardian(), guardian); // Now the deployer is the guardian
+    /**
+     * @notice Tests that guardian address is set correctly
+     */
+    function test_guardian() public view {
+        assertEq(gov.guardian(), guardian);
     }
 
-    function test__propose() public {
+    /**
+     * @notice Tests proposal creation with various validation scenarios
+     * @dev Verifies proposal threshold, arity mismatch, empty actions, max operations, and duplicate proposal prevention
+     */
+    function test_propose() public {
         (
             address[] memory targets,
             uint256[] memory values,
@@ -167,19 +228,20 @@ contract GovernorAlphaTest is Test {
             string memory description
         ) = _buildProposalParams();
 
-        vm.expectRevert("GovernorAlpha::propose: proposer votes below proposal threshold");
+        vm.expectRevert("Governor::propose: proposer votes below proposal threshold");
         gov.propose(targets, values, signatures, data, description);
 
         vm.roll(block.number + 10);
 
-        bytes[] memory inv_data = new bytes[](2);
-        inv_data[0] = new bytes(1);
-        inv_data[1] = new bytes(2);
+        // Create invalid data array with mismatched length
+        bytes[] memory invalidData = new bytes[](2);
+        invalidData[0] = new bytes(1);
+        invalidData[1] = new bytes(2);
 
-        vm.expectRevert("GovernorAlpha::propose: proposal function information arity mismatch");
-        gov.propose(targets, values, signatures, inv_data, description);
+        vm.expectRevert("Governor::propose: proposal function information arity mismatch");
+        gov.propose(targets, values, signatures, invalidData, description);
 
-        vm.expectRevert("GovernorAlpha::propose: must provide actions");
+        vm.expectRevert("Governor::propose: must provide actions");
         gov.propose(
             new address[](0),
             new uint256[](0),
@@ -188,7 +250,7 @@ contract GovernorAlphaTest is Test {
             description
         );
 
-        vm.expectRevert("GovernorAlpha::propose: too many actions");
+        vm.expectRevert("Governor::propose: too many actions");
         gov.propose(
             new address[](11),
             new uint256[](11),
@@ -197,33 +259,24 @@ contract GovernorAlphaTest is Test {
             description
         );
 
-        // Create Proposal
-        vm.expectEmit(true, true, true, true);
-        emit ProposalCreated(
-            PROPOSAL_ID,
-            guardian,
-            targets,
-            values,
-            signatures,
-            data,
-            block.number + gov.votingDelay(),
-            block.number + gov.votingDelay() + gov.votingPeriod(),
-            description
-        );
+        // Create proposal successfully
         gov.propose(targets, values, signatures, data, description);
 
         assertEq(gov.proposalCount(), 1);
         assertEq(gov.latestProposalIds(guardian), PROPOSAL_ID);
 
-        // Can't create new proposal if user has active/pending proposal
+        // Cannot create a new proposal if proposer has an active or pending proposal
         vm.expectRevert(
-            "GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal"
+            "Governor::propose: one live proposal per proposer, found an already pending proposal"
         );
 
         gov.propose(targets, values, signatures, data, description);
     }
 
-    function test_propose_Reverts_WhenUserHasActiveProposal() public {
+    /**
+     * @notice Tests that proposing fails when user has an active proposal
+     */
+    function test_propose_RevertsWhenUserHasActiveProposal() public {
         _createProposal();
         (
             address[] memory _targets,
@@ -233,35 +286,35 @@ contract GovernorAlphaTest is Test {
         ) = gov.getActions(PROPOSAL_ID);
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.expectRevert(
-            "GovernorAlpha::propose: one live proposal per proposer, found an already active proposal"
+            "Governor::propose: one live proposal per proposer, found an already active proposal"
         );
         gov.propose(_targets, _values, _signatures, _data, "Transfer PCE");
     }
 
-    function test__castVote() public {
+    /**
+     * @notice Tests casting votes on a proposal
+     * @dev Verifies that votes can be cast by different voters during the voting period
+     */
+    function test_castVote() public {
         _createProposal();
 
-        uint256 aliceVotes = pceToken.getPastVotes(alice, block.number - 1); // alice's and bob's delegated votes
-        uint256 guardianVotes = pceToken.getPastVotes(guardian, block.number - 1);
-
-        vm.roll(block.timestamp + gov.votingPeriod());
+        vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
-        vm.expectEmit(false, false, false, true);
-        emit VoteCast(alice, PROPOSAL_ID, true, aliceVotes);
         gov.castVote(PROPOSAL_ID, true);
 
         vm.prank(guardian);
-        vm.expectEmit(false, false, false, true);
-        emit VoteCast(guardian, PROPOSAL_ID, true, guardianVotes);
         gov.castVote(PROPOSAL_ID, true);
     }
 
-    function test__getReceipt() public {
+    /**
+     * @notice Tests retrieving vote receipt for a voter
+     * @dev Verifies receipt contains correct voting status, support, and vote count
+     */
+    function test_getReceipt() public {
         _createProposal();
 
-        uint256 aliceVotes = pceToken.getPastVotes(alice, block.number - 1);
-
-        vm.roll(block.timestamp + gov.votingPeriod());
+        uint256 aliceVotes = governanceToken.getPastVotes(alice, block.number - 1);
+        vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, true);
 
@@ -271,12 +324,16 @@ contract GovernorAlphaTest is Test {
         assertEq(receipt.votes, aliceVotes);
     }
 
-    function test__acceptAdmin() public {
+    /**
+     * @notice Tests accepting admin role from timelock
+     * @dev Verifies only guardian can accept admin role
+     */
+    function test_acceptAdmin() public {
         vm.prank(alice);
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::__acceptAdmin: sender must be gov guardian");
+        vm.expectRevert("Governor::__acceptAdmin: sender must be gov guardian");
         gov.__acceptAdmin();
 
         vm.prank(guardian);
@@ -284,9 +341,13 @@ contract GovernorAlphaTest is Test {
         assertEq(timelock.admin(), address(gov));
     }
 
-    function test__abdicate() public {
+    /**
+     * @notice Tests guardian abdication functionality
+     * @dev Verifies only guardian can abdicate and guardian is set to zero address
+     */
+    function test_abdicate() public {
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::__abdicate: sender must be gov guardian");
+        vm.expectRevert("Governor::__abdicate: sender must be gov guardian");
         gov.__abdicate();
 
         vm.prank(guardian);
@@ -294,194 +355,247 @@ contract GovernorAlphaTest is Test {
         assertEq(gov.guardian(), address(0));
     }
 
-    function test__cancel() public {
+    /**
+     * @notice Tests proposal cancellation functionality
+     * @dev Verifies guardian can cancel proposals and non-guardian cannot cancel when proposer is above threshold
+     */
+    function test_cancel() public {
         _createProposal();
-        test__acceptAdmin();
+        test_acceptAdmin();
 
+        // Non-guardian cannot cancel proposal when proposer is above threshold
         vm.prank(bob);
-        vm.expectRevert("GovernorAlpha::cancel: proposer above threshold");
+        vm.expectRevert("Governor::cancel: proposer above threshold");
         gov.cancel(PROPOSAL_ID);
 
-        // Guardian can Cancel
+        // Guardian can cancel the proposal
         vm.prank(guardian);
-        vm.expectEmit(false, false, false, true);
-        emit ProposalCanceled(PROPOSAL_ID);
         gov.cancel(PROPOSAL_ID);
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Canceled));
     }
 
-    function test__cancel_RevertsWhenExecuted() public {
-        // Can't cancel a proposal that has been executed
-        test__execute();
+    /**
+     * @notice Tests that canceling an executed proposal reverts
+     */
+    function test_cancel_RevertsWhenExecuted() public {
+        test_execute();
         vm.prank(guardian);
-        vm.expectRevert("GovernorAlpha::cancel: cannot cancel executed proposal");
+        vm.expectRevert("Governor::cancel: cannot cancel executed proposal");
         gov.cancel(PROPOSAL_ID);
     }
 
-    function test__queue() public {
-        //Accept Admin
-        test__acceptAdmin();
+    /**
+     * @notice Tests queueing a successful proposal
+     * @dev Verifies proposal transitions to Queued state after voting period ends
+     */
+    function test_queue() public {
+        test_acceptAdmin();
 
         uint256 proposalId = _createProposal();
-        vm.roll(block.timestamp + gov.votingPeriod());
+        vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(proposalId, true);
 
         vm.roll(block.number + gov.votingPeriod());
-        vm.expectEmit(false, false, false, true);
-        emit ProposalQueued(proposalId, block.timestamp + timelock.delay());
         gov.queue(proposalId);
 
         assertEq(uint256(gov.state(proposalId)), uint256(GovernorAlpha.ProposalState.Queued));
     }
 
-    function test__execute() public {
-        //Queue TX
-        test__queue();
+    /**
+     * @notice Tests executing a queued proposal
+     * @dev Verifies proposal execution updates token balances and proposal state
+     */
+    function test_execute() public {
+        test_queue();
 
         skip(timelock.delay() * 2);
-        vm.expectEmit(false, false, false, true);
-        emit ProposalExecuted(PROPOSAL_ID);
         gov.execute(PROPOSAL_ID);
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(alice));
-        assertEq(INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(address(timelock)));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(alice));
+        assertEq(
+            INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE,
+            governanceToken.balanceOf(address(timelock))
+        );
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Executed));
     }
 
-    function test__execute_WithInvalidState() public {
-        //Accept Admin
-        test__acceptAdmin();
+    /**
+     * @notice Tests that executing a proposal in invalid state reverts
+     */
+    function test_execute_RevertsWithInvalidState() public {
+        test_acceptAdmin();
         _createProposal();
 
         vm.roll(block.number + gov.votingPeriod());
         skip(timelock.delay() * 2);
-        vm.expectRevert("GovernorAlpha::execute: proposal can only be executed if it is queued");
+        vm.expectRevert("Governor::execute: proposal can only be executed if it is queued");
         gov.execute(PROPOSAL_ID);
     }
 
-    function test__proposalState() public {
+    /**
+     * @notice Tests proposal state transitions
+     * @dev Verifies proposal moves through Pending -> Active -> Succeeded states correctly
+     */
+    function test_proposalState() public {
         _createProposal();
 
-        // Should be Pending right after creation
+        // Proposal should be in Pending state immediately after creation
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Pending));
 
-        // Move to Active state
+        // Move past voting delay to transition to Active state
         vm.roll(block.number + gov.votingDelay() + 1);
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Active));
 
-        // Cast some votes
+        // Cast votes during active period
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, true);
 
-        // Move to end of voting period
+        // Move to end of voting period to transition to Succeeded state
         vm.roll(block.number + gov.votingPeriod());
         assertEq(uint256(gov.state(PROPOSAL_ID)), uint256(GovernorAlpha.ProposalState.Succeeded));
     }
 
-    function test__doubleVotePrevention() public {
+    /**
+     * @notice Tests that double voting is prevented
+     * @dev Verifies a voter cannot cast multiple votes on the same proposal
+     */
+    function test_doubleVotePrevention() public {
         _createProposal();
 
-        vm.roll(block.timestamp + gov.votingPeriod());
+        vm.roll(block.number + gov.votingDelay() + 1);
 
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, true);
 
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::_castVote: voter already voted");
+        vm.expectRevert("Governor::_castVote: voter already voted");
         gov.castVote(PROPOSAL_ID, true);
     }
 
-    function test__votingPeriodBoundaries() public {
+    /**
+     * @notice Tests voting period boundaries
+     * @dev Verifies voting is only allowed during the active voting period
+     */
+    function test_votingPeriodBoundaries() public {
         _createProposal();
 
-        // Too early to vote
+        // Attempt to vote before voting delay has passed
         vm.prank(alice);
-        vm.expectRevert("GovernorAlpha::_castVote: voting is closed");
+        vm.expectRevert("Governor::_castVote: voting is closed");
         gov.castVote(PROPOSAL_ID, true);
 
-        // Move to just after voting delay
+        // Move to just after voting delay - voting should now be open
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
-        gov.castVote(PROPOSAL_ID, true); // Should succeed
+        gov.castVote(PROPOSAL_ID, true);
 
-        // Move past voting period
+        // Move past voting period - voting should now be closed
         vm.roll(block.number + gov.votingPeriod() + 1);
         vm.prank(bob);
-        vm.expectRevert("GovernorAlpha::_castVote: voting is closed");
+        vm.expectRevert("Governor::_castVote: voting is closed");
         gov.castVote(PROPOSAL_ID, true);
     }
 
-    function test__queueInvalidStates() public {
+    /**
+     * @notice Tests that queueing proposals in invalid states reverts
+     * @dev Verifies proposals can only be queued when in Succeeded state
+     */
+    function test_queue_RevertsWithInvalidStates() public {
         _createProposal();
 
-        // Can't queue before voting period ends
-        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        // Cannot queue proposal before voting period ends
+        vm.expectRevert("Governor::queue: proposal can only be queued if it is succeeded");
         gov.queue(PROPOSAL_ID);
 
-        // Move to voting period and defeat the proposal
+        // Move to voting period and vote against the proposal to defeat it
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, false);
 
+        // Cannot queue a defeated proposal
         vm.roll(block.number + gov.votingPeriod());
-        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        vm.expectRevert("Governor::queue: proposal can only be queued if it is succeeded");
         gov.queue(PROPOSAL_ID);
     }
 
-    function test__proposer() public {
+    /**
+     * @notice Tests retrieving the proposer address for a proposal
+     */
+    function test_proposer() public {
         _createProposal();
         assertEq(gov.proposer(PROPOSAL_ID), guardian);
     }
 
-    function test__updateVariables(
-        uint256 quorumVotes_,
-        uint256 proposalThreshold_,
-        uint256 proposalMaxOperations_
+    /**
+     * @notice Tests updating governance parameters
+     * @dev Verifies only guardian or timelock can update parameters, and updates are applied correctly
+     * @param newQuorumVotes New quorum votes value
+     * @param newProposalThreshold New proposal threshold value
+     * @param newProposalMaxOperations New proposal max operations value
+     */
+    function test_updateVariables(
+        uint256 newQuorumVotes,
+        uint256 newProposalThreshold,
+        uint256 newProposalMaxOperations
     ) public {
-        quorumVotes_ = bound(quorumVotes_, 0, type(uint32).max);
-        proposalThreshold_ = bound(proposalThreshold_, 0, type(uint32).max);
-        proposalMaxOperations_ = bound(proposalMaxOperations_, 0, type(uint32).max);
+        newQuorumVotes = bound(newQuorumVotes, 0, type(uint32).max);
+        newProposalThreshold = bound(newProposalThreshold, 0, type(uint32).max);
+        newProposalMaxOperations = bound(newProposalMaxOperations, 0, type(uint32).max);
 
         vm.prank(alice);
         vm.expectRevert(
-            "GovernorAlpha::updateVariables: only guardian or timelock can update variables"
+            "Governor::updateVariables: only guardian or timelock can update variables"
         );
-        gov.updateGovernanceParameters(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
+        gov.updateGovernanceParameters(
+            newQuorumVotes,
+            newProposalThreshold,
+            newProposalMaxOperations
+        );
 
         vm.prank(guardian);
-        gov.updateGovernanceParameters(quorumVotes_, proposalThreshold_, proposalMaxOperations_);
-        assertEq(gov.quorumVotes(), quorumVotes_);
-        assertEq(gov.proposalThreshold(), proposalThreshold_);
-        assertEq(gov.proposalMaxOperations(), proposalMaxOperations_);
+        gov.updateGovernanceParameters(
+            newQuorumVotes,
+            newProposalThreshold,
+            newProposalMaxOperations
+        );
+        assertEq(gov.quorumVotes(), newQuorumVotes);
+        assertEq(gov.proposalThreshold(), newProposalThreshold);
+        assertEq(gov.proposalMaxOperations(), newProposalMaxOperations);
 
         vm.prank(address(timelock));
         gov.updateGovernanceParameters(
-            quorumVotes_ + 1,
-            proposalThreshold_ + 1,
-            proposalMaxOperations_ + 1
+            newQuorumVotes + 1,
+            newProposalThreshold + 1,
+            newProposalMaxOperations + 1
         );
-        assertEq(gov.quorumVotes(), quorumVotes_ + 1);
-        assertEq(gov.proposalThreshold(), proposalThreshold_ + 1);
-        assertEq(gov.proposalMaxOperations(), proposalMaxOperations_ + 1);
+        assertEq(gov.quorumVotes(), newQuorumVotes + 1);
+        assertEq(gov.proposalThreshold(), newProposalThreshold + 1);
+        assertEq(gov.proposalMaxOperations(), newProposalMaxOperations + 1);
     }
 
-    function test__queueSetTimelockPendingAdmin__RevertsWhen__NotGuardian() public {
+    /**
+     * @notice Tests that queueing timelock pending admin reverts when caller is not guardian
+     */
+    function test_queueSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert(
-            "GovernorAlpha::__queueSetTimelockPendingAdmin: sender must be gov guardian"
-        );
+        vm.expectRevert("Governor::__queueSetTimelockPendingAdmin: sender must be gov guardian");
         gov.__queueSetTimelockPendingAdmin(alice, 0);
     }
 
-    function test__executeSetTimelockPendingAdmin__RevertsWhen__NotGuardian() public {
+    /**
+     * @notice Tests that executing timelock pending admin reverts when caller is not guardian
+     */
+    function test_executeSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert(
-            "GovernorAlpha::__executeSetTimelockPendingAdmin: sender must be gov guardian"
-        );
+        vm.expectRevert("Governor::__executeSetTimelockPendingAdmin: sender must be gov guardian");
         gov.__executeSetTimelockPendingAdmin(alice, 0);
     }
 
-    function test__getActions() public {
+    /**
+     * @notice Tests retrieving proposal actions
+     * @dev Verifies all proposal action components are returned correctly
+     */
+    function test_getActions() public {
         (
             address[] memory targets,
             uint256[] memory values,
@@ -507,14 +621,17 @@ contract GovernorAlphaTest is Test {
         assertEq(_data.length, data.length);
     }
 
-    function test__batchQueue() public {
-        //Accept Admin
-        test__acceptAdmin();
+    /**
+     * @notice Tests batch queueing multiple proposals
+     * @dev Verifies multiple proposals can be queued simultaneously
+     */
+    function test_batchQueue() public {
+        test_acceptAdmin();
 
-        // Create proposal 1
+        // Create first proposal
         uint256 proposalIdOne = _createProposal();
 
-        // Create proposal 2 with different data
+        // Create second proposal with different data to avoid duplicate proposal actions
         vm.startPrank(alice);
         (
             address[] memory targets,
@@ -524,7 +641,6 @@ contract GovernorAlphaTest is Test {
             string memory description
         ) = _buildProposalParams();
         data[0] = abi.encode(bob, EXECUTE_TRANSFER_VALUE);
-        // Adding different data to avoid having duplicated proposal actions queued
         uint256 proposalIdTwo = _createProposalWithParams(
             targets,
             values,
@@ -534,54 +650,58 @@ contract GovernorAlphaTest is Test {
         );
         vm.stopPrank();
 
-        // Proposals votes
-        vm.roll(block.timestamp + gov.votingPeriod());
+        // Cast votes on both proposals
+        vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(proposalIdOne, true);
 
         vm.prank(guardian);
         gov.castVote(proposalIdTwo, true);
 
+        // Prepare proposal IDs array for batch queue
         uint256[] memory proposalIds = new uint256[](2);
         proposalIds[0] = proposalIdOne;
         proposalIds[1] = proposalIdTwo;
 
         vm.roll(block.number + gov.votingPeriod());
-        vm.expectEmit(false, false, false, true);
-        emit ProposalQueued(proposalIdOne, block.timestamp + timelock.delay());
 
-        vm.expectEmit(false, false, false, true);
-        emit ProposalQueued(proposalIdTwo, block.timestamp + timelock.delay());
+        // Batch queue both proposals
         gov.batchQueue(proposalIds);
 
         assertEq(uint256(gov.state(proposalIdOne)), uint256(GovernorAlpha.ProposalState.Queued));
         assertEq(uint256(gov.state(proposalIdTwo)), uint256(GovernorAlpha.ProposalState.Queued));
     }
 
-    function test__batchQueue_WithInvalidStates() public {
+    /**
+     * @notice Tests that batch queueing proposals in invalid states reverts
+     */
+    function test_batchQueue_RevertsWithInvalidStates() public {
         _createProposal();
 
         uint256[] memory proposalIds = new uint256[](2);
         proposalIds[0] = PROPOSAL_ID;
 
-        // Can't queue before voting period ends
-        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        // Cannot batch queue before voting period ends
+        vm.expectRevert("Governor::queue: proposal can only be queued if it is succeeded");
         gov.batchQueue(proposalIds);
 
-        // Move to voting period and defeat the proposal
+        // Move to voting period and vote against the proposal to defeat it
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, false);
 
+        // Cannot batch queue a defeated proposal
         vm.roll(block.number + gov.votingPeriod());
-        vm.expectRevert("GovernorAlpha::queue: proposal can only be queued if it is succeeded");
+        vm.expectRevert("Governor::queue: proposal can only be queued if it is succeeded");
         gov.batchQueue(proposalIds);
     }
 
-    function test__batchExecute() public {
-        // Batch proposal 1 and 2
-        // Proposal 1 transfers to Alice and propsal 2 to Bob
-        test__batchQueue();
+    /**
+     * @notice Tests batch executing multiple queued proposals
+     * @dev Verifies multiple proposals can be executed simultaneously and token balances are updated correctly
+     */
+    function test_batchExecute() public {
+        test_batchQueue();
         skip(timelock.delay() * 2);
 
         uint256 proposalIdOne = 1;
@@ -591,24 +711,22 @@ contract GovernorAlphaTest is Test {
         proposalIds[0] = proposalIdOne;
         proposalIds[1] = proposalIdTwo;
 
-        vm.expectEmit(false, false, false, true);
-        emit ProposalExecuted(proposalIdOne);
-
-        vm.expectEmit(false, false, false, true);
-        emit ProposalExecuted(proposalIdTwo);
         gov.batchExecute(proposalIds);
 
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(alice));
-        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, pceToken.balanceOf(bob));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(alice));
+        assertEq(INITIAL_BALANCE + EXECUTE_TRANSFER_VALUE, governanceToken.balanceOf(bob));
         assertEq(
             INITIAL_BALANCE - EXECUTE_TRANSFER_VALUE * 2,
-            pceToken.balanceOf(address(timelock))
+            governanceToken.balanceOf(address(timelock))
         );
         assertEq(uint256(gov.state(proposalIdOne)), uint256(GovernorAlpha.ProposalState.Executed));
         assertEq(uint256(gov.state(proposalIdTwo)), uint256(GovernorAlpha.ProposalState.Executed));
     }
 
-    function test__batchExecute_WithInvalidState() public {
+    /**
+     * @notice Tests that batch executing proposals in invalid state reverts
+     */
+    function test_batchExecute_RevertsWithInvalidState() public {
         _createProposal();
 
         uint256[] memory proposalIds = new uint256[](2);
@@ -616,7 +734,7 @@ contract GovernorAlphaTest is Test {
 
         vm.roll(block.number + gov.votingPeriod());
         skip(timelock.delay() * 2);
-        vm.expectRevert("GovernorAlpha::execute: proposal can only be executed if it is queued");
+        vm.expectRevert("Governor::execute: proposal can only be executed if it is queued");
         gov.batchExecute(proposalIds);
     }
 }

@@ -7,264 +7,581 @@ import {Campaigns} from "../src/Campaigns.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
-import {DeployDAOFactory} from "../src/deploy/DeployDAOFactory.sol";
+import {DAOFactory} from "../src/DAOFactory.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {ITokens} from "../src/interfaces/ITokens.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
+import {Timelock} from "../src/Governance/Timelock.sol";
+import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
+import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 
-contract CampaignsTest is Test, DeployDAOFactory {
+/**
+ * @title CampaignsTest
+ * @notice Comprehensive test suite for the Campaigns contract
+ * @dev Tests campaign creation, winner management, claiming functionality, and access control
+ */
+contract CampaignsTest is Test {
     using Strings for uint256;
+
+    // ============ Contract Instances ============
+
+    /// @notice Campaigns contract under test
     Campaigns public campaigns;
-    MockERC20 public token;
+
+    /// @notice NFT contract for campaign rewards
     PEACECOINDAO_NFT public nft;
+
+    /// @notice SBT contract for DAO membership
     PEACECOINDAO_SBT public sbt;
+
+    // ============ Test Accounts ============
+
+    /// @notice DAO manager with administrative privileges
     address public daoManager = makeAddr("DaoManager");
+
+    /// @notice Regular user account for testing
     address public user = makeAddr("User");
+
+    /// @notice Test account for campaign winners
     address public alice = makeAddr("Alice");
+
+    /// @notice Test account for campaign winners
     address public bob = makeAddr("Bob");
+
+    /// @notice Test account not whitelisted for campaigns
     address public notWhitelistedUser = makeAddr("NotWhitelisted");
 
+    // ============ Test Data ============
+
+    /// @notice Test gist hash for signature validation
     bytes32 public gist = keccak256(abi.encodePacked("testGist"));
 
-    string public uri = "https://peacecoin-dao.mypinata.cloud/ipfs/";
-    string public name = "PEACECOIN DAO SBT";
-    string public symbol = "PCE_SBT";
+    /// @notice Default campaign title for testing
+    string public campaignTitle = "Test Campaign";
 
-    string public _title = "Test Campaign";
-    string public _description = "Test Description";
+    /// @notice Default campaign description for testing
+    string public campaignDescription = "Test Description";
 
-    bytes32 public DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    // ============ Governance Contracts ============
 
-    Campaigns.Campaign _campaign =
+    /// @notice Timelock contract for governance proposals
+    Timelock public timelock;
+
+    /// @notice Governor contract for DAO governance
+    GovernorAlpha public governor;
+
+    /// @notice Governance token for voting
+    PCECommunityGovToken public governanceToken;
+
+    /// @notice DAO factory contract address
+    address public daoFactory;
+
+    /// @notice Mock ERC20 token for DAO creation
+    MockERC20 public mockERC20;
+
+    /// @notice DAO identifier for test campaigns
+    bytes32 public daoId;
+
+    // ============ Constants ============
+
+    /// @notice DAO configuration constants
+    string private constant DAO_NAME = "Test DAO";
+    string private constant TOKEN_URI = "test-uri";
+    uint256 private constant VOTING_POWER = 100;
+    string private constant BASE_URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    bytes32 private constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+
+    /// @notice Governance parameters
+    uint256 private constant VOTING_DELAY = 1;
+    uint256 private constant VOTING_PERIOD = 1000;
+    uint256 private constant PROPOSAL_THRESHOLD = 1000;
+    uint256 private constant QUORUM_VOTES = 1000;
+    uint256 private constant TIMELOCK_DELAY = 1000;
+
+    /// @notice Campaign configuration constants
+    uint256 private constant CAMPAIGN_START_OFFSET = 100;
+    uint256 private constant CAMPAIGN_DURATION = 1000;
+    uint256 private constant CAMPAIGN_CLAIM_AMOUNT = 2;
+    uint256 private constant CAMPAIGN_TOTAL_AMOUNT = 10;
+    uint256 private constant CAMPAIGN_SBT_ID = 1;
+    uint256 private constant CAMPAIGN_TOKEN_ID = 1;
+
+    // ============ Configuration Objects ============
+
+    /// @notice Social media configuration for DAO
+    IDAOFactory.SocialConfig SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "Test Description",
+            website: "https://website.com",
+            linkedin: "https://linkedin.com",
+            twitter: "https://twitter.com",
+            telegram: "https://telegram.com"
+        });
+
+    /// @notice Default campaign structure for testing
+    Campaigns.Campaign private defaultCampaign =
         Campaigns.Campaign({
-            sbtId: 1,
-            title: _title,
-            description: _description,
+            sbtId: CAMPAIGN_SBT_ID,
+            title: campaignTitle,
+            description: campaignDescription,
             token: address(0),
             tokenType: Campaigns.TokenType.NFT,
-            claimAmount: 2,
-            totalAmount: 10,
-            startDate: block.timestamp + 100,
-            endDate: block.timestamp + 1000,
+            claimAmount: CAMPAIGN_CLAIM_AMOUNT,
+            totalAmount: CAMPAIGN_TOTAL_AMOUNT,
+            startDate: block.timestamp + CAMPAIGN_START_OFFSET,
+            endDate: block.timestamp + CAMPAIGN_START_OFFSET + CAMPAIGN_DURATION,
             validateSignatures: false,
             creator: address(0)
         });
 
+    // ============ Setup ============
+
+    /**
+     * @notice Sets up the test environment before each test
+     * @dev Deploys and initializes all necessary contracts for testing campaign functionality
+     */
     function setUp() public {
-        (address daoFactory, , , , ) = deployDAOFactory();
+        vm.startPrank(daoManager);
 
-        nft = new PEACECOINDAO_NFT();
-        nft.initialize(name, symbol, uri, daoFactory);
-
+        // Deploy core governance contracts
         sbt = new PEACECOINDAO_SBT();
-        sbt.initialize(name, symbol, uri, daoFactory);
+        nft = new PEACECOINDAO_NFT();
+        timelock = new Timelock();
+        governor = new GovernorAlpha();
+        governanceToken = new PCECommunityGovToken();
 
-        // Deploy Campaigns contract
+        // Deploy and configure DAO factory
+        DAOFactory factory = new DAOFactory(address(sbt), address(nft));
+        daoFactory = address(factory);
+        factory.setImplementation(address(timelock), address(governor), address(governanceToken));
+
+        // Initialize SBT and NFT contracts
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", BASE_URI, address(factory));
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", BASE_URI, address(factory));
+
+        // Grant necessary permissions to test contract
+        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, address(this));
+        nft.setMinter(address(this));
+        sbt.setMinter(address(this));
+
+        // Deploy and initialize mock ERC20 token
+        mockERC20 = new MockERC20();
+        mockERC20.initialize();
+
+        // Create a test DAO
+        daoId = factory.createDAO(
+            DAO_NAME,
+            SOCIAL_CONFIG,
+            address(mockERC20),
+            VOTING_DELAY,
+            VOTING_PERIOD,
+            PROPOSAL_THRESHOLD,
+            QUORUM_VOTES,
+            TIMELOCK_DELAY
+        );
+
+        // Deploy and initialize Campaigns contract
         campaigns = new Campaigns();
-        campaigns.initialize(daoFactory, sbt, nft);
+        campaigns.initialize(address(factory), sbt, nft);
 
-        // Set minter for NFT
+        // Set Campaigns contract as NFT minter
         nft.setMinter(address(campaigns));
 
-        IAccessControl(daoFactory).grantRole(DAO_MANAGER_ROLE, daoManager);
+        // Grant DAO_MANAGER_ROLE to daoManager for tests
+        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, daoManager);
 
-        vm.prank(daoManager);
-
-        token = new MockERC20();
-        token.mint(daoManager, 1000 ether);
-
-        vm.prank(daoManager);
-        token.approve(address(campaigns), 1000 ether);
-
-        IAccessControl(daoFactory).grantRole(DAO_MANAGER_ROLE, address(this));
+        vm.stopPrank();
     }
 
-    function test_createCampaign() public {
-        // Create Token & Create Campaign
+    // ============ Helper Functions ============
+
+    /**
+     * @notice Creates a test campaign with default configuration
+     * @dev Helper function to set up a campaign for testing
+     * @return campaignId The ID of the created campaign
+     */
+    function _createTestCampaign() internal returns (uint256 campaignId) {
         vm.startPrank(daoManager);
-        nft.createToken();
-        campaigns.createCampaign(_campaign);
+
+        // Create NFT token for the campaign
+        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        vm.roll(block.number + 1);
+
+        // Create the campaign
+        campaigns.createCampaign(defaultCampaign);
+        campaignId = campaigns.campaignId();
+
         vm.stopPrank();
 
-        // Check if creator is set
-        assertEq(ITokens(address(nft)).creators(1), daoManager);
+        return campaignId;
+    }
 
+    /**
+     * @notice Adds winners to a campaign
+     * @dev Helper function to add test winners to a campaign
+     * @param campaignId The ID of the campaign
+     * @param winners Array of winner addresses
+     * @param gists Array of gist hashes for signature validation
+     */
+    function _addCampaignWinners(
+        uint256 campaignId,
+        address[] memory winners,
+        bytes32[] memory gists
+    ) internal {
+        vm.prank(daoManager);
+        campaigns.addCampWinners(campaignId, winners, gists);
+    }
+
+    /**
+     * @notice Tests successful campaign creation
+     * @dev Verifies that campaigns can be created with valid parameters
+     */
+    function test_createCampaign() public {
+        // Create NFT token and campaign
+        vm.startPrank(daoManager);
+        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        vm.roll(block.number + 1);
+        campaigns.createCampaign(defaultCampaign);
+        vm.stopPrank();
+
+        uint256 campaignId = campaigns.campaignId();
+
+        // Verify NFT creator is set correctly
+        assertEq(
+            ITokens(address(nft)).creators(CAMPAIGN_TOKEN_ID),
+            daoManager,
+            "NFT creator should be set to daoManager"
+        );
+
+        // Retrieve and verify campaign data
         (
             uint256 sbtId,
-            string memory title_,
-            string memory description_,
-            address _token,
-            Campaigns.TokenType _tokenType,
+            string memory title,
+            string memory description,
+            address token,
+            Campaigns.TokenType tokenType,
             uint256 claimAmount,
             uint256 totalAmount,
             uint256 startDate,
             uint256 endDate,
             bool validateSignatures,
             address creator
-        ) = campaigns.campaigns(1);
+        ) = campaigns.campaigns(campaignId);
 
-        assertEq(sbtId, 1);
-        assertEq(title_, _title);
-        assertEq(description_, _description);
-        assertEq(_token, address(0));
-        assertEq(uint256(_tokenType), uint256(Campaigns.TokenType.NFT));
-        assertEq(claimAmount, 2);
-        assertEq(totalAmount, 10);
-        assertGt(startDate, 0);
-        assertGt(endDate, startDate);
-        assertEq(validateSignatures, false);
-        assertEq(campaigns.campaignId(), 1);
-        assertEq(creator, daoManager);
+        // Verify all campaign fields
+        assertEq(sbtId, CAMPAIGN_SBT_ID, "SBT ID should match");
+        assertEq(title, campaignTitle, "Campaign title should match");
+        assertEq(description, campaignDescription, "Campaign description should match");
+        assertEq(token, address(0), "Token address should be zero for NFT campaigns");
+        assertEq(uint256(tokenType), uint256(Campaigns.TokenType.NFT), "Token type should be NFT");
+        assertEq(claimAmount, CAMPAIGN_CLAIM_AMOUNT, "Claim amount should match");
+        assertEq(totalAmount, CAMPAIGN_TOTAL_AMOUNT, "Total amount should match");
+        assertGt(startDate, 0, "Start date should be set");
+        assertGt(endDate, startDate, "End date should be after start date");
+        assertEq(validateSignatures, false, "Signature validation should be disabled");
+        assertEq(campaignId, CAMPAIGN_TOKEN_ID, "Campaign ID should match token ID");
+        assertEq(creator, daoManager, "Campaign creator should be daoManager");
 
-        // Revert if normal users try to create a campaign
+        // Verify NFT balance on Campaigns contract
+        assertEq(
+            nft.balanceOf(address(campaigns), CAMPAIGN_TOKEN_ID),
+            defaultCampaign.totalAmount,
+            "Campaigns contract should hold total campaign amount"
+        );
+
+        // Verify creator retrieval
+        assertEq(
+            campaigns.getCreator(campaignId),
+            daoManager,
+            "getCreator should return correct creator"
+        );
+    }
+
+    /**
+     * @notice Tests access control for campaign creation
+     * @dev Verifies that only authorized users can create campaigns
+     */
+    function test_createCampaign_AccessControl() public {
+        // Should revert if unauthorized user tries to create a campaign
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        campaigns.createCampaign(_campaign);
+        campaigns.createCampaign(defaultCampaign);
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Tests campaign creation with invalid parameters
+     * @dev Verifies that campaigns cannot be created with invalid data
+     */
+    function test_createCampaign_InvalidParameters() public {
+        vm.startPrank(daoManager);
+        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        vm.roll(block.number + 1);
         vm.stopPrank();
 
-        Campaigns.Campaign memory invalidCampaign = _campaign;
+        // Test: Start date after end date
+        Campaigns.Campaign memory invalidCampaign = defaultCampaign;
+        invalidCampaign.startDate = block.timestamp + 2000;
+        invalidCampaign.endDate = block.timestamp + 1000;
 
-        // Revert if start date is greater than end date
         vm.startPrank(daoManager);
-        invalidCampaign.startDate = block.timestamp + 1000;
         vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidStartDate.selector));
         campaigns.createCampaign(invalidCampaign);
         vm.stopPrank();
 
-        // Revert if total amount is zero
-        invalidCampaign = _campaign;
-        vm.startPrank(daoManager);
+        // Test: Total amount is zero
+        invalidCampaign = defaultCampaign;
         invalidCampaign.totalAmount = 0;
+
+        vm.startPrank(daoManager);
         vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidAmount.selector));
         campaigns.createCampaign(invalidCampaign);
         vm.stopPrank();
 
-        // Revert if claim amount is greater than total amount
-        invalidCampaign = _campaign;
-        vm.startPrank(daoManager);
+        // Test: Claim amount exceeds total amount
+        invalidCampaign = defaultCampaign;
         invalidCampaign.claimAmount = 15;
+        invalidCampaign.totalAmount = 10;
+
+        vm.startPrank(daoManager);
         vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidClaimAmount.selector));
         campaigns.createCampaign(invalidCampaign);
         vm.stopPrank();
-
-        // Balance of NFT on Campaigns contract
-        assertEq(nft.balanceOf(address(campaigns), 1), _campaign.totalAmount);
-
-        // Get Creator of Campaign
-        assertEq(campaigns.getCreator(1), daoManager);
     }
 
+    /**
+     * @notice Tests adding winners to a campaign
+     * @dev Verifies that winners can be added and events are emitted correctly
+     */
     function test_addCampWinners() public {
-        test_createCampaign();
+        uint256 campaignId = _createTestCampaign();
 
-        address[] memory _winners = new address[](2);
-        _winners[0] = alice;
-        _winners[1] = bob;
+        address[] memory winners = new address[](2);
+        winners[0] = alice;
+        winners[1] = bob;
 
-        bytes32[] memory _gists = new bytes32[](1);
-        _gists[0] = gist;
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
 
-        vm.prank(daoManager);
-        campaigns.addCampWinners(1, _winners, _gists);
+        // Add winners to campaign
+        _addCampaignWinners(campaignId, winners, gists);
 
-        assertEq(campaigns.campWinners(1, 0), alice);
-        assertEq(campaigns.campWinners(1, 1), bob);
+        // Verify winners were added correctly
+        assertEq(campaigns.campWinners(campaignId, 0), alice, "First winner should be alice");
+        assertEq(campaigns.campWinners(campaignId, 1), bob, "Second winner should be bob");
+    }
 
-        // Should revert if normal users try to add winners
+    /**
+     * @notice Tests access control for adding winners
+     * @dev Verifies that only authorized users can add winners
+     */
+    function test_addCampWinners_AccessControl() public {
+        uint256 campaignId = _createTestCampaign();
+
+        address[] memory winners = new address[](2);
+        winners[0] = alice;
+        winners[1] = bob;
+
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
+
+        // Should revert if unauthorized user tries to add winners
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        campaigns.addCampWinners(1, _winners, _gists);
+        campaigns.addCampWinners(campaignId, winners, gists);
         vm.stopPrank();
+    }
 
-        // Should emit event
+    /**
+     * @notice Tests event emission when adding winners
+     * @dev Verifies that CampWinnersAdded event is emitted correctly
+     */
+    function test_addCampWinners_EventEmission() public {
+        uint256 campaignId = _createTestCampaign();
+
+        address[] memory winners = new address[](2);
+        winners[0] = alice;
+        winners[1] = bob;
+
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
+
+        // Verify event is emitted
         vm.startPrank(daoManager);
         vm.expectEmit(true, true, true, true);
-        emit Campaigns.CampWinnersAdded(1, _winners);
-        campaigns.addCampWinners(1, _winners, _gists);
+        emit Campaigns.CampWinnersAdded(campaignId, winners);
+        campaigns.addCampWinners(campaignId, winners, gists);
         vm.stopPrank();
     }
 
+    /**
+     * @notice Tests successful campaign claim
+     * @dev Verifies that winners can claim their rewards after campaign starts
+     */
     function test_claimCampaign() public {
-        test_addCampWinners();
+        uint256 campaignId = _createTestCampaign();
 
-        // Should revert if campaign is not started
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.CampaignNotStarted.selector));
-        campaigns.claimCampaign(1, gist, "Test Message", bytes(""));
-        vm.stopPrank();
+        address[] memory winners = new address[](2);
+        winners[0] = alice;
+        winners[1] = bob;
 
-        // Warp to after start date
-        vm.warp(block.timestamp + 200);
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
 
-        // Should revert if not listed as a winner
-        vm.startPrank(notWhitelistedUser);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.NotWhitelisted.selector));
-        campaigns.claimCampaign(1, gist, "Test Message", bytes(""));
-        vm.stopPrank();
+        _addCampaignWinners(campaignId, winners, gists);
 
-        // Should claim if listed as a winner
+        // Advance time to after campaign start date
+        vm.warp(block.timestamp + CAMPAIGN_START_OFFSET + 100);
+
+        // Claim campaign reward
         vm.startPrank(alice);
         vm.expectEmit(true, true, true, true);
-        emit Campaigns.CampWinnersClaimed(1, alice);
-        campaigns.claimCampaign(1, gist, "Test Message", bytes(""));
+        emit Campaigns.CampWinnersClaimed(campaignId, alice);
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
         vm.stopPrank();
 
-        // Should revert if already claimed
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.AlreadyClaimed.selector));
-        campaigns.claimCampaign(1, gist, "Test Message", bytes(""));
-        vm.stopPrank();
-
-        // Should revert if campaign is ended
-        vm.warp(block.timestamp + 1200);
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.CampaignEnded.selector));
-        campaigns.claimCampaign(1, gist, "Test Message", bytes(""));
-        vm.stopPrank();
-
-        // Check if balance of NFT is correct
-        assertEq(nft.balanceOf(alice, 1), _campaign.claimAmount);
-
-        // Check if balance of NFT on Campaigns contract is correct
+        // Verify NFT balance of winner
         assertEq(
-            nft.balanceOf(address(campaigns), 1),
-            _campaign.totalAmount - _campaign.claimAmount
+            nft.balanceOf(alice, CAMPAIGN_TOKEN_ID),
+            defaultCampaign.claimAmount,
+            "Winner should receive claim amount"
         );
 
-        // Check if total claimed is correct
-        assertEq(campaigns.totalClaimed(1), _campaign.claimAmount);
+        // Verify remaining balance on Campaigns contract
+        assertEq(
+            nft.balanceOf(address(campaigns), CAMPAIGN_TOKEN_ID),
+            defaultCampaign.totalAmount - defaultCampaign.claimAmount,
+            "Campaigns contract should hold remaining amount"
+        );
+
+        // Verify total claimed amount
+        assertEq(
+            campaigns.totalClaimed(campaignId),
+            defaultCampaign.claimAmount,
+            "Total claimed should match claim amount"
+        );
     }
 
+    /**
+     * @notice Tests claim validation and error cases
+     * @dev Verifies that claims fail under invalid conditions
+     */
+    function test_claimCampaign_ValidationErrors() public {
+        uint256 campaignId = _createTestCampaign();
+
+        address[] memory winners = new address[](1);
+        winners[0] = alice;
+
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
+
+        _addCampaignWinners(campaignId, winners, gists);
+
+        // Test: Campaign not started
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.CampaignNotStarted.selector));
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
+        vm.stopPrank();
+
+        // Advance time to after campaign start date
+        vm.warp(block.timestamp + CAMPAIGN_START_OFFSET + 100);
+
+        // Test: Not whitelisted user
+        vm.startPrank(notWhitelistedUser);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.NotWhitelisted.selector));
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
+        vm.stopPrank();
+
+        // Test: Successful claim
+        vm.prank(alice);
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
+
+        // Test: Already claimed
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.AlreadyClaimed.selector));
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
+        vm.stopPrank();
+
+        // Test: Campaign ended
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 200);
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.CampaignEnded.selector));
+        campaigns.claimCampaign(campaignId, gist, "Test Message", bytes(""));
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Tests winner verification functionality
+     * @dev Verifies that isWinner correctly identifies campaign winners
+     */
     function test_checkWinner() public {
-        test_addCampWinners();
+        uint256 campaignId = _createTestCampaign();
 
-        // Should return true if listed as a winner
-        assertEq(campaigns.isWinner(1, alice), true);
-        assertEq(campaigns.isWinner(1, bob), true);
+        address[] memory winners = new address[](2);
+        winners[0] = alice;
+        winners[1] = bob;
 
-        // Should return false if not listed as a winner
-        assertEq(campaigns.isWinner(1, notWhitelistedUser), false);
+        bytes32[] memory gists = new bytes32[](1);
+        gists[0] = gist;
+
+        _addCampaignWinners(campaignId, winners, gists);
+
+        // Verify winners are correctly identified
+        assertEq(
+            campaigns.isWinner(campaignId, alice),
+            true,
+            "Alice should be identified as a winner"
+        );
+        assertEq(campaigns.isWinner(campaignId, bob), true, "Bob should be identified as a winner");
+
+        // Verify non-winners are correctly identified
+        assertEq(
+            campaigns.isWinner(campaignId, notWhitelistedUser),
+            false,
+            "Non-whitelisted user should not be identified as a winner"
+        );
     }
 
+    /**
+     * @notice Tests campaign creator retrieval
+     * @dev Verifies that getCreator returns the correct creator address
+     */
     function test_getCreator() public {
-        test_createCampaign();
+        uint256 campaignId = _createTestCampaign();
 
-        // Should return creator of campaign
-        assertEq(campaigns.getCreator(1), daoManager);
+        // Verify creator is returned correctly
+        assertEq(campaigns.getCreator(campaignId), daoManager, "Creator should be daoManager");
     }
 
+    /**
+     * @notice Tests campaign status retrieval
+     * @dev Verifies that getStatus returns correct status based on current time
+     */
     function test_getStatus() public {
-        test_createCampaign();
+        uint256 campaignId = _createTestCampaign();
 
-        // Should return pending status
-        assertEq(uint256(campaigns.getStatus(1)), uint256(Campaigns.Status.Pending));
+        // Test: Pending status (before start date)
+        assertEq(
+            uint256(campaigns.getStatus(campaignId)),
+            uint256(Campaigns.Status.Pending),
+            "Campaign should be pending before start date"
+        );
 
-        // Should return active status
-        vm.warp(block.timestamp + 200);
-        assertEq(uint256(campaigns.getStatus(1)), uint256(Campaigns.Status.Active));
+        // Test: Active status (after start date, before end date)
+        vm.warp(block.timestamp + CAMPAIGN_START_OFFSET + 100);
+        assertEq(
+            uint256(campaigns.getStatus(campaignId)),
+            uint256(Campaigns.Status.Active),
+            "Campaign should be active between start and end date"
+        );
 
-        // Should return ended status
-        vm.warp(block.timestamp + 1200);
-        assertEq(uint256(campaigns.getStatus(1)), uint256(Campaigns.Status.Ended));
+        // Test: Ended status (after end date)
+        vm.warp(block.timestamp + CAMPAIGN_DURATION + 200);
+        assertEq(
+            uint256(campaigns.getStatus(campaignId)),
+            uint256(Campaigns.Status.Ended),
+            "Campaign should be ended after end date"
+        );
     }
 }

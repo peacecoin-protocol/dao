@@ -6,6 +6,10 @@ import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {console} from "forge-std/console.sol";
+import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {DAOFactory} from "../src/DAOFactory.sol";
+import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
     function getBlockTimestampPublic() public view returns (uint256) {
@@ -17,14 +21,25 @@ contract TimelockTest is Test {
     address alice = makeAddr("alice"); // admin
     address bob = makeAddr("bob");
 
-    MockGovToken pceToken;
-    GovernorAlpha gov;
+    MockGovToken governanceToken;
+    PEACECOINDAO_SBT sbt;
+    PEACECOINDAO_NFT nft;
+    GovernorAlpha governor;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
+    uint256 constant VOTING_DELAY = 1;
     uint256 constant VOTING_PERIOD = 1 days;
     uint256 constant PROPOSAL_THRESHOLD = 100e18;
     uint256 constant QUORUM_VOTES = 1000e18;
-
+    string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+        IDAOFactory.SocialConfig({
+            description: "PEACECOIN DAO",
+            website: "https://peacecoin.com",
+            linkedin: "https://linkedin.com/peacecoin",
+            twitter: "https://twitter.com/peacecoin",
+            telegram: "https://t.me/peacecoin"
+        });
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
@@ -56,25 +71,44 @@ contract TimelockTest is Test {
     function setUp() public {
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-        pceToken = new MockGovToken();
-        pceToken.initialize();
+
+        governanceToken = new MockGovToken();
+        governanceToken.initialize();
+
+        sbt = new PEACECOINDAO_SBT();
+        nft = new PEACECOINDAO_NFT();
+
+        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
+
+        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
+        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
 
         timelock = new Timelock();
         timelock.initialize(alice, 2 hours);
 
-        gov = new GovernorAlpha();
-        gov.initialize(
+        governor = new GovernorAlpha();
+        governor.initialize(
             "PCE DAO",
-            address(pceToken),
+            address(governanceToken),
+            address(sbt),
+            address(nft),
             address(timelock),
-            1,
+            VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
-            QUORUM_VOTES
+            QUORUM_VOTES,
+            address(this),
+            SOCIAL_CONFIG
         );
-        pceToken.mint(address(this), INITIAL_AMOUNT);
+        governanceToken.mint(address(this), INITIAL_AMOUNT);
 
-        assertEq(pceToken.totalSupply(), pceToken.balanceOf(address(this)));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(governor),
+            address(governanceToken)
+        );
+
+        assertEq(governanceToken.totalSupply(), governanceToken.balanceOf(address(this)));
     }
 
     // Helper functions
@@ -120,7 +154,7 @@ contract TimelockTest is Test {
         timelock.setPendingAdmin(address(0));
 
         vm.expectRevert("Timelock::setPendingAdmin: First call must come from admin.");
-        timelock.setPendingAdmin(address(gov));
+        timelock.setPendingAdmin(address(governor));
 
         vm.prank(alice);
         vm.expectEmit(true, false, false, false);

@@ -13,7 +13,7 @@ import {IErrors} from "./interfaces/IErrors.sol";
  * @title DAOFactory
  * @dev Factory contract for creating and managing DAOs
  * @notice This contract allows authorized users to create new DAOs with governance tokens and timelock controllers
- * @author Your Name
+ * @author Daniel Lee
  */
 contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IErrors {
     using Clones for address;
@@ -34,6 +34,9 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
     /// @notice Mapping to track DAO names to prevent duplicates
     mapping(string => bool) public daoNames;
 
+    /// @notice Mapping from DAO ID to its creator
+    mapping(bytes32 => address) public daoCreators;
+
     /// @notice Counter for total DAOs created
     uint256 public totalDAOs;
 
@@ -42,9 +45,12 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
     address public governorImplementation;
     address public governanceTokenImplementation;
 
+    address public sbt;
+    address public nft;
+
     // ============ Events ============
     event ContractDeployed(address indexed contractAddress);
-    event DAOCreated(bytes32 indexed daoId, string indexed daoName, address indexed creator);
+    event DAOCreated(bytes32 indexed daoId, string daoName, address creator);
 
     event ImplementationUpdated(
         address indexed timelockImplementation,
@@ -67,7 +73,10 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
     }
 
     // ============ Constructor ============
-    constructor() {
+    constructor(address _sbt, address _nft) {
+        sbt = _sbt;
+        nft = _nft;
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
     }
@@ -153,11 +162,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
         address governorAddress = _deployGovernor(
             _daoName,
             governanceTokenAddress,
+            sbt,
+            nft,
             timelockAddress,
             _votingDelay,
             _votingPeriod,
             _proposalThreshold,
-            _quorumVotes
+            _quorumVotes,
+            address(this),
+            _socialConfig
         );
 
         // Store DAO address
@@ -169,6 +182,8 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
 
         // Grant DAO manager role
         _grantRole(DAO_MANAGER_ROLE, msg.sender);
+
+        daoCreators[daoId] = msg.sender;
 
         // Emit events
         emit DAOCreated(daoId, _daoName, msg.sender);
@@ -212,9 +227,6 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
 
     // ============ Internal Functions ============
 
-    /**
-     * @notice Validate inputs for DAO creation
-     */
     function _validateCreateDAOInputs(
         string memory daoName,
         address communityToken,
@@ -224,10 +236,36 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
         uint256 quorumVotes,
         address creator
     ) internal view {
+        _validateAddresses(communityToken, creator);
+        _validateName(daoName);
+        _validateParameters(votingDelay, votingPeriod, timelockDelay, quorumVotes);
+    }
+
+    /**
+     * @notice Validate address inputs
+     */
+    function _validateAddresses(address communityToken, address creator) internal view {
         if (communityToken == address(0)) revert InvalidAddress();
         if (creator != IToken(communityToken).owner()) revert InvalidCommunityTokenOwner();
+    }
+
+    /**
+     * @notice Validate DAO name
+     */
+    function _validateName(string memory daoName) internal view {
         if (bytes(daoName).length == 0) revert InvalidName();
         if (daoNames[daoName]) revert DAONameAlreadyExists();
+    }
+
+    /**
+     * @notice Validate governance parameters
+     */
+    function _validateParameters(
+        uint256 votingDelay,
+        uint256 votingPeriod,
+        uint256 timelockDelay,
+        uint256 quorumVotes
+    ) internal pure {
         if (votingDelay > MAX_VOTING_DELAY) revert InvalidVotingDelay();
         if (votingPeriod > MAX_VOTING_PERIOD) revert InvalidVotingPeriod();
         if (timelockDelay > MAX_TIMELOCK_DELAY) revert InvalidTimelockDelay();
@@ -264,11 +302,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
     function _deployGovernor(
         string memory daoName,
         address governanceTokenAddress,
+        address sbtAddress,
+        address nftAddress,
         address timelockAddress,
         uint256 votingDelay,
         uint256 votingPeriod,
         uint256 proposalThreshold,
-        uint256 quorumVotes
+        uint256 quorumVotes,
+        address guardian,
+        IDAOFactory.SocialConfig memory _socialConfig
     ) internal returns (address) {
         address governorAddress = governorImplementation.clone();
         if (governorAddress == address(0)) revert ContractDeploymentFailed();
@@ -276,11 +318,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
         ICommunityGovernance(governorAddress).initialize(
             daoName,
             governanceTokenAddress,
+            sbtAddress,
+            nftAddress,
             timelockAddress,
             votingDelay,
             votingPeriod,
             proposalThreshold,
-            quorumVotes
+            quorumVotes,
+            guardian,
+            _socialConfig
         );
         emit ContractDeployed(governorAddress);
         return governorAddress;
@@ -304,10 +350,14 @@ interface ICommunityGovernance {
     function initialize(
         string memory daoName,
         address _token,
+        address _sbt,
+        address _nft,
         address _timelock,
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _proposalThreshold,
-        uint256 _quorumVotes
+        uint256 _quorumVotes,
+        address _guardian,
+        IDAOFactory.SocialConfig memory _socialConfig
     ) external;
 }
