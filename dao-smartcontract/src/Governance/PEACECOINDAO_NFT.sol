@@ -7,10 +7,16 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IErrors} from "../interfaces/IErrors.sol";
+import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 
 contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, IErrors {
     using Checkpoints for Checkpoints.Trace224;
     using EnumerableSet for EnumerableSet.UintSet;
+
+    error BlockNumberTooLarge();
+    error InsufficientVotesToMove();
+    error VoteCalculationOverflow();
+    error VoteOverflow();
 
     bytes32 public constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
 
@@ -25,44 +31,39 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     mapping(address => bool) public minters;
     mapping(uint256 => bool) public isRevoked;
     mapping(uint256 => address) public creators;
-    mapping(uint256 => bytes32) public daoIds;
 
     function initialize(
-        string memory _name,
-        string memory _symbol,
         string memory _uri,
-        address _daoFactory
+        address _daoFactory,
+        address _owner,
+        bool _isSBT
     ) external initializer {
-        require(bytes(_name).length > 0, InvalidName());
-        require(bytes(_symbol).length > 0, InvalidSymbol());
+        __AccessControl_init();
+        __ERC1155_init(_uri);
 
-        name = _name;
-        symbol = _symbol;
         uri_ = _uri;
         daoFactory = _daoFactory;
 
-        __ERC1155_init(_uri);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        if (_isSBT) {
+            name = "PEACECOIN DAO SBT";
+            symbol = "PCE_SBT";
+        } else {
+            name = "PEACECOIN DAO NFT";
+            symbol = "PCE_NFT";
+        }
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
     }
 
     // Voting weight per token ID
     mapping(uint256 => uint256) public votingPowerPerId;
-
-    // Balances per user
-    mapping(address => mapping(uint256 => uint256)) private _balances;
 
     // Delegation and voting history
     mapping(address => address) private _delegates;
     mapping(address => Checkpoints.Trace224) private _checkpoints;
 
     event Revoked(uint256 indexed tokenId, bool isRevoked);
-    event CreatedToken(
-        uint256 indexed tokenId,
-        bytes32 indexed daoId,
-        string tokenURI,
-        uint256 votingPower,
-        address creator
-    );
+    event CreatedToken(uint256 indexed tokenId, string tokenURI, uint256 votingPower);
     event Delegated(address indexed delegator, address indexed delegatee, uint256 votes);
     event VotesMoved(address indexed from, address indexed to, uint256 amount);
     event SetTokenURI(uint256 indexed tokenId, string uri, uint256 weight);
@@ -72,21 +73,17 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
         _;
     }
 
-    modifier onlyDAOManager() {
-        require(
-            IAccessControl(daoFactory).hasRole(DAO_MANAGER_ROLE, msg.sender),
-            PermissionDenied()
-        );
-        _;
-    }
-
     modifier validTokenId(uint256 id) {
-        require(id > 0 && id <= numberOfTokens, InvalidTokenId());
+        if (id == 0 || id > numberOfTokens) revert InvalidTokenId();
         _;
     }
 
     modifier onlyMinter() {
-        require(minters[msg.sender], InvalidMinter());
+        if (
+            !minters[msg.sender] && address(IDAOFactory(daoFactory).campaignFactory()) != msg.sender
+        ) {
+            revert InvalidMinter();
+        }
         _;
     }
 
@@ -95,23 +92,15 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     }
 
     // ========== Admin ==========
-    function createToken(
-        string memory _tokenURI,
-        uint256 _votingPower,
-        bytes32 _daoId
-    ) external onlyDAOManager {
-        if (IFactory(daoFactory).daoCreators(_daoId) != msg.sender) revert InvalidCreator();
-
+    function createToken(string memory _tokenURI, uint256 _votingPower) external onlyDefaultAdmin {
         numberOfTokens++;
-
         uint256 id = numberOfTokens;
 
         tokenURIs[id] = _tokenURI;
         votingPowerPerId[id] = _votingPower;
         creators[id] = msg.sender;
-        daoIds[id] = _daoId;
 
-        emit CreatedToken(id, _daoId, _tokenURI, _votingPower, msg.sender);
+        emit CreatedToken(id, _tokenURI, _votingPower);
     }
 
     function setTokenURI(
@@ -125,47 +114,38 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     }
 
     function mint(address to, uint256 id, uint256 amount) external onlyMinter validTokenId(id) {
-        require(amount > 0, InvalidAmount());
-        require(to != address(0), InvalidAddress());
-        require(id <= numberOfTokens, InvalidTokenId());
+        if (amount == 0) revert InvalidAmount();
+        if (to == address(0)) revert InvalidAddress();
 
         _mint(to, id, amount, "");
-        _balances[to][id] += amount;
-
-        address delegatee = _delegates[to];
-        if (delegatee != address(0) && votingPowerPerId[id] > 0) {
-            uint256 voteAmount = amount * votingPowerPerId[id];
-            _moveVotes(address(0), delegatee, voteAmount);
-        }
     }
 
     function setMinter(address minter) external onlyDefaultAdmin {
         minters[minter] = true;
     }
 
-    function revoke(uint256 id, bool isRevoked_) external onlyDAOManager validTokenId(id) {
+    function removeMinter(address minter) external onlyDefaultAdmin {
+        minters[minter] = false;
+    }
+
+    function revoke(uint256 id, bool isRevoked_) external onlyDefaultAdmin validTokenId(id) {
         isRevoked[id] = isRevoked_;
         emit Revoked(id, isRevoked_);
     }
 
     function burn(address from, uint256 id, uint256 amount) external onlyMinter validTokenId(id) {
-        require(_balances[from][id] >= amount, InvalidBalance());
-        require(amount > 0, InvalidAmount());
+        if (balanceOf(from, id) < amount) revert InvalidBalance();
+        if (amount == 0) revert InvalidAmount();
 
         _burn(from, id, amount);
-        _balances[from][id] -= amount;
-
-        address delegatee = _delegates[from];
-        if (delegatee != address(0) && votingPowerPerId[id] > 0) {
-            uint256 voteAmount = amount * votingPowerPerId[id];
-            _moveVotes(delegatee, address(0), voteAmount);
-        }
+        // Balance and voting power updates are handled in _update
     }
 
     // ========== Delegation ==========
     function delegate(address to) external {
+        if (to == address(0)) revert InvalidAddress();
+
         address prev = _delegates[msg.sender];
-        require(prev != to, AlreadyDelegated());
 
         _delegates[msg.sender] = to;
 
@@ -184,11 +164,13 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
 
         // Cache storage reads for gas optimization
         for (uint256 i = 1; i <= numberOfTokens; i++) {
-            uint256 balance = _balances[account][i];
+            uint256 balance = balanceOf(account, i);
 
             if (balance > 0) {
                 uint256 weight = votingPowerPerId[i];
                 if (weight > 0) {
+                    // Check for overflow: balance * weight <= type(uint256).max
+                    if (balance > type(uint256).max / weight) revert VoteCalculationOverflow();
                     totalVotes += balance * weight;
                 }
             }
@@ -208,7 +190,7 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
 
     function getPastVotes(address who, uint256 blockNumber) external view returns (uint256) {
         // Fix: Checkpoints.Trace224 expects uint32 for key
-        require(blockNumber <= type(uint32).max, "blockNumber too large");
+        if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
         return _checkpoints[who].upperLookup(uint32(blockNumber));
     }
 
@@ -229,22 +211,18 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external onlyMinter {
-        require(to.length == ids.length && ids.length == amounts.length, InvalidArrayLength());
-        require(to.length > 0, InvalidArrayLength());
+        if (to.length == 0) revert InvalidArrayLength();
+        if (to.length != ids.length || ids.length != amounts.length) {
+            revert InvalidArrayLength();
+        }
 
         for (uint256 i = 0; i < to.length; i++) {
-            require(ids[i] > 0 && ids[i] <= numberOfTokens, InvalidTokenId());
-            require(amounts[i] > 0, InvalidAmount());
-            require(to[i] != address(0), InvalidAddress());
+            if (ids[i] == 0 || ids[i] > numberOfTokens) revert InvalidTokenId();
+            if (amounts[i] == 0) revert InvalidAmount();
+            if (to[i] == address(0)) revert InvalidAddress();
 
             _mint(to[i], ids[i], amounts[i], "");
-            _balances[to[i]][ids[i]] += amounts[i];
-
-            address delegatee = _delegates[to[i]];
-            if (delegatee != address(0) && votingPowerPerId[ids[i]] > 0) {
-                uint256 voteAmount = amounts[i] * votingPowerPerId[ids[i]];
-                _moveVotes(address(0), delegatee, voteAmount);
-            }
+            // Balance and voting power updates are handled in _update
         }
     }
 
@@ -256,15 +234,64 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
 
         if (from != address(0)) {
             uint256 oldFrom = _checkpoints[from].latest();
+            if (oldFrom < amount) revert InsufficientVotesToMove();
             _checkpoints[from].push(currentBlock, uint224(oldFrom - amount));
         }
 
         if (to != address(0)) {
             uint256 oldTo = _checkpoints[to].latest();
+            // Check for overflow: oldTo + amount <= type(uint224).max
+            if (oldTo + amount > type(uint224).max) revert VoteOverflow();
             _checkpoints[to].push(currentBlock, uint224(oldTo + amount));
         }
 
         emit VotesMoved(from, to, amount);
+    }
+
+    function _update(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory values
+    ) internal virtual override {
+        // Call parent to handle base ERC1155 transfer logic
+        // This already updates ERC1155's internal balances
+        super._update(from, to, ids, values);
+
+        // Calculate and adjust voting power on token transfer
+        // Process each token individually to correctly handle vote transfers
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            uint256 value = values[i];
+            uint256 weight = votingPowerPerId[id];
+
+            if (weight > 0 && value > 0) {
+                // Check for overflow: value * weight <= type(uint256).max
+                if (value > type(uint256).max / weight) revert VoteCalculationOverflow();
+                uint256 votes = value * weight;
+
+                // Get delegates (only if addresses are not zero)
+                address fromDelegate = address(0);
+                address toDelegate = address(0);
+
+                if (from != address(0)) {
+                    fromDelegate = _delegates[from];
+                }
+                if (to != address(0)) {
+                    toDelegate = _delegates[to];
+                }
+
+                // Move votes from sender's delegate (if delegated)
+                if (fromDelegate != address(0)) {
+                    _moveVotes(fromDelegate, address(0), votes);
+                }
+
+                // Move votes to recipient's delegate (if delegated)
+                if (toDelegate != address(0)) {
+                    _moveVotes(address(0), toDelegate, votes);
+                }
+            }
+        }
     }
 
     function supportsInterface(
@@ -272,8 +299,4 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     ) public view virtual override(ERC1155Upgradeable, AccessControlUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
-}
-
-interface IFactory {
-    function daoCreators(bytes32 _daoId) external view returns (address);
 }

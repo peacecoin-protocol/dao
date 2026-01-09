@@ -8,7 +8,6 @@ import {Timelock} from "../src/Governance/Timelock.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
-import {DAOFactory} from "../src/DAOFactory.sol";
 
 contract GovernorAlphaTest is Test {
     address alice = makeAddr("alice");
@@ -31,12 +30,12 @@ contract GovernorAlphaTest is Test {
     GovernorAlpha gov;
     Timelock timelock;
 
-    uint256 constant INITIAL_BALANCE = 50000e18;
+    uint256 constant INITIAL_BALANCE = 50000 ether;
     uint256 constant TIME_LOCK_DELAY = 10 minutes;
     uint256 constant VOTING_DELAY = 1;
     uint256 constant VOTING_PERIOD = 1000;
-    uint256 constant PROPOSAL_THRESHOLD = 100e18;
-    uint256 constant QUORUM_VOTES = 1000e18;
+    uint256 constant PROPOSAL_THRESHOLD = 100 ether;
+    uint256 constant QUORUM_VOTES = 1000 ether;
     uint256 constant PROPOSAL_MAX_OPERATIONS = 10;
     uint256 constant EXECUTE_TRANSFER_VALUE = 100;
     uint256 constant PROPOSAL_ID = 1;
@@ -52,10 +51,8 @@ contract GovernorAlphaTest is Test {
         sbt = new PEACECOINDAO_SBT();
         nft = new PEACECOINDAO_NFT();
 
-        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
-
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
+        sbt.initialize(URI, address(this), address(this), true);
+        nft.initialize(URI, address(this), address(this), false);
 
         timelock = new Timelock();
         timelock.initialize(alice, TIME_LOCK_DELAY);
@@ -75,8 +72,6 @@ contract GovernorAlphaTest is Test {
             guardian,
             SOCIAL_CONFIG
         );
-
-        daoFactory.setImplementation(address(timelock), address(gov), address(governanceToken));
 
         governanceToken.mint(guardian, INITIAL_BALANCE);
         governanceToken.mint(alice, INITIAL_BALANCE);

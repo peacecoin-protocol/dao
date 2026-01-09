@@ -9,6 +9,8 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
+import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
 
 contract DaoFactoryTest is Test {
     DAOFactory public daoFactory;
@@ -16,6 +18,8 @@ contract DaoFactoryTest is Test {
     GovernorAlpha public governor;
     MockERC20 public mockERC20;
     PCECommunityGovToken public governanceToken;
+    PEACECOINDAO_SBT public sbt;
+    PEACECOINDAO_NFT public nft;
 
     uint256 public VOTING_DELAY = 10;
     uint256 public VOTING_PERIOD = 100;
@@ -33,88 +37,102 @@ contract DaoFactoryTest is Test {
             telegram: "https://telegram.com"
         });
 
+    string public BASE_URI = "https://ipfs-dao-studio.mypinata.cloud/ipfs/";
+
     address public defaultAdmin = makeAddr("defaultAdmin");
     address public nonDefaultAdmin = makeAddr("nonDefaultAdmin");
 
     function setUp() public {
-        vm.prank(defaultAdmin);
-        daoFactory = new DAOFactory(address(0), address(0));
+        vm.startPrank(defaultAdmin);
+        daoFactory = new DAOFactory();
+        daoFactory.initialize();
+        vm.stopPrank();
 
         vm.startPrank(nonDefaultAdmin);
         timelock = new Timelock();
         governor = new GovernorAlpha();
         governanceToken = new PCECommunityGovToken();
-
-        mockERC20 = new MockERC20();
-        mockERC20.initialize();
+        sbt = new PEACECOINDAO_SBT();
+        nft = new PEACECOINDAO_NFT();
         vm.stopPrank();
-    }
 
-    function test_setImplementation() public {
-        // Default Admin can set implementation
         vm.prank(defaultAdmin);
         daoFactory.setImplementation(
             address(timelock),
             address(governor),
-            address(governanceToken)
+            address(governanceToken),
+            address(sbt),
+            address(nft)
         );
 
+        mockERC20 = new MockERC20();
+        mockERC20.initialize();
+    }
+
+    function test_setImplementation() public {
         // Non-Default Admin cannot set implementation
         vm.prank(nonDefaultAdmin);
         vm.expectRevert();
         daoFactory.setImplementation(
             address(timelock),
             address(governor),
-            address(governanceToken)
+            address(governanceToken),
+            address(sbt),
+            address(nft)
         );
 
         // Zero address cannot be set as implementation
         vm.startPrank(defaultAdmin);
         vm.expectRevert();
-        daoFactory.setImplementation(address(0), address(governor), address(governanceToken));
+        daoFactory.setImplementation(
+            address(0),
+            address(governor),
+            address(governanceToken),
+            address(sbt),
+            address(nft)
+        );
 
         // Zero address cannot be set as implementation
         vm.expectRevert();
-        daoFactory.setImplementation(address(timelock), address(0), address(governanceToken));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(0),
+            address(governanceToken),
+            address(sbt),
+            address(nft)
+        );
 
         // Zero address cannot be set as implementation
         vm.expectRevert();
-        daoFactory.setImplementation(address(timelock), address(governor), address(0));
+        daoFactory.setImplementation(
+            address(timelock),
+            address(governor),
+            address(0),
+            address(sbt),
+            address(nft)
+        );
 
         // Check that ImplementationUpdated event is emitted with correct arguments
         vm.expectEmit(true, true, true, true);
         emit DAOFactory.ImplementationUpdated(
             address(timelock),
             address(governor),
-            address(governanceToken)
+            address(governanceToken),
+            address(sbt),
+            address(nft)
         );
         daoFactory.setImplementation(
             address(timelock),
             address(governor),
-            address(governanceToken)
+            address(governanceToken),
+            address(sbt),
+            address(nft)
         );
         vm.stopPrank();
     }
 
     function test_createDAO() public {
-        // Revert if implementation is not set
-        vm.expectRevert(IErrors.TimelockImplementationNotSet.selector);
-        daoFactory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
-        );
-
-        // Set implementation
-        test_setImplementation();
-
         // only token owner can create DAO
-        vm.startPrank(nonDefaultAdmin);
         daoFactory.createDAO(
             DAO_NAME,
             SOCIAL_CONFIG,
@@ -218,8 +236,6 @@ contract DaoFactoryTest is Test {
             0
         );
 
-        vm.stopPrank();
-
         // Revert if community token owner is not the msg.sender
         vm.prank(defaultAdmin);
         vm.expectRevert(IErrors.InvalidCommunityTokenOwner.selector);
@@ -233,20 +249,6 @@ contract DaoFactoryTest is Test {
             TIMELOCK_DELAY,
             QUORUM_VOTES
         );
-    }
-
-    function test_getDAO() public {
-        test_createDAO();
-
-        address daoAddress = daoFactory.getDAOAddress(keccak256(abi.encodePacked(DAO_NAME)));
-        assertEq(daoAddress != address(0), true);
-    }
-
-    function test_isDaoExists() public {
-        test_createDAO();
-
-        bool daoExists = daoFactory.isDaoExists(keccak256(abi.encodePacked(DAO_NAME)));
-        assertEq(daoExists, true);
     }
 
     function test_pause() public {
