@@ -8,7 +8,6 @@ import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {console} from "forge-std/console.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
-import {DAOFactory} from "../src/DAOFactory.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
@@ -78,10 +77,8 @@ contract TimelockTest is Test {
         sbt = new PEACECOINDAO_SBT();
         nft = new PEACECOINDAO_NFT();
 
-        DAOFactory daoFactory = new DAOFactory(address(sbt), address(nft));
-
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", URI, address(daoFactory));
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", URI, address(daoFactory));
+        sbt.initialize(URI, address(this), address(this), true);
+        nft.initialize(URI, address(this), address(this), false);
 
         timelock = new Timelock();
         timelock.initialize(alice, 2 hours);
@@ -101,12 +98,6 @@ contract TimelockTest is Test {
             SOCIAL_CONFIG
         );
         governanceToken.mint(address(this), INITIAL_AMOUNT);
-
-        daoFactory.setImplementation(
-            address(timelock),
-            address(governor),
-            address(governanceToken)
-        );
 
         assertEq(governanceToken.totalSupply(), governanceToken.balanceOf(address(this)));
     }

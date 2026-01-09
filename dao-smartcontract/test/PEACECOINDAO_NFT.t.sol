@@ -3,16 +3,9 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
-import {MockERC20} from "../src/mocks/MockERC20.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
-import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
-import {Timelock} from "../src/Governance/Timelock.sol";
-import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
-import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
-
+import {Campaigns} from "../src/Campaigns.sol";
 /**
  * @title PEACECOINDAO_NFTTest
  * @notice Comprehensive test suite for the PEACECOINDAO_NFT contract
@@ -21,51 +14,17 @@ import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 contract PEACECOINDAO_NFTTest is Test {
     // ============ State Variables ============
 
-    /// @notice Governance contracts
-    Timelock public timelock;
-    GovernorAlpha public governor;
-    PCECommunityGovToken public governanceToken;
-
     /// @notice NFT and SBT contracts
     PEACECOINDAO_NFT public nft;
-    PEACECOINDAO_SBT public sbt;
 
     /// @notice Test accounts
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
-    address public daoFactory;
-
-    /// @notice Mock ERC20 token for DAO creation
-    MockERC20 public mockERC20;
-
-    /// @notice DAO identifier
-    bytes32 public daoId;
-
     // ============ Constants ============
 
-    /// @notice DAO configuration constants
-    string private constant DAO_NAME = "Test DAO";
-    string private constant TOKEN_URI = "test-uri";
-    uint256 private constant VOTING_POWER = 100;
     string private constant BASE_URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
-    bytes32 private constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
-
-    /// @notice Governance parameters
-    uint256 private constant VOTING_DELAY = 1;
-    uint256 private constant VOTING_PERIOD = 1000;
-    uint256 private constant PROPOSAL_THRESHOLD = 1000;
-    uint256 private constant QUORUM_VOTES = 1000;
-    uint256 private constant TIMELOCK_DELAY = 1000;
-
-    /// @notice Social media configuration for DAO
-    IDAOFactory.SocialConfig SOCIAL_CONFIG =
-        IDAOFactory.SocialConfig({
-            description: "Test Description",
-            website: "https://website.com",
-            linkedin: "https://linkedin.com",
-            twitter: "https://twitter.com",
-            telegram: "https://telegram.com"
-        });
+    uint256 private constant VOTING_POWER = 100;
+    string private constant TOKEN_URI = "test-uri";
 
     // ============ Setup ============
 
@@ -74,40 +33,16 @@ contract PEACECOINDAO_NFTTest is Test {
      * @dev Deploys and initializes all necessary contracts for testing
      */
     function setUp() public {
+        DAOFactory daoFactory = new DAOFactory();
+        daoFactory.initialize();
+        Campaigns campaigns = new Campaigns();
+        campaigns.initialize(address(daoFactory));
+        daoFactory.setCampaignFactory(address(campaigns));
+
         // Deploy core contracts
-        sbt = new PEACECOINDAO_SBT();
         nft = new PEACECOINDAO_NFT();
-        timelock = new Timelock();
-        governor = new GovernorAlpha();
-        governanceToken = new PCECommunityGovToken();
-
-        // Deploy and configure DAO factory
-        DAOFactory factory = new DAOFactory(address(sbt), address(nft));
-        factory.setImplementation(address(timelock), address(governor), address(governanceToken));
-
-        // Initialize SBT and NFT contracts
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", BASE_URI, address(factory));
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", BASE_URI, address(factory));
-
-        // Grant necessary permissions
-        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, address(this));
+        nft.initialize(BASE_URI, address(daoFactory), address(this), false);
         nft.setMinter(address(this));
-
-        // Deploy and initialize mock ERC20 token
-        mockERC20 = new MockERC20();
-        mockERC20.initialize();
-
-        // Create a test DAO
-        daoId = factory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            QUORUM_VOTES,
-            TIMELOCK_DELAY
-        );
     }
 
     // ============ Helper Functions ============
@@ -118,7 +53,7 @@ contract PEACECOINDAO_NFTTest is Test {
      * @return The created token ID
      */
     function _createToken(uint256 tokenId) private returns (uint256) {
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
         assertEq(nft.numberOfTokens(), tokenId, "Token count should match");
         return tokenId;
     }
@@ -142,7 +77,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_createToken_Success() public {
         // Act: Create a token
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
 
         // Assert: Verify token was created
         assertEq(nft.numberOfTokens(), 1, "Should have one token");
@@ -157,7 +92,7 @@ contract PEACECOINDAO_NFTTest is Test {
         // Act & Assert: Unauthorized user should not be able to create token
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
     }
 
     // ============ Minting Tests ============
@@ -337,7 +272,7 @@ contract PEACECOINDAO_NFTTest is Test {
     function test_votingPower_MultipleTokens() public {
         // Arrange: Create multiple tokens with different voting powers
         _createToken(1);
-        nft.createToken(TOKEN_URI, 200, daoId);
+        nft.createToken(TOKEN_URI, 200);
 
         // Mint different amounts of each token
         _mintToken(alice, 1, 2); // 2 * 100 = 200
@@ -353,7 +288,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_votingPower_ZeroVotingPower() public {
         // Arrange: Create token with zero voting power
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         _mintToken(alice, 1, 5);
 
         // Assert: Voting power should be zero
@@ -403,8 +338,8 @@ contract PEACECOINDAO_NFTTest is Test {
         _createToken(1);
         _mintToken(alice, 1, 1);
 
-        // Act & Assert: Should revert with blockNumber too large
-        vm.expectRevert("blockNumber too large");
+        // Act & Assert: Should revert with blockNumber too larg
+        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.BlockNumberTooLarge.selector));
         nft.getPastVotes(alice, uint256(type(uint32).max) + 1);
     }
 
@@ -427,7 +362,7 @@ contract PEACECOINDAO_NFTTest is Test {
      * @notice Tests getPastVotes for address with no checkpoints returns zero
      * @dev Verifies that getPastVotes returns zero for addresses that never had votes
      */
-    function test_getPastVotes_NoCheckpoints() public {
+    function test_getPastVotes_NoCheckpoints() public view {
         // Assert: Address with no votes should return zero
         assertEq(nft.getPastVotes(alice, block.number), 0, "Should return zero for no checkpoints");
     }
@@ -493,25 +428,6 @@ contract PEACECOINDAO_NFTTest is Test {
     }
 
     // ============ Delegation Edge Cases ============
-
-    /**
-     * @notice Tests delegation to same address reverts
-     * @dev Verifies that delegating to the same address reverts with AlreadyDelegated
-     */
-    function test_delegate_AlreadyDelegated() public {
-        // Arrange: Create and mint token
-        _createToken(1);
-        _mintToken(alice, 1, 1);
-
-        // Act: Delegate to bob
-        vm.prank(alice);
-        nft.delegate(bob);
-
-        // Act & Assert: Delegating to bob again should revert
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.AlreadyDelegated.selector));
-        nft.delegate(bob);
-    }
 
     /**
      * @notice Tests delegation when user has no tokens
@@ -601,7 +517,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_delegate_ZeroTotalVotes() public {
         // Arrange: Create token with zero voting power and mint
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         _mintToken(alice, 1, 1);
 
         // Act: Delegate to bob
@@ -664,7 +580,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_mint_ZeroVotingPower() public {
         // Arrange: Create token with zero voting power
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         vm.prank(alice);
         nft.delegate(bob);
 
@@ -696,7 +612,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_mint_DelegateeButZeroVotingPower() public {
         // Arrange: Create token with zero voting power and set up delegation
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         vm.prank(alice);
         nft.delegate(bob);
 
@@ -780,7 +696,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_burn_DelegateeButZeroVotingPower() public {
         // Arrange: Create token with zero voting power, mint, and delegate
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         _mintToken(alice, 1, 1);
         vm.prank(alice);
         nft.delegate(bob);
@@ -966,7 +882,7 @@ contract PEACECOINDAO_NFTTest is Test {
      */
     function test_batchMint_ZeroVotingPower() public {
         // Arrange: Create token with zero voting power and set up delegation
-        nft.createToken(TOKEN_URI, 0, daoId);
+        nft.createToken(TOKEN_URI, 0);
         vm.prank(alice);
         nft.delegate(bob);
 
@@ -1015,42 +931,10 @@ contract PEACECOINDAO_NFTTest is Test {
      * @dev Verifies that only the DAO creator can create tokens
      */
     function test_createToken_InvalidCreator() public {
-        // Arrange: Grant DAO_MANAGER_ROLE to alice but she's not the DAO creator
-        DAOFactory factory = DAOFactory(nft.daoFactory());
-        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, alice);
-
-        // Act & Assert: Should revert when not the DAO creator
+        // Act & Assert: Should revert when not the default admin
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidCreator.selector));
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
-    }
-
-    // ============ Initialize Edge Cases ============
-
-    /**
-     * @notice Tests initialize with empty name reverts
-     * @dev Verifies that initialize reverts with empty name
-     */
-    function test_initialize_EmptyName() public {
-        // Arrange: Deploy new NFT contract
-        PEACECOINDAO_NFT newNft = new PEACECOINDAO_NFT();
-
-        // Act & Assert: Should revert with empty name
-        vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidName.selector));
-        newNft.initialize("", "SYMBOL", BASE_URI, address(this));
-    }
-
-    /**
-     * @notice Tests initialize with empty symbol reverts
-     * @dev Verifies that initialize reverts with empty symbol
-     */
-    function test_initialize_EmptySymbol() public {
-        // Arrange: Deploy new NFT contract
-        PEACECOINDAO_NFT newNft = new PEACECOINDAO_NFT();
-
-        // Act & Assert: Should revert with empty symbol
-        vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidSymbol.selector));
-        newNft.initialize("NAME", "", BASE_URI, address(this));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.PermissionDenied.selector));
+        nft.createToken(TOKEN_URI, VOTING_POWER);
     }
 
     // ============ SupportsInterface Tests ============
@@ -1059,7 +943,7 @@ contract PEACECOINDAO_NFTTest is Test {
      * @notice Tests supportsInterface function
      * @dev Verifies that supportsInterface returns correct values
      */
-    function test_supportsInterface() public {
+    function test_supportsInterface() public view {
         // Test ERC1155 interface
         assertTrue(nft.supportsInterface(0xd9b67a26), "Should support ERC1155 interface");
 

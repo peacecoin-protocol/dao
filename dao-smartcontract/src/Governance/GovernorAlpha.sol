@@ -530,7 +530,10 @@ contract GovernorAlpha {
     }
 
     function getPastVotes(address account, uint256 blockNumber) public view returns (uint96) {
-        return token.getPastVotes(account, blockNumber);
+        return
+            token.getPastVotes(account, blockNumber) +
+            sbt.getPastVotes(account, blockNumber) +
+            nft.getPastVotes(account, blockNumber);
     }
 
     function add256(uint256 a, uint256 b) internal pure returns (uint256) {

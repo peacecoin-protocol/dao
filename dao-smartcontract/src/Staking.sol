@@ -209,8 +209,6 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
         if (stakingPool == 0) return 0;
         uint256 SECONDS_PER_YEAR = 31536000;
         uint256 SECONDS_PER_BLOCK = 2;
-        return
-            ((((rewardPerBlock * 1e18) * SECONDS_PER_YEAR) / stakingPool) / SECONDS_PER_BLOCK) *
-            100;
+        return ((rewardPerBlock * SECONDS_PER_YEAR * 1e18 * 100) / stakingPool / SECONDS_PER_BLOCK);
     }
 }

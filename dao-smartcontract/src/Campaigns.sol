@@ -38,6 +38,7 @@ contract Campaigns is
     }
 
     struct Campaign {
+        bytes32 daoId; // DAO ID associated with the campaign
         uint256 sbtId; // SBT token ID associated with the campaign
         string title; // Campaign title
         string description; // Campaign description
@@ -59,8 +60,6 @@ contract Campaigns is
 
     uint256 public campaignId;
     address public daoFactory;
-    PEACECOINDAO_SBT public sbt;
-    PEACECOINDAO_NFT public nft;
 
     bytes32 public DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
 
@@ -75,6 +74,7 @@ contract Campaigns is
     event CampWinnersClaimed(uint256 indexed campaignId, address indexed winner);
     event CampaignCreated(
         uint256 indexed campaignId,
+        bytes32 indexed daoId,
         uint256 indexed sbtId,
         string title,
         string description,
@@ -96,21 +96,11 @@ contract Campaigns is
 
     /**
      * @notice Initialize the Campaigns contract
-     * @dev Sets up the SBT and NFT contracts and initializes parent contracts
-     * @param _sbt Address of the SBT contract
-     * @param _nft Address of the NFT contract
+     * @dev Initializes parent contracts
+     * @param _daoFactory Address of the DAO factory contract
      */
-    function initialize(
-        address _daoFactory,
-        PEACECOINDAO_SBT _sbt,
-        PEACECOINDAO_NFT _nft
-    ) public initializer {
-        if (address(_sbt) == address(0)) revert InvalidAddress();
-        if (address(_nft) == address(0)) revert InvalidAddress();
-
+    function initialize(address _daoFactory) public initializer {
         daoFactory = _daoFactory;
-        nft = _nft;
-        sbt = _sbt;
 
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
@@ -122,9 +112,12 @@ contract Campaigns is
      * @param _campaign Campaign configuration struct
      */
     function createCampaign(Campaign memory _campaign) external onlyDAOManager {
-        if (_campaign.tokenType == TokenType.ERC20) {
-            require(ITokens(address(_campaign.token)).owner() == msg.sender, PermissionDenied());
-        }
+        (, , address _nft, , , , address _creator) = IDAOFactory(daoFactory).daoConfigs(
+            _campaign.daoId
+        );
+        if (_creator != msg.sender) revert IErrors.InvalidCreator();
+
+        PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
 
         if (_campaign.startDate >= _campaign.endDate) revert IErrors.InvalidStartDate();
         if (_campaign.totalAmount == 0) revert IErrors.InvalidAmount();
@@ -149,6 +142,7 @@ contract Campaigns is
 
         emit CampaignCreated(
             campaignId,
+            _campaign.daoId,
             _campaign.sbtId,
             _campaign.title,
             _campaign.description,
@@ -216,6 +210,11 @@ contract Campaigns is
         bytes memory _signature
     ) external nonReentrant {
         Campaign memory campaign = campaigns[_campaignId];
+
+        (, address _sbt, address _nft, , , , ) = IDAOFactory(daoFactory).daoConfigs(campaign.daoId);
+
+        PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
+        PEACECOINDAO_SBT sbt = PEACECOINDAO_SBT(_sbt);
 
         if (campaign.startDate >= block.timestamp) revert IErrors.CampaignNotStarted();
         if (campaign.endDate <= block.timestamp) revert IErrors.CampaignEnded();

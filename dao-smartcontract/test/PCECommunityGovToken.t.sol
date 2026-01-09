@@ -16,7 +16,7 @@ contract PCECommunityGovTokenTest is Test {
     PCECommunityGovToken public pceToken;
     address public owner;
     address public user;
-    uint256 public constant INITIAL_BALANCE = 5e18;
+    uint256 public constant INITIAL_BALANCE = 5 ether;
 
     // Events
     event Deposited(address indexed user, uint256 amount);
