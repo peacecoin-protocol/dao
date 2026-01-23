@@ -2,10 +2,11 @@
 pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {INFTInterface} from "./interfaces/INFTInterface.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 
@@ -15,7 +16,13 @@ import {IErrors} from "./interfaces/IErrors.sol";
  * @notice This contract allows authorized users to create new DAOs with governance tokens and timelock controllers
  * @author Daniel Lee
  */
-contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IErrors {
+contract DAOFactory is
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    IDAOFactory,
+    IErrors
+{
     using Clones for address;
 
     // ============ Constants ============
@@ -28,54 +35,60 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
     uint256 public constant MAX_TIMELOCK_DELAY = 30 days;
 
     // ============ State Variables ============
-    /// @notice Mapping from DAO ID to its configuration
-    mapping(bytes32 => address) public timelock;
 
     /// @notice Mapping to track DAO names to prevent duplicates
     mapping(string => bool) public daoNames;
 
     /// @notice Mapping from DAO ID to its creator
-    mapping(bytes32 => address) public daoCreators;
+    mapping(bytes32 => DAOConfig) public daoConfigs;
 
-    /// @notice Counter for total DAOs created
-    uint256 public totalDAOs;
+    string public uri_;
 
     /// @notice Implementation addresses for cloning
     address public timelockImplementation;
     address public governorImplementation;
     address public governanceTokenImplementation;
+    address public sbtImplementation;
+    address public nftImplementation;
 
-    address public sbt;
-    address public nft;
+    address public campaignFactory;
+    address public multipleVotingImplementation;
 
     // ============ Events ============
     event ContractDeployed(address indexed contractAddress);
     event DAOCreated(bytes32 indexed daoId, string daoName, address creator);
 
     event ImplementationUpdated(
-        address indexed timelockImplementation,
-        address indexed governorImplementation,
-        address indexed governanceTokenImplementation
+        address timelockImplementation,
+        address governorImplementation,
+        address governanceTokenImplementation,
+        address multipleVotingImplementation,
+        address sbtImplementation,
+        address nftImplementation
     );
 
     // ============ Modifiers ============
     modifier validDAO(bytes32 daoId) {
-        if (timelock[daoId] == address(0)) revert DAODoesNotExist();
+        IDAOFactory.DAOConfig memory daoConfig = daoConfigs[daoId];
+        if (daoConfig.timelock == address(0)) revert IErrors.DAODoesNotExist();
         _;
     }
 
     modifier validImplementation() {
-        if (timelockImplementation == address(0)) revert TimelockImplementationNotSet();
-        if (governorImplementation == address(0)) revert GovernorImplementationNotSet();
+        if (timelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
+        if (governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
         if (governanceTokenImplementation == address(0))
-            revert GovernanceTokenImplementationNotSet();
+            revert IErrors.GovernanceTokenImplementationNotSet();
+        if (sbtImplementation == address(0)) revert IErrors.InvalidAddress();
+        if (nftImplementation == address(0)) revert IErrors.InvalidAddress();
         _;
     }
 
-    // ============ Constructor ============
-    constructor(address _sbt, address _nft) {
-        sbt = _sbt;
-        nft = _nft;
+    // ============ Initializer ============
+    function initialize() public initializer {
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -89,26 +102,55 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
      * @param _timelockImplementation Address of the timelock implementation
      * @param _governorImplementation Address of the governor implementation
      * @param _governanceTokenImplementation Address of the governance token implementation
+     * @param _sbtImplementation Address of the SBT implementation
+     * @param _nftImplementation Address of the NFT implementation
      */
     function setImplementation(
         address _timelockImplementation,
         address _governorImplementation,
-        address _governanceTokenImplementation
+        address _governanceTokenImplementation,
+        address _multipleVotingImplementation,
+        address _sbtImplementation,
+        address _nftImplementation
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_timelockImplementation == address(0)) revert TimelockImplementationNotSet();
-        if (_governorImplementation == address(0)) revert GovernorImplementationNotSet();
+        if (_timelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
+        if (_governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
         if (_governanceTokenImplementation == address(0))
-            revert GovernanceTokenImplementationNotSet();
+            revert IErrors.GovernanceTokenImplementationNotSet();
+        if (_multipleVotingImplementation == address(0))
+            revert IErrors.MultipleVotingImplementationNotSet();
+        if (_sbtImplementation == address(0)) revert IErrors.InvalidAddress();
+        if (_nftImplementation == address(0)) revert IErrors.InvalidAddress();
 
         timelockImplementation = _timelockImplementation;
         governorImplementation = _governorImplementation;
         governanceTokenImplementation = _governanceTokenImplementation;
+        multipleVotingImplementation = _multipleVotingImplementation;
+        sbtImplementation = _sbtImplementation;
+        nftImplementation = _nftImplementation;
 
         emit ImplementationUpdated(
             _timelockImplementation,
             _governorImplementation,
-            _governanceTokenImplementation
+            _governanceTokenImplementation,
+            _multipleVotingImplementation,
+            _sbtImplementation,
+            _nftImplementation
         );
+    }
+
+    function setURI(string memory _uri) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uri_ = _uri;
+    }
+
+    function setCampaignFactory(address _campaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        campaignFactory = _campaignFactory;
+        grantRole(DEFAULT_ADMIN_ROLE, campaignFactory);
+    }
+
+    function removeCampaignFactory() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        campaignFactory = address(0);
+        revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
     }
 
     /**
@@ -154,16 +196,19 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
 
         // Check if DAO already exists
         bytes32 daoId = keccak256(abi.encodePacked(_daoName));
-        if (timelock[daoId] != address(0)) revert DAOAlreadyExists();
+        if (daoConfigs[daoId].timelock != address(0)) revert IErrors.DAOAlreadyExists();
 
         // Deploy contracts
         address timelockAddress = _deployTimelock(timelockDelay);
         address governanceTokenAddress = _deployGovernanceToken(_communityToken);
+
+        address sbtAddress = _deploySBT(msg.sender);
+        address nftAddress = _deployNFT(msg.sender);
         address governorAddress = _deployGovernor(
             _daoName,
             governanceTokenAddress,
-            sbt,
-            nft,
+            sbtAddress,
+            nftAddress,
             timelockAddress,
             _votingDelay,
             _votingPeriod,
@@ -172,9 +217,19 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
             address(this),
             _socialConfig
         );
-
+        address multipleVotingAddress = _deployMultipleVoting(governorAddress, msg.sender);
         // Store DAO address
-        timelock[daoId] = timelockAddress;
+
+        daoConfigs[daoId] = IDAOFactory.DAOConfig({
+            timelock: timelockAddress,
+            multipleVoting: multipleVotingAddress,
+            sbt: sbtAddress,
+            nft: nftAddress,
+            governor: governorAddress,
+            governanceToken: governanceTokenAddress,
+            communityToken: _communityToken,
+            creator: msg.sender
+        });
 
         // Set up governance hierarchy
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
@@ -182,31 +237,10 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
 
         // Grant DAO manager role
         _grantRole(DAO_MANAGER_ROLE, msg.sender);
-
-        daoCreators[daoId] = msg.sender;
-
         // Emit events
         emit DAOCreated(daoId, _daoName, msg.sender);
 
         return daoId;
-    }
-
-    /**
-     * @notice Get DAO configuration by ID
-     * @param daoId Unique identifier of the DAO
-     * @return DAO configuration struct
-     */
-    function getDAOAddress(bytes32 daoId) external view validDAO(daoId) returns (address) {
-        return timelock[daoId];
-    }
-
-    /**
-     * @notice Check if a DAO exists
-     * @param daoId Unique identifier of the DAO
-     * @return True if DAO exists, false otherwise
-     */
-    function isDaoExists(bytes32 daoId) external view returns (bool) {
-        return timelock[daoId] != address(0);
     }
 
     /**
@@ -245,16 +279,16 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
      * @notice Validate address inputs
      */
     function _validateAddresses(address communityToken, address creator) internal view {
-        if (communityToken == address(0)) revert InvalidAddress();
-        if (creator != IToken(communityToken).owner()) revert InvalidCommunityTokenOwner();
+        if (communityToken == address(0)) revert IErrors.InvalidAddress();
+        if (creator != IToken(communityToken).owner()) revert IErrors.InvalidCommunityTokenOwner();
     }
 
     /**
      * @notice Validate DAO name
      */
     function _validateName(string memory daoName) internal view {
-        if (bytes(daoName).length == 0) revert InvalidName();
-        if (daoNames[daoName]) revert DAONameAlreadyExists();
+        if (bytes(daoName).length == 0) revert IErrors.InvalidName();
+        if (daoNames[daoName]) revert IErrors.DAONameAlreadyExists();
     }
 
     /**
@@ -266,10 +300,10 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
         uint256 timelockDelay,
         uint256 quorumVotes
     ) internal pure {
-        if (votingDelay > MAX_VOTING_DELAY) revert InvalidVotingDelay();
-        if (votingPeriod > MAX_VOTING_PERIOD) revert InvalidVotingPeriod();
-        if (timelockDelay > MAX_TIMELOCK_DELAY) revert InvalidTimelockDelay();
-        if (quorumVotes == 0) revert InvalidQuorumVotes();
+        if (votingDelay > MAX_VOTING_DELAY) revert IErrors.InvalidVotingDelay();
+        if (votingPeriod > MAX_VOTING_PERIOD) revert IErrors.InvalidVotingPeriod();
+        if (timelockDelay > MAX_TIMELOCK_DELAY) revert IErrors.InvalidTimelockDelay();
+        if (quorumVotes == 0) revert IErrors.InvalidQuorumVotes();
     }
 
     /**
@@ -277,7 +311,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
      */
     function _deployTimelock(uint256 timelockDelay) internal returns (address) {
         address timelockAddress = timelockImplementation.clone();
-        if (timelockAddress == address(0)) revert ContractDeploymentFailed();
+        if (timelockAddress == address(0)) revert IErrors.ContractDeploymentFailed();
 
         ITimelock(timelockAddress).initialize(address(this), timelockDelay);
         emit ContractDeployed(timelockAddress);
@@ -289,11 +323,44 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
      */
     function _deployGovernanceToken(address communityToken) internal returns (address) {
         address governanceTokenAddress = governanceTokenImplementation.clone();
-        if (governanceTokenAddress == address(0)) revert ContractDeploymentFailed();
+        if (governanceTokenAddress == address(0)) revert IErrors.ContractDeploymentFailed();
 
         IToken(governanceTokenAddress).initialize(communityToken);
         emit ContractDeployed(governanceTokenAddress);
         return governanceTokenAddress;
+    }
+
+    /**
+     * @notice Deploy multiple voting contract
+     */
+    function _deployMultipleVoting(address governor, address admin) internal returns (address) {
+        address multipleVotingAddress = multipleVotingImplementation.clone();
+        if (multipleVotingAddress == address(0)) revert IErrors.ContractDeploymentFailed();
+        emit ContractDeployed(multipleVotingAddress);
+        IMultipleVoting(multipleVotingAddress).initialize(governor, admin);
+        return multipleVotingAddress;
+    }
+
+    /**
+     * @notice Deploy SBT contract
+     */
+    function _deploySBT(address owner) internal returns (address) {
+        address sbtAddress = sbtImplementation.clone();
+        if (sbtAddress == address(0)) revert IErrors.ContractDeploymentFailed();
+        INFTInterface(sbtAddress).initialize(uri_, address(this), owner, true);
+        emit ContractDeployed(sbtAddress);
+        return sbtAddress;
+    }
+
+    /**
+     * @notice Deploy NFT contract
+     */
+    function _deployNFT(address owner) internal returns (address) {
+        address nftAddress = nftImplementation.clone();
+        if (nftAddress == address(0)) revert IErrors.ContractDeploymentFailed();
+        INFTInterface(nftAddress).initialize(uri_, address(this), owner, false);
+        emit ContractDeployed(nftAddress);
+        return nftAddress;
     }
 
     /**
@@ -313,7 +380,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
         IDAOFactory.SocialConfig memory _socialConfig
     ) internal returns (address) {
         address governorAddress = governorImplementation.clone();
-        if (governorAddress == address(0)) revert ContractDeploymentFailed();
+        if (governorAddress == address(0)) revert IErrors.ContractDeploymentFailed();
 
         ICommunityGovernance(governorAddress).initialize(
             daoName,
@@ -338,6 +405,10 @@ contract DAOFactory is AccessControl, ReentrancyGuard, Pausable, IDAOFactory, IE
 interface IToken {
     function owner() external view returns (address);
     function initialize(address _communityToken) external;
+}
+
+interface IMultipleVoting {
+    function initialize(address _governor, address _admin) external;
 }
 
 interface ITimelock {

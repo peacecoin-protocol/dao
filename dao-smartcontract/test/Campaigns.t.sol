@@ -15,6 +15,7 @@ import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
+import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 /**
  * @title CampaignsTest
@@ -34,6 +35,9 @@ contract CampaignsTest is Test {
 
     /// @notice SBT contract for DAO membership
     PEACECOINDAO_SBT public sbt;
+
+    /// @notice Multiple voting contract for DAO governance
+    MultipleVotings public multipleVoting;
 
     // ============ Test Accounts ============
 
@@ -120,20 +124,7 @@ contract CampaignsTest is Test {
         });
 
     /// @notice Default campaign structure for testing
-    Campaigns.Campaign private defaultCampaign =
-        Campaigns.Campaign({
-            sbtId: CAMPAIGN_SBT_ID,
-            title: campaignTitle,
-            description: campaignDescription,
-            token: address(0),
-            tokenType: Campaigns.TokenType.NFT,
-            claimAmount: CAMPAIGN_CLAIM_AMOUNT,
-            totalAmount: CAMPAIGN_TOTAL_AMOUNT,
-            startDate: block.timestamp + CAMPAIGN_START_OFFSET,
-            endDate: block.timestamp + CAMPAIGN_START_OFFSET + CAMPAIGN_DURATION,
-            validateSignatures: false,
-            creator: address(0)
-        });
+    Campaigns.Campaign public defaultCampaign;
 
     // ============ Setup ============
 
@@ -145,25 +136,25 @@ contract CampaignsTest is Test {
         vm.startPrank(daoManager);
 
         // Deploy core governance contracts
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
+        PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
+        MultipleVotings multipleVotingImplementation = new MultipleVotings();
         timelock = new Timelock();
         governor = new GovernorAlpha();
         governanceToken = new PCECommunityGovToken();
 
         // Deploy and configure DAO factory
-        DAOFactory factory = new DAOFactory(address(sbt), address(nft));
+        DAOFactory factory = new DAOFactory();
+        factory.initialize();
         daoFactory = address(factory);
-        factory.setImplementation(address(timelock), address(governor), address(governanceToken));
-
-        // Initialize SBT and NFT contracts
-        sbt.initialize("PEACECOIN DAO SBT", "PCE_SBT", BASE_URI, address(factory));
-        nft.initialize("PEACECOIN DAO NFT", "PCE_NFT", BASE_URI, address(factory));
-
-        // Grant necessary permissions to test contract
-        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, address(this));
-        nft.setMinter(address(this));
-        sbt.setMinter(address(this));
+        factory.setImplementation(
+            address(timelock),
+            address(governor),
+            address(governanceToken),
+            address(multipleVotingImplementation),
+            address(sbtImplementation),
+            address(nftImplementation)
+        );
 
         // Deploy and initialize mock ERC20 token
         mockERC20 = new MockERC20();
@@ -181,15 +172,30 @@ contract CampaignsTest is Test {
             TIMELOCK_DELAY
         );
 
+        defaultCampaign = Campaigns.Campaign({
+            daoId: daoId,
+            sbtId: CAMPAIGN_SBT_ID,
+            title: campaignTitle,
+            description: campaignDescription,
+            token: address(0),
+            tokenType: Campaigns.TokenType.NFT,
+            claimAmount: CAMPAIGN_CLAIM_AMOUNT,
+            totalAmount: CAMPAIGN_TOTAL_AMOUNT,
+            startDate: block.timestamp + CAMPAIGN_START_OFFSET,
+            endDate: block.timestamp + CAMPAIGN_START_OFFSET + CAMPAIGN_DURATION,
+            validateSignatures: false,
+            creator: address(0)
+        });
+
+        (, , address sbtAddress, address nftAddress, , , , ) = factory.daoConfigs(daoId);
+        sbt = PEACECOINDAO_SBT(sbtAddress);
+        nft = PEACECOINDAO_NFT(nftAddress);
+
         // Deploy and initialize Campaigns contract
         campaigns = new Campaigns();
-        campaigns.initialize(address(factory), sbt, nft);
+        campaigns.initialize(address(factory));
 
-        // Set Campaigns contract as NFT minter
-        nft.setMinter(address(campaigns));
-
-        // Grant DAO_MANAGER_ROLE to daoManager for tests
-        IAccessControl(address(factory)).grantRole(DAO_MANAGER_ROLE, daoManager);
+        factory.setCampaignFactory(address(campaigns));
 
         vm.stopPrank();
     }
@@ -205,7 +211,7 @@ contract CampaignsTest is Test {
         vm.startPrank(daoManager);
 
         // Create NFT token for the campaign
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
         vm.roll(block.number + 1);
 
         // Create the campaign
@@ -240,7 +246,7 @@ contract CampaignsTest is Test {
     function test_createCampaign() public {
         // Create NFT token and campaign
         vm.startPrank(daoManager);
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
         vm.roll(block.number + 1);
         campaigns.createCampaign(defaultCampaign);
         vm.stopPrank();
@@ -256,6 +262,7 @@ contract CampaignsTest is Test {
 
         // Retrieve and verify campaign data
         (
+            ,
             uint256 sbtId,
             string memory title,
             string memory description,
@@ -266,7 +273,7 @@ contract CampaignsTest is Test {
             uint256 startDate,
             uint256 endDate,
             bool validateSignatures,
-            address creator
+
         ) = campaigns.campaigns(campaignId);
 
         // Verify all campaign fields
@@ -281,7 +288,6 @@ contract CampaignsTest is Test {
         assertGt(endDate, startDate, "End date should be after start date");
         assertEq(validateSignatures, false, "Signature validation should be disabled");
         assertEq(campaignId, CAMPAIGN_TOKEN_ID, "Campaign ID should match token ID");
-        assertEq(creator, daoManager, "Campaign creator should be daoManager");
 
         // Verify NFT balance on Campaigns contract
         assertEq(
@@ -316,7 +322,7 @@ contract CampaignsTest is Test {
      */
     function test_createCampaign_InvalidParameters() public {
         vm.startPrank(daoManager);
-        nft.createToken(TOKEN_URI, VOTING_POWER, daoId);
+        nft.createToken(TOKEN_URI, VOTING_POWER);
         vm.roll(block.number + 1);
         vm.stopPrank();
 

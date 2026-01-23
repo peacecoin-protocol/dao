@@ -36,6 +36,7 @@ interface IErrors {
     error TimelockImplementationNotSet();
     error GovernorImplementationNotSet();
     error GovernanceTokenImplementationNotSet();
+    error MultipleVotingImplementationNotSet();
     error InvalidVotingDelay();
     error InvalidVotingPeriod();
     error InvalidTimelockDelay();

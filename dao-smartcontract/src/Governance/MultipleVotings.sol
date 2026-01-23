@@ -2,22 +2,24 @@
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 /// @title MultipleVotings
 /// @notice Contract for handling multiple choice voting proposals in the governance system
 /// @dev Supports up to 20 options per proposal, allows users to allocate voting power across options
-contract MultipleVotings is Initializable, ReentrancyGuard {
-    /// @notice Maximum number of options allowed per proposal
+contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
+    /// @notice Maximum number of options allowed per proposa
     uint256 public constant MAX_OPTIONS = 20;
-    uint256 public constant MAX_VOTING_DELAY = 1;
-    uint256 public constant MAX_VOTING_PERIOD = 100;
-    uint256 public votingDelay;
-    uint256 public votingPeriod;
-    uint256 public quorumVotes;
-    uint256 public proposalThreshold;
+
+    /// @notice The address of the governor contract
+    address public governor;
+
+    /// @notice The address of the admin
     address public admin;
-    mapping(address => uint256) public latestProposalIds;
+
+    /// @notice The proposal threshold
+    uint256 public proposalThreshold;
 
     /// @notice Multiple choice proposal structure
     struct MultipleChoiceProposal {
@@ -25,10 +27,10 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         uint256 id;
         /// @notice Creator of the proposal
         address proposer;
-        /// @notice The block at which voting begins
-        uint256 startBlock;
-        /// @notice The block at which voting ends
-        uint256 endBlock;
+        /// @notice Proposal start timestamp
+        uint256 startTimestamp;
+        /// @notice Proposal end timestamp
+        uint256 endTimestamp;
         /// @notice Array of option descriptions (up to 20)
         string[] options;
         /// @notice Total voting power allocated to each option
@@ -41,16 +43,9 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         mapping(address => bool) hasVoted;
         /// @notice Proposal state
         ProposalState state;
+        /// @notice Proposal created at
+        uint256 createdAt;
     }
-
-    /// @notice The address of the PCE governance token
-    GovernorTokenInterface public token;
-
-    /// @notice The address of the NFT
-    GovernorTokenInterface public nft;
-
-    /// @notice The address of the SBT
-    GovernorTokenInterface public sbt;
 
     /// @notice The total number of multiple choice proposals
     uint256 public proposalCount;
@@ -63,9 +58,10 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         uint256 indexed id,
         address indexed proposer,
         string[] options,
-        uint256 startBlock,
-        uint256 endBlock,
-        string description
+        uint256 startTimestamp,
+        uint256 endTimestamp,
+        string description,
+        uint256 createdAt
     );
 
     event MultipleChoiceVoteCast(
@@ -79,45 +75,18 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
     event ProposalFinalized(uint256 indexed id, ProposalState state);
 
     /// @notice Initialize the contract
-    /// @param _token Address of the governance token
-    /// @param _sbt Address of the SBT contract
-    /// @param _nft Address of the NFT contract
-    /// @param _votingDelay The delay before voting starts
-    /// @param _votingPeriod The period of the voting
-    /// @param _quorumVotes The quorum votes required to succeed a proposal
-    /// @param _proposalThreshold The threshold for a proposal to be successful
+    /// @param _governor Address of the governor contract
     /// @param _admin The address of the admin
-    function initialize(
-        address _token,
-        address _sbt,
-        address _nft,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _quorumVotes,
-        uint256 _proposalThreshold,
-        address _admin
-    ) external initializer {
-        require(_votingDelay <= MAX_VOTING_DELAY, "Multiple_Votings: voting delay too long");
-        require(_votingPeriod <= MAX_VOTING_PERIOD, "Multiple_Votings: voting period too long");
-        require(_token != address(0), "Multiple_Votings: invalid token address");
-        require(_sbt != address(0), "Multiple_Votings: invalid SBT address");
-        require(_nft != address(0), "Multiple_Votings: invalid NFT address");
+    function initialize(address _governor, address _admin) external initializer {
+        require(_governor != address(0), "Multiple_Votings: invalid governor address");
         require(_admin != address(0), "Multiple_Votings: invalid admin address");
-        require(_quorumVotes > 0, "Multiple_Votings: quorum votes must be greater than 0");
-        require(
-            _proposalThreshold > 0,
-            "Multiple_Votings: proposal threshold must be greater than 0"
-        );
 
-        token = GovernorTokenInterface(_token);
-        sbt = GovernorTokenInterface(_sbt);
-        nft = GovernorTokenInterface(_nft);
-
-        votingDelay = _votingDelay;
-        votingPeriod = _votingPeriod;
-        quorumVotes = _quorumVotes;
-        proposalThreshold = _proposalThreshold;
+        governor = _governor;
         admin = _admin;
+
+        proposalThreshold = IGovernor(_governor).proposalThreshold();
+
+        __ReentrancyGuard_init();
     }
 
     modifier onlyAdmin() {
@@ -131,37 +100,15 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         admin = _admin;
     }
 
-    /// @notice Set the voting delay
-    /// @param _votingDelay The new voting delay
-    function setVotingDelay(uint256 _votingDelay) external onlyAdmin {
-        votingDelay = _votingDelay;
-    }
-
-    /// @notice Set the voting period
-    /// @param _votingPeriod The new voting period
-    function setVotingPeriod(uint256 _votingPeriod) external onlyAdmin {
-        votingPeriod = _votingPeriod;
-    }
-
-    /// @notice Set the quorum votes
-    /// @param _quorumVotes The new quorum votes
-    function setQuorumVotes(uint256 _quorumVotes) external onlyAdmin {
-        quorumVotes = _quorumVotes;
-    }
-
-    /// @notice Set the proposal threshold
-    /// @param _proposalThreshold The new proposal threshold
-    function setProposalThreshold(uint256 _proposalThreshold) external onlyAdmin {
-        proposalThreshold = _proposalThreshold;
-    }
-
     /// @notice Create a new multiple choice proposal
     /// @param options Array of option descriptions (max 20)
     /// @param description Proposal description
     /// @return proposalId The ID of the created proposal
     function proposeMultipleChoice(
         string[] memory options,
-        string memory description
+        string memory description,
+        uint256 startTimestamp,
+        uint256 endTimestamp
     ) external nonReentrant returns (uint256) {
         require(options.length > 1, "Multiple_Votings: must have at least 2 options");
         require(options.length <= MAX_OPTIONS, "Multiple_Votings: too many options");
@@ -173,14 +120,6 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
             "Multiple_Votings: proposer votes below proposal threshold"
         );
 
-        uint256 latestProposalId = latestProposalIds[msg.sender];
-        if (latestProposalId != 0) {
-            require(
-                proposals[latestProposalId].state != ProposalState.Active,
-                "Multiple_Votings: one live proposal per proposer, found an already active proposal"
-            );
-        }
-
         proposalCount++;
         uint256 proposalId = proposalCount;
 
@@ -188,8 +127,9 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
 
         newProposal.id = proposalId;
         newProposal.proposer = msg.sender;
-        newProposal.startBlock = block.number + votingDelay;
-        newProposal.endBlock = block.number + votingDelay + votingPeriod;
+        newProposal.startTimestamp = startTimestamp;
+        newProposal.endTimestamp = endTimestamp;
+        newProposal.createdAt = block.number;
         newProposal.state = ProposalState.Active;
         newProposal.description = description;
         newProposal.totalVotesCast = 0;
@@ -205,9 +145,10 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
             proposalId,
             msg.sender,
             options,
-            newProposal.startBlock,
-            newProposal.endBlock,
-            description
+            newProposal.startTimestamp,
+            newProposal.endTimestamp,
+            description,
+            newProposal.createdAt
         );
 
         return proposalId;
@@ -225,13 +166,13 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         require(selectedOption < proposal.options.length, "Multiple_Votings: invalid option index");
         require(proposal.id != 0, "Multiple_Votings: proposal does not exist");
         require(proposal.state == ProposalState.Active, "Multiple_Votings: voting is closed");
-        require(block.number >= proposal.startBlock, "Multiple_Votings: voting not started");
-        require(block.number <= proposal.endBlock, "Multiple_Votings: voting ended");
+        require(block.timestamp >= proposal.startTimestamp, "Multiple_Votings: voting not started");
+        require(block.timestamp <= proposal.endTimestamp, "Multiple_Votings: voting ended");
         require(!proposal.hasVoted[msg.sender], "Multiple_Votings: voter already voted");
         require(proposal.state != ProposalState.Canceled, "Multiple_Votings: proposal canceled");
 
         // Get voter's available voting power at proposal start block
-        uint256 availableVotes = getPastVotes(msg.sender, proposal.startBlock);
+        uint256 availableVotes = getPastVotes(msg.sender, proposal.createdAt);
         require(availableVotes > 0, "Multiple_Votings: no voting power");
 
         // Allocate votes to the selected option
@@ -262,11 +203,13 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
     /// @return id Proposal ID
     /// @return proposer Proposal creator
     /// @return options Array of option descriptions
-    /// @return startBlock Voting start block
-    /// @return endBlock Voting end block
+    /// @return startTimestamp Voting start timestamp
+    /// @return endTimestamp Voting end timestamp
     /// @return totalVotesCasted Total votes cast
     /// @return state Proposal state
     /// @return description Proposal description
+    /// @return hasVoted Whether the sender has voted
+    /// @return createdAt Proposal creation timestamp
     function getProposal(
         uint256 proposalId
     )
@@ -276,11 +219,13 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
             uint256 id,
             address proposer,
             string[] memory options,
-            uint256 startBlock,
-            uint256 endBlock,
+            uint256 startTimestamp,
+            uint256 endTimestamp,
             uint256 totalVotesCasted,
             ProposalState state,
-            string memory description
+            string memory description,
+            bool hasVoted,
+            uint256 createdAt
         )
     {
         MultipleChoiceProposal storage proposal = proposals[proposalId];
@@ -289,56 +234,13 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         id = proposal.id;
         proposer = proposal.proposer;
         options = proposal.options;
-        startBlock = proposal.startBlock;
-        endBlock = proposal.endBlock;
+        startTimestamp = proposal.startTimestamp;
+        endTimestamp = proposal.endTimestamp;
         totalVotesCasted = proposal.totalVotesCast;
         state = proposal.state;
         description = proposal.description;
-    }
-
-    /// @notice Determine the winning option for a proposal
-    /// @param proposalId The ID of the proposal
-    /// @return majorityVotes The number of votes for the majority option
-    function determineMajority(uint256 proposalId) internal view returns (uint256) {
-        MultipleChoiceProposal storage proposal = proposals[proposalId];
-        require(proposal.id != 0, "Multiple_Votings: proposal does not exist");
-
-        uint256 majorityVotes = 0;
-
-        for (uint256 i = 0; i < proposal.options.length; i++) {
-            if (proposal.optionVotes[i] > majorityVotes) {
-                majorityVotes = proposal.optionVotes[i];
-            }
-        }
-
-        return majorityVotes;
-    }
-
-    /// @notice Finalize proposal and determine winner (callable after voting ends)
-    /// @param proposalId The ID of the proposal
-    function finalizeProposal(uint256 proposalId) external nonReentrant {
-        MultipleChoiceProposal storage proposal = proposals[proposalId];
-        require(proposal.id != 0, "Multiple_Votings: proposal does not exist");
-
-        // Check if already finalized
-        require(
-            proposal.state == ProposalState.Active,
-            "Multiple_Votings: proposal already finalized or canceled"
-        );
-
-        // Require voting to have ended
-        require(block.number > proposal.endBlock, "Multiple_Votings: voting not ended");
-
-        // Determine winning option (see CRITICAL-2)
-        uint256 majorityVotes = determineMajority(proposalId);
-
-        if (majorityVotes >= quorumVotes) {
-            proposal.state = ProposalState.Succeeded;
-        } else {
-            proposal.state = ProposalState.Defeated;
-        }
-
-        emit ProposalFinalized(proposalId, proposal.state);
+        hasVoted = proposal.hasVoted[msg.sender];
+        createdAt = proposal.createdAt;
     }
 
     /// @notice Cancel a proposal (only admin or proposer)
@@ -350,7 +252,7 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
             "Multiple_Votings: only admin or proposer can cancel"
         );
         require(proposal.id != 0, "Multiple_Votings: proposal does not exist");
-        require(block.number < proposal.endBlock, "Multiple_Votings: voting ended");
+        require(block.timestamp < proposal.endTimestamp, "Multiple_Votings: voting ended");
         require(
             proposal.state != ProposalState.Canceled,
             "Multiple_Votings: proposal already canceled"
@@ -365,55 +267,42 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
     /// @param blockNumber The block number to check at
     /// @return votes The voting power
     function getPastVotes(address account, uint256 blockNumber) public view returns (uint256) {
-        uint256 tokenVotes = uint256(token.getPastVotes(account, blockNumber));
-        uint256 sbtVotes = uint256(sbt.getPastVotes(account, blockNumber));
-        uint256 nftVotes = uint256(nft.getPastVotes(account, blockNumber));
-
-        uint256 totalVotes = tokenVotes + sbtVotes + nftVotes;
-
-        return totalVotes;
+        return uint256(GovernorInterface(governor).getPastVotes(account, blockNumber));
     }
 
     /// @notice Proposal state enum (matches Governor)
     enum ProposalState {
+        Pending,
         Active,
         Canceled,
-        Defeated,
-        Succeeded
+        Ended
     }
 
     /// @notice Get the state of a proposal
     /// @dev This function is external to allow for external calls
     /// @param proposalId The ID of the proposal
     /// @return state The state of the proposal
-    function getProposalState(uint256 proposalId) external view returns (ProposalState) {
+    function getProposalState(uint256 proposalId) public view returns (ProposalState) {
         MultipleChoiceProposal storage proposal = proposals[proposalId];
         require(proposal.id != 0, "Multiple_Votings: proposal does not exist");
 
         // If already finalized or canceled, return stored state
-        if (
-            proposal.state == ProposalState.Canceled ||
-            proposal.state == ProposalState.Succeeded ||
-            proposal.state == ProposalState.Defeated
-        ) {
+        if (proposal.state == ProposalState.Canceled || proposal.state == ProposalState.Ended) {
             return proposal.state;
         }
 
-        if (block.number <= proposal.endBlock) {
+        if (block.timestamp <= proposal.startTimestamp) {
+            return ProposalState.Pending;
+        }
+
+        if (block.timestamp <= proposal.endTimestamp) {
             return ProposalState.Active;
         }
 
-        // Voting has ended but not finalized - compute state
-        uint256 majorityVotes = determineMajority(proposalId);
-
-        if (majorityVotes >= quorumVotes) {
-            return ProposalState.Succeeded;
-        } else {
-            return ProposalState.Defeated;
-        }
+        return ProposalState.Ended;
     }
 }
 
-interface GovernorTokenInterface {
+interface GovernorInterface {
     function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
 }

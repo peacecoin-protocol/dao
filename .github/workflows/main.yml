@@ -16,14 +16,12 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
 
       - name: Install dependencies
         run: forge install
 
       - name: Run coverage
-        run: forge coverage --skip 'src/mocks/**' --skip 'src/script/**' --skip 'src/deploy/**'
+        run: forge coverage --skip 'src/mocks/**' --skip 'src/script/**' --skip 'src/deploy/**' --ir-minimum
 
       - name: Upload filtered coverage to Codecov
         uses: codecov/codecov-action@v5
