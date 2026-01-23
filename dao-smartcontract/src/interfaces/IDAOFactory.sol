@@ -5,6 +5,7 @@ pragma solidity ^0.8.30;
 interface IDAOFactory {
     struct DAOConfig {
         address timelock;
+        address multipleVoting;
         address sbt;
         address nft;
         address governor;
@@ -25,6 +26,7 @@ interface IDAOFactory {
         address _timelockImplementation,
         address _governorImplementation,
         address _governanceTokenImplementation,
+        address _multipleVotingImplementation,
         address _sbtImplementation,
         address _nftImplementation
     ) external;
@@ -44,5 +46,8 @@ interface IDAOFactory {
     function setCampaignFactory(address _campaignFactory) external;
     function daoConfigs(
         bytes32 daoID
-    ) external view returns (address, address, address, address, address, address, address);
+    )
+        external
+        view
+        returns (address, address, address, address, address, address, address, address);
 }

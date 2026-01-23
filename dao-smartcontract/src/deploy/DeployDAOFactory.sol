@@ -12,6 +12,8 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import {PEACECOINDAO_SBT} from "../Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../Governance/PEACECOINDAO_NFT.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
     function deployDAOFactory() public returns (address, address, address, address) {
@@ -25,9 +27,10 @@ contract DeployDAOFactory is Script {
         address timelockImplementation = address(new Timelock());
         address governorImplementation = address(new GovernorAlpha());
         address governanceTokenImplementation = address(new PCECommunityGovToken());
+        address multipleVotingImplementation = address(new MultipleVotings());
 
         // Deploy simple admin (deployer will be the proxy admin for now)
-        address proxyAdmin = deployerAddress;
+        address proxyAdmin = address(new ProxyAdmin(deployerAddress));
 
         // Deploy proxies
         address timelockAddress = address(
@@ -38,6 +41,9 @@ contract DeployDAOFactory is Script {
         );
         address governanceTokenAddress = address(
             new TransparentUpgradeableProxy(governanceTokenImplementation, proxyAdmin, "")
+        );
+        address multipleVotingAddress = address(
+            new TransparentUpgradeableProxy(multipleVotingImplementation, proxyAdmin, "")
         );
 
         PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
@@ -61,6 +67,7 @@ contract DeployDAOFactory is Script {
             timelockImplementation,
             governorImplementation,
             governanceTokenImplementation,
+            multipleVotingImplementation,
             address(sbtImplementation),
             address(nftImplementation)
         );
@@ -71,6 +78,7 @@ contract DeployDAOFactory is Script {
         console.log("Timelock deployed at", _timelockAddress);
         console.log("GovernorAlpha deployed at", _governorAddress);
         console.log("GovernanceToken deployed at", _governanceTokenAddress);
+        console.log("MultipleVoting deployed at", multipleVotingAddress);
         console.log("MockERC20 deployed at", address(mockERC20));
 
         return (daoFactoryAddress, timelockAddress, governorAddress, address(mockERC20));

@@ -2,13 +2,13 @@
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 /// @title MultipleVotings
 /// @notice Contract for handling multiple choice voting proposals in the governance system
 /// @dev Supports up to 20 options per proposal, allows users to allocate voting power across options
-contract MultipleVotings is Initializable, ReentrancyGuard {
+contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Maximum number of options allowed per proposa
     uint256 public constant MAX_OPTIONS = 20;
 
@@ -85,6 +85,8 @@ contract MultipleVotings is Initializable, ReentrancyGuard {
         admin = _admin;
 
         proposalThreshold = IGovernor(_governor).proposalThreshold();
+
+        __ReentrancyGuard_init();
     }
 
     modifier onlyAdmin() {

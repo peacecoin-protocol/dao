@@ -112,7 +112,7 @@ contract Campaigns is
      * @param _campaign Campaign configuration struct
      */
     function createCampaign(Campaign memory _campaign) external onlyDAOManager {
-        (, , address _nft, , , , address _creator) = IDAOFactory(daoFactory).daoConfigs(
+        (, , , address _nft, , , , address _creator) = IDAOFactory(daoFactory).daoConfigs(
             _campaign.daoId
         );
         if (_creator != msg.sender) revert IErrors.InvalidCreator();
@@ -211,7 +211,9 @@ contract Campaigns is
     ) external nonReentrant {
         Campaign memory campaign = campaigns[_campaignId];
 
-        (, address _sbt, address _nft, , , , ) = IDAOFactory(daoFactory).daoConfigs(campaign.daoId);
+        (, , address _sbt, address _nft, , , , ) = IDAOFactory(daoFactory).daoConfigs(
+            campaign.daoId
+        );
 
         PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
         PEACECOINDAO_SBT sbt = PEACECOINDAO_SBT(_sbt);

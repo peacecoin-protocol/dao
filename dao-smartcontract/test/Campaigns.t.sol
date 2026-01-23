@@ -15,6 +15,7 @@ import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
+import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 /**
  * @title CampaignsTest
@@ -34,6 +35,9 @@ contract CampaignsTest is Test {
 
     /// @notice SBT contract for DAO membership
     PEACECOINDAO_SBT public sbt;
+
+    /// @notice Multiple voting contract for DAO governance
+    MultipleVotings public multipleVoting;
 
     // ============ Test Accounts ============
 
@@ -134,7 +138,7 @@ contract CampaignsTest is Test {
         // Deploy core governance contracts
         PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
         PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
-
+        MultipleVotings multipleVotingImplementation = new MultipleVotings();
         timelock = new Timelock();
         governor = new GovernorAlpha();
         governanceToken = new PCECommunityGovToken();
@@ -147,6 +151,7 @@ contract CampaignsTest is Test {
             address(timelock),
             address(governor),
             address(governanceToken),
+            address(multipleVotingImplementation),
             address(sbtImplementation),
             address(nftImplementation)
         );
@@ -182,7 +187,7 @@ contract CampaignsTest is Test {
             creator: address(0)
         });
 
-        (, address sbtAddress, address nftAddress, , , , ) = factory.daoConfigs(daoId);
+        (, , address sbtAddress, address nftAddress, , , , ) = factory.daoConfigs(daoId);
         sbt = PEACECOINDAO_SBT(sbtAddress);
         nft = PEACECOINDAO_NFT(nftAddress);
 

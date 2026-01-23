@@ -52,6 +52,7 @@ contract DAOFactory is
     address public nftImplementation;
 
     address public campaignFactory;
+    address public multipleVotingImplementation;
 
     // ============ Events ============
     event ContractDeployed(address indexed contractAddress);
@@ -61,6 +62,7 @@ contract DAOFactory is
         address timelockImplementation,
         address governorImplementation,
         address governanceTokenImplementation,
+        address multipleVotingImplementation,
         address sbtImplementation,
         address nftImplementation
     );
@@ -107,6 +109,7 @@ contract DAOFactory is
         address _timelockImplementation,
         address _governorImplementation,
         address _governanceTokenImplementation,
+        address _multipleVotingImplementation,
         address _sbtImplementation,
         address _nftImplementation
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -114,12 +117,15 @@ contract DAOFactory is
         if (_governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
         if (_governanceTokenImplementation == address(0))
             revert IErrors.GovernanceTokenImplementationNotSet();
+        if (_multipleVotingImplementation == address(0))
+            revert IErrors.MultipleVotingImplementationNotSet();
         if (_sbtImplementation == address(0)) revert IErrors.InvalidAddress();
         if (_nftImplementation == address(0)) revert IErrors.InvalidAddress();
 
         timelockImplementation = _timelockImplementation;
         governorImplementation = _governorImplementation;
         governanceTokenImplementation = _governanceTokenImplementation;
+        multipleVotingImplementation = _multipleVotingImplementation;
         sbtImplementation = _sbtImplementation;
         nftImplementation = _nftImplementation;
 
@@ -127,6 +133,7 @@ contract DAOFactory is
             _timelockImplementation,
             _governorImplementation,
             _governanceTokenImplementation,
+            _multipleVotingImplementation,
             _sbtImplementation,
             _nftImplementation
         );
@@ -194,6 +201,7 @@ contract DAOFactory is
         // Deploy contracts
         address timelockAddress = _deployTimelock(timelockDelay);
         address governanceTokenAddress = _deployGovernanceToken(_communityToken);
+
         address sbtAddress = _deploySBT(msg.sender);
         address nftAddress = _deployNFT(msg.sender);
         address governorAddress = _deployGovernor(
@@ -209,11 +217,12 @@ contract DAOFactory is
             address(this),
             _socialConfig
         );
-
+        address multipleVotingAddress = _deployMultipleVoting(governorAddress, msg.sender);
         // Store DAO address
 
         daoConfigs[daoId] = IDAOFactory.DAOConfig({
             timelock: timelockAddress,
+            multipleVoting: multipleVotingAddress,
             sbt: sbtAddress,
             nft: nftAddress,
             governor: governorAddress,
@@ -322,6 +331,17 @@ contract DAOFactory is
     }
 
     /**
+     * @notice Deploy multiple voting contract
+     */
+    function _deployMultipleVoting(address governor, address admin) internal returns (address) {
+        address multipleVotingAddress = multipleVotingImplementation.clone();
+        if (multipleVotingAddress == address(0)) revert IErrors.ContractDeploymentFailed();
+        emit ContractDeployed(multipleVotingAddress);
+        IMultipleVoting(multipleVotingAddress).initialize(governor, admin);
+        return multipleVotingAddress;
+    }
+
+    /**
      * @notice Deploy SBT contract
      */
     function _deploySBT(address owner) internal returns (address) {
@@ -385,6 +405,10 @@ contract DAOFactory is
 interface IToken {
     function owner() external view returns (address);
     function initialize(address _communityToken) external;
+}
+
+interface IMultipleVoting {
+    function initialize(address _governor, address _admin) external;
 }
 
 interface ITimelock {

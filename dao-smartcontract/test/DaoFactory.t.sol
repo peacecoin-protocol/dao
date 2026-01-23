@@ -11,6 +11,7 @@ import {IErrors} from "../src/interfaces/IErrors.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 contract DaoFactoryTest is Test {
     DAOFactory public daoFactory;
@@ -20,6 +21,7 @@ contract DaoFactoryTest is Test {
     PCECommunityGovToken public governanceToken;
     PEACECOINDAO_SBT public sbt;
     PEACECOINDAO_NFT public nft;
+    MultipleVotings public multipleVoting;
 
     uint256 public VOTING_DELAY = 10;
     uint256 public VOTING_PERIOD = 100;
@@ -54,6 +56,7 @@ contract DaoFactoryTest is Test {
         governanceToken = new PCECommunityGovToken();
         sbt = new PEACECOINDAO_SBT();
         nft = new PEACECOINDAO_NFT();
+        multipleVoting = new MultipleVotings();
         vm.stopPrank();
 
         vm.prank(defaultAdmin);
@@ -61,6 +64,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(governor),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -77,6 +81,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(governor),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -88,6 +93,7 @@ contract DaoFactoryTest is Test {
             address(0),
             address(governor),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -98,6 +104,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(0),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -108,6 +115,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(governor),
             address(0),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -118,6 +126,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(governor),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
@@ -125,6 +134,7 @@ contract DaoFactoryTest is Test {
             address(timelock),
             address(governor),
             address(governanceToken),
+            address(multipleVoting),
             address(sbt),
             address(nft)
         );
