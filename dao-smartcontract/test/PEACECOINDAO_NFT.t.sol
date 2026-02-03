@@ -16,6 +16,8 @@ contract PEACECOINDAO_NFTTest is Test {
 
     /// @notice NFT and SBT contracts
     PEACECOINDAO_NFT public nft;
+    DAOFactory public daoFactory;
+    Campaigns public campaigns;
 
     /// @notice Test accounts
     address public alice = makeAddr("alice");
@@ -33,9 +35,9 @@ contract PEACECOINDAO_NFTTest is Test {
      * @dev Deploys and initializes all necessary contracts for testing
      */
     function setUp() public {
-        DAOFactory daoFactory = new DAOFactory();
+        daoFactory = new DAOFactory();
         daoFactory.initialize();
-        Campaigns campaigns = new Campaigns();
+        campaigns = new Campaigns();
         campaigns.initialize(address(daoFactory));
         daoFactory.setCampaignFactory(address(campaigns));
 
@@ -990,5 +992,98 @@ contract PEACECOINDAO_NFTTest is Test {
         // Assert: Voting power should remain the same
         assertEq(nft.getVotes(bob), votesBefore, "Voting power should not change");
         assertTrue(nft.isTokenRevoked(1), "Token should be revoked");
+    }
+
+    // ============ Initialization Tests ============
+
+    /**
+     * @notice Tests initialize for NFT configuration
+     * @dev Verifies name, symbol, and admin role when _isSBT is false
+     */
+    function test_initialize_NFT_Config() public {
+        PEACECOINDAO_NFT nftLocal = new PEACECOINDAO_NFT();
+        nftLocal.initialize(BASE_URI, address(daoFactory), alice, false);
+
+        assertEq(nftLocal.name(), "PEACECOIN DAO NFT", "NFT name should match");
+        assertEq(nftLocal.symbol(), "PCE_NFT", "NFT symbol should match");
+        assertTrue(
+            nftLocal.hasRole(nftLocal.DEFAULT_ADMIN_ROLE(), alice),
+            "Alice should be admin"
+        );
+    }
+
+    /**
+     * @notice Tests initialize for SBT configuration
+     * @dev Verifies name and symbol when _isSBT is true
+     */
+    function test_initialize_SBT_Config() public {
+        PEACECOINDAO_NFT nftLocal = new PEACECOINDAO_NFT();
+        nftLocal.initialize(BASE_URI, address(daoFactory), alice, true);
+
+        assertEq(nftLocal.name(), "PEACECOIN DAO SBT", "SBT name should match");
+        assertEq(nftLocal.symbol(), "PCE_SBT", "SBT symbol should match");
+    }
+
+    // ============ Minter Role Tests ============
+
+    /**
+     * @notice Tests campaignFactory can mint even if not set as a minter
+     * @dev Verifies onlyMinter allows the DAOFactory campaignFactory address
+     */
+    function test_mint_AllowsCampaignFactory() public {
+        _createToken(1);
+
+        vm.prank(address(campaigns));
+        nft.mint(alice, 1, 1);
+
+        assertEq(nft.balanceOf(alice, 1), 1, "Alice should receive token from campaignFactory");
+    }
+
+    // ============ Overflow Tests ============
+
+    /**
+     * @notice Tests mint reverts when votes exceed uint224 max
+     * @dev Verifies VoteOverflow on delegate checkpoint update
+     */
+    function test_mint_VoteOverflow() public {
+        _createToken(1);
+        nft.setTokenURI(1, TOKEN_URI, uint256(type(uint224).max) + 1);
+
+        vm.prank(alice);
+        nft.delegate(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteOverflow.selector));
+        nft.mint(alice, 1, 1);
+    }
+
+    /**
+     * @notice Tests mint reverts when vote calculation overflows uint256
+     * @dev Verifies VoteCalculationOverflow in _update
+     */
+    function test_mint_VoteCalculationOverflow() public {
+        _createToken(1);
+        nft.setTokenURI(1, TOKEN_URI, type(uint256).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector)
+        );
+        nft.mint(alice, 1, 2);
+    }
+
+    /**
+     * @notice Tests total voting power calculation overflow after multiple mints
+     * @dev Verifies VoteCalculationOverflow in _calculateTotalVotes
+     */
+    function test_getTotalVotingPower_Overflow() public {
+        _createToken(1);
+        nft.setTokenURI(1, TOKEN_URI, type(uint256).max);
+
+        nft.mint(alice, 1, 1);
+        nft.mint(alice, 1, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector)
+        );
+        nft.getTotalVotingPower(alice);
     }
 }
