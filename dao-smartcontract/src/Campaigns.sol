@@ -89,7 +89,8 @@ contract Campaigns is
     );
 
     modifier onlyDAOManager() {
-        if (!IAccessControl(daoFactory).hasRole(DAO_MANAGER_ROLE, msg.sender))
+        bytes32 _DAO_MANAGER_ROLE = IDAOFactory(daoFactory).DAO_MANAGER_ROLE();
+        if (!IAccessControl(daoFactory).hasRole(_DAO_MANAGER_ROLE, msg.sender))
             revert PermissionDenied();
         _;
     }

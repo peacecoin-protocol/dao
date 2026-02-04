@@ -1006,10 +1006,7 @@ contract PEACECOINDAO_NFTTest is Test {
 
         assertEq(nftLocal.name(), "PEACECOIN DAO NFT", "NFT name should match");
         assertEq(nftLocal.symbol(), "PCE_NFT", "NFT symbol should match");
-        assertTrue(
-            nftLocal.hasRole(nftLocal.DEFAULT_ADMIN_ROLE(), alice),
-            "Alice should be admin"
-        );
+        assertTrue(nftLocal.hasRole(nftLocal.DEFAULT_ADMIN_ROLE(), alice), "Alice should be admin");
     }
 
     /**
@@ -1064,9 +1061,7 @@ contract PEACECOINDAO_NFTTest is Test {
         _createToken(1);
         nft.setTokenURI(1, TOKEN_URI, type(uint256).max);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector));
         nft.mint(alice, 1, 2);
     }
 
@@ -1081,9 +1076,7 @@ contract PEACECOINDAO_NFTTest is Test {
         nft.mint(alice, 1, 1);
         nft.mint(alice, 1, 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector));
         nft.getTotalVotingPower(alice);
     }
 }

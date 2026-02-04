@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
-import "../mocks/MockERC20.sol";
 import "../Bounty.sol";
 import "../Governance/GovernorAlpha.sol";
 import "../Governance/Timelock.sol";
@@ -13,8 +12,9 @@ import "../Campaigns.sol";
 import "../Governance/PEACECOINDAO_SBT.sol";
 import "../Governance/PCE.sol";
 import "../Governance/PEACECOINDAO_NFT.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+
 import {console} from "forge-std/console.sol";
 import {DeployDAOFactory} from "../deploy/DeployDAOFactory.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
@@ -38,21 +38,18 @@ contract deploy is Script, DeployDAOFactory {
             telegram: "https://t.me/peacecoin"
         });
     address PCE_TOKEN = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
-    MockERC20 mockERC20;
 
     function run() external {
         (
             address daoFactoryAddress,
             address timelockAddress,
-            address governorAddress,
-            address mockERC20Address
+            address governorAddress
         ) = deployDAOFactory();
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
+        address proxyAdminAddress = address(new ProxyAdmin(deployerAddress));
         vm.startBroadcast(deployerPrivateKey);
-
-        mockERC20 = MockERC20(mockERC20Address);
 
         vm.roll(block.number + 1);
 
@@ -66,7 +63,7 @@ contract deploy is Script, DeployDAOFactory {
 
         Campaigns campaigns = new Campaigns();
         address campaignsAddress = address(
-            new TransparentUpgradeableProxy(address(campaigns), _deployerAddress, "")
+            new TransparentUpgradeableProxy(address(campaigns), proxyAdminAddress, "")
         );
         Campaigns(campaignsAddress).initialize(daoFactoryAddress);
         IDAOFactory(daoFactoryAddress).setCampaignFactory(campaignsAddress);
@@ -75,5 +72,6 @@ contract deploy is Script, DeployDAOFactory {
         console.log("PCE Token: ", PCE_TOKEN);
         console.log("Bounty: ", address(bounty));
         console.log("ContractFactory: ", address(contractFactory));
+        console.log("ProxyAdmin: ", proxyAdminAddress);
     }
 }
