@@ -7,3 +7,7 @@
 [submodule "dao-smartcontract/lib/openzeppelin-contracts-upgradeable"]
 	path = dao-smartcontract/lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+[submodule "core"]
+	path = core
+	url = https://github.com/peacecoin-protocol/core.git
+	branch = main
