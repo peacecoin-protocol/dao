@@ -16,7 +16,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
-    function deployDAOFactory() public returns (address, address, address, address) {
+    function deployDAOFactory() public returns (address, address, address) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
@@ -46,6 +46,8 @@ contract DeployDAOFactory is Script {
             new TransparentUpgradeableProxy(multipleVotingImplementation, proxyAdmin, "")
         );
 
+        address proxyAdminAddress = address(proxyAdmin);
+
         PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
         PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
 
@@ -55,7 +57,11 @@ contract DeployDAOFactory is Script {
         DAOFactory daoFactoryImplementation = new DAOFactory();
 
         address daoFactoryAddress = address(
-            new TransparentUpgradeableProxy(address(daoFactoryImplementation), proxyAdmin, "")
+            new TransparentUpgradeableProxy(
+                address(daoFactoryImplementation),
+                proxyAdminAddress,
+                ""
+            )
         );
 
         address _timelockAddress = timelockAddress;
@@ -71,6 +77,7 @@ contract DeployDAOFactory is Script {
             address(sbtImplementation),
             address(nftImplementation)
         );
+        DAOFactory(daoFactoryAddress).setURI(URI);
 
         vm.stopBroadcast();
 
@@ -81,6 +88,6 @@ contract DeployDAOFactory is Script {
         console.log("MultipleVoting deployed at", multipleVotingAddress);
         console.log("MockERC20 deployed at", address(mockERC20));
 
-        return (daoFactoryAddress, timelockAddress, governorAddress, address(mockERC20));
+        return (daoFactoryAddress, timelockAddress, governorAddress);
     }
 }

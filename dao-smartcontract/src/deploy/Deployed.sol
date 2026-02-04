@@ -2,15 +2,31 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
-import "../mocks/PCEGovTokenTest.sol";
+import "../Campaigns.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 
 contract Deployed is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        PCEGovTokenTest bounty = new PCEGovTokenTest();
-        bounty.initialize();
+        address deployerAddress = vm.addr(deployerPrivateKey);
+
+        address daoFactoryAddress = 0x167F0B2D2aA5e76170201d0a14BA7fDA649EA25E;
+
+        address proxyAdmin = address(new ProxyAdmin(deployerAddress));
+
+        Campaigns campaigns = new Campaigns();
+        address campaignsAddress = address(
+            new TransparentUpgradeableProxy(address(campaigns), proxyAdmin, "")
+        );
+        Campaigns(campaignsAddress).initialize(daoFactoryAddress);
+        IDAOFactory(daoFactoryAddress).setCampaignFactory(campaignsAddress);
+
+        console.log("Campaigns deployed at", campaignsAddress);
+
         vm.stopBroadcast();
     }
 }

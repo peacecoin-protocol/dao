@@ -52,6 +52,7 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
             symbol = "PCE_NFT";
         }
 
+        minters[_owner] = true;
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
     }
 
