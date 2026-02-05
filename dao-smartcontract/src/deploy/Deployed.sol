@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../Campaigns.sol";
+import {Script} from "forge-std/Script.sol";
+import {Campaigns} from "../Campaigns.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
+import {console} from "forge-std/console.sol";
 
 contract Deployed is Script {
     function run() external {

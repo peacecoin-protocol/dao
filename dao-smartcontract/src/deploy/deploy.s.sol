@@ -1,23 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../Bounty.sol";
-import "../Governance/GovernorAlpha.sol";
-import "../Governance/Timelock.sol";
-import "../ContractFactory.sol";
-import "../DAOFactory.sol";
-import "../mocks/PCECommunityGovToken.sol";
-import "../Campaigns.sol";
-import "../Governance/PEACECOINDAO_SBT.sol";
-import "../Governance/PCE.sol";
-import "../Governance/PEACECOINDAO_NFT.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-
-import {console} from "forge-std/console.sol";
+import {Script} from "forge-std/Script.sol";
+import {Bounty} from "../Bounty.sol";
+import {ContractFactory} from "../ContractFactory.sol";
+import {Campaigns} from "../Campaigns.sol";
 import {DeployDAOFactory} from "../deploy/DeployDAOFactory.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {
+    ERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {console} from "forge-std/console.sol";
 
 contract deploy is Script, DeployDAOFactory {
     // Metadata for SBT
@@ -29,7 +26,7 @@ contract deploy is Script, DeployDAOFactory {
     uint256 _quorumVotes = 200 ether;
     uint256 _bountyAmount = 0;
 
-    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
             description: "PEACECOIN DAO",
             website: "https://peacecoin.com",
@@ -37,14 +34,10 @@ contract deploy is Script, DeployDAOFactory {
             twitter: "https://twitter.com/peacecoin",
             telegram: "https://t.me/peacecoin"
         });
-    address PCE_TOKEN = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
+    address pceToken = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
 
     function run() external {
-        (
-            address daoFactoryAddress,
-            address timelockAddress,
-            address governorAddress
-        ) = deployDAOFactory();
+        (address daoFactoryAddress, , address governorAddress) = deployDaoFactory();
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -54,11 +47,10 @@ contract deploy is Script, DeployDAOFactory {
         vm.roll(block.number + 1);
 
         Bounty bounty = new Bounty(); // Deploy Bounty Contract
-        bounty.initialize(ERC20Upgradeable(PCE_TOKEN), _bountyAmount, address(governorAddress));
+        bounty.initialize(ERC20Upgradeable(pceToken), _bountyAmount, address(governorAddress));
 
         ContractFactory contractFactory = new ContractFactory(deployerAddress);
 
-        address _deployerAddress = deployerAddress;
         vm.roll(block.number + 1); // Wait for 1 block
 
         Campaigns campaigns = new Campaigns();
@@ -69,7 +61,7 @@ contract deploy is Script, DeployDAOFactory {
         IDAOFactory(daoFactoryAddress).setCampaignFactory(campaignsAddress);
 
         console.log("Campaigns deployed at", campaignsAddress);
-        console.log("PCE Token: ", PCE_TOKEN);
+        console.log("PCE Token: ", pceToken);
         console.log("Bounty: ", address(bounty));
         console.log("ContractFactory: ", address(contractFactory));
         console.log("ProxyAdmin: ", proxyAdminAddress);

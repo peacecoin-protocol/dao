@@ -42,7 +42,7 @@ interface IErrors {
     error InvalidTimelockDelay();
     error InvalidQuorumVotes();
     error DAODoesNotExist();
-    error InvalidDAOManager();
+    error InvalidateDaoManager();
     error ContractDeploymentFailed();
     error InvalidProposalState();
     error ZeroAmount();

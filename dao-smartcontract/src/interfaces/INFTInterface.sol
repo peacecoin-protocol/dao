@@ -7,6 +7,6 @@ interface INFTInterface {
         string memory _uri,
         address _daoFactory,
         address _owner,
-        bool _isSBT
+        bool _isSbt
     ) external;
 }

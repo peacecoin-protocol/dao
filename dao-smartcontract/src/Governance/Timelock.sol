@@ -32,9 +32,9 @@ contract Timelock is Initializable {
         uint256 eta
     );
 
-    uint256 public GRACE_PERIOD;
-    uint256 public MINIMUM_DELAY;
-    uint256 public MAXIMUM_DELAY;
+    uint256 public gracePeriod;
+    uint256 public minimumDelay;
+    uint256 public maximumDelay;
 
     address public admin;
     address public pendingAdmin;
@@ -45,15 +45,12 @@ contract Timelock is Initializable {
     mapping(bytes32 => bool) public queuedTransactions;
 
     function initialize(address admin_, uint256 delay_) external initializer {
-        GRACE_PERIOD = 14 days;
-        MINIMUM_DELAY = 1 minutes;
-        MAXIMUM_DELAY = 30 hours;
+        gracePeriod = 14 days;
+        minimumDelay = 1 minutes;
+        maximumDelay = 30 hours;
 
-        require(delay_ >= MINIMUM_DELAY, "Timelock::constructor: Delay must exceed minimum delay.");
-        require(
-            delay_ <= MAXIMUM_DELAY,
-            "Timelock::setDelay: Delay must not exceed maximum delay."
-        );
+        require(delay_ >= minimumDelay, "Timelock::constructor: Delay must exceed minimum delay.");
+        require(delay_ <= maximumDelay, "Timelock::setDelay: Delay must not exceed maximum delay.");
 
         admin = admin_;
         delay = delay_;
@@ -65,25 +62,22 @@ contract Timelock is Initializable {
             "Timelock::updateVariables: Call must come from Timelock."
         );
         require(
-            minDelay_ >= MINIMUM_DELAY,
+            minDelay_ >= minimumDelay,
             "Timelock::updateVariables: Minimum delay must exceed minimum delay."
         );
         require(
-            maxDelay_ <= MAXIMUM_DELAY,
+            maxDelay_ <= maximumDelay,
             "Timelock::updateVariables: Maximum delay must not exceed maximum delay."
         );
-        GRACE_PERIOD = gracePeriod_;
-        MINIMUM_DELAY = minDelay_;
-        MAXIMUM_DELAY = maxDelay_;
+        gracePeriod = gracePeriod_;
+        minimumDelay = minDelay_;
+        maximumDelay = maxDelay_;
     }
 
     function setDelay(uint256 delay_) public {
         require(msg.sender == address(this), "Timelock::setDelay: Call must come from Timelock.");
-        require(delay_ >= MINIMUM_DELAY, "Timelock::setDelay: Delay must exceed minimum delay.");
-        require(
-            delay_ <= MAXIMUM_DELAY,
-            "Timelock::setDelay: Delay must not exceed maximum delay."
-        );
+        require(delay_ >= minimumDelay, "Timelock::setDelay: Delay must exceed minimum delay.");
+        require(delay_ <= maximumDelay, "Timelock::setDelay: Delay must not exceed maximum delay.");
         delay = delay_;
 
         emit NewDelay(delay);
@@ -173,7 +167,7 @@ contract Timelock is Initializable {
             "Timelock::executeTransaction: Transaction hasn't surpassed time lock."
         );
         require(
-            getBlockTimestamp() <= eta + GRACE_PERIOD,
+            getBlockTimestamp() <= eta + gracePeriod,
             "Timelock::executeTransaction: Transaction is stale."
         );
 

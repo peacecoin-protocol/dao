@@ -2,16 +2,23 @@
 
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20VotesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable {
     mapping(address => bool) public isMinter;
 
     modifier onlyMinter() {
-        require(isMinter[msg.sender], "Not a minter");
+        _onlyMinter();
         _;
+    }
+
+    function _onlyMinter() internal view {
+        require(isMinter[msg.sender], "Not a minter");
     }
 
     function initialize() external initializer {

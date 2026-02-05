@@ -319,7 +319,8 @@ contract BountyTest is Test {
     // ============ Recovery Tests ============
     function test_RecoverERC20() public {
         uint256 amount = TEST_AMOUNT;
-        token.transfer(address(bounty), amount);
+        bool success = token.transfer(address(bounty), amount);
+        assertTrue(success);
 
         uint256 initialOwnerBalance = token.balanceOf(owner);
 

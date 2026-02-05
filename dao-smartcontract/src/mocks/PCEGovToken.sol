@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import "../interfaces/IPCEToken.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20VotesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {IPCEToken} from "../interfaces/IPCEToken.sol";
 
 contract PCEGovToken is ERC20VotesUpgradeable, OwnableUpgradeable {
     address public pceToken;
@@ -27,6 +31,6 @@ contract PCEGovToken is ERC20VotesUpgradeable, OwnableUpgradeable {
 
         isCommunityTokenClaimed[_communityToken] = true;
 
-        _mint(msg.sender, localToken.depositedPCEToken);
+        _mint(msg.sender, localToken.depositedPceToken);
     }
 }

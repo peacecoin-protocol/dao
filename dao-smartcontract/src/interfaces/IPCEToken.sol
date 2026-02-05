@@ -5,7 +5,7 @@ interface IPCEToken {
     struct LocalToken {
         bool isExists;
         uint256 exchangeRate;
-        uint256 depositedPCEToken;
+        uint256 depositedPceToken;
     }
 
     function getLocalToken(address communityToken) external view returns (LocalToken memory);

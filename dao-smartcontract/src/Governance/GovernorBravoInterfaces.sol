@@ -174,7 +174,7 @@ contract GovernorBravoDelegateStorageV2 is GovernorBravoDelegateStorageV1 {
 
 interface TimelockInterface {
     function delay() external view returns (uint256);
-    function GRACE_PERIOD() external view returns (uint256);
+    function gracePeriod() external view returns (uint256);
     function acceptAdmin() external;
     function queuedTransactions(bytes32 hash) external view returns (bool);
     function queueTransaction(

@@ -90,8 +90,12 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Multiple_Votings: only admin can call this function");
+        _onlyAdmin();
         _;
+    }
+
+    function _onlyAdmin() internal view {
+        require(msg.sender == admin, "Multiple_Votings: only admin can call this function");
     }
 
     /// @notice Set the admin address

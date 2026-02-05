@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {DAOFactory} from "../DAOFactory.sol";
-import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 import {PCECommunityGovToken} from "../mocks/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../Governance/GovernorAlpha.sol";
 import {Timelock} from "../Governance/Timelock.sol";
@@ -16,7 +15,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
-    function deployDAOFactory() public returns (address, address, address) {
+    function deployDaoFactory() public returns (address, address, address) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);

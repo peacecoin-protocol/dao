@@ -5,49 +5,47 @@ import {Test} from "forge-std/Test.sol";
 import {Staking} from "../src/Staking.sol";
 import {PCE} from "../src/Governance/PCE.sol";
 import {WPCE} from "../src/Governance/WPCE.sol";
-import {console} from "forge-std/console.sol";
 
 contract StakingTest is Test {
     Staking public staking;
 
     address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
     PCE public pce;
-    WPCE public wPCE;
+    WPCE public wPce;
 
-    uint256 public INITIAL_BALANCE = 1_000_000_000 * 1e18;
-    uint256 public REWARD_PER_BLOCK = 100 * 1e18;
+    uint256 public initialBalance = 1_000_000_000 * 1e18;
+    uint256 public rewardPerBlock = 100 * 1e18;
 
     function setUp() public {
         pce = new PCE();
         pce.initialize();
-        wPCE = new WPCE();
+        wPce = new WPCE();
 
-        wPCE.initialize();
+        wPce.initialize();
         staking = new Staking();
-        staking.initialize(REWARD_PER_BLOCK, address(pce), address(wPCE));
+        staking.initialize(rewardPerBlock, address(pce), address(wPce));
 
-        wPCE.addMinter(address(staking));
+        wPce.addMinter(address(staking));
 
-        pce.mint(alice, INITIAL_BALANCE);
-        pce.mint(address(staking), INITIAL_BALANCE);
+        pce.mint(alice, initialBalance);
+        pce.mint(address(staking), initialBalance);
     }
 
     function test_stake() public {
         vm.startPrank(alice);
-        pce.approve(address(staking), INITIAL_BALANCE);
-        staking.stake(INITIAL_BALANCE);
-        assertEq(staking.getStakedPEACECOIN(alice), INITIAL_BALANCE);
+        pce.approve(address(staking), initialBalance);
+        staking.stake(initialBalance);
+        assertEq(staking.getStakedPeacecoin(alice), initialBalance);
 
-        staking.withdraw(wPCE.balanceOf(alice));
-        assertEq(pce.balanceOf(alice), INITIAL_BALANCE);
+        staking.withdraw(wPce.balanceOf(alice));
+        assertEq(pce.balanceOf(alice), initialBalance);
 
-        pce.approve(address(staking), INITIAL_BALANCE);
-        staking.stake(INITIAL_BALANCE);
-        assertEq(staking.getStakedPEACECOIN(alice), INITIAL_BALANCE);
+        pce.approve(address(staking), initialBalance);
+        staking.stake(initialBalance);
+        assertEq(staking.getStakedPeacecoin(alice), initialBalance);
 
         vm.roll(block.number + 1000);
-        staking.withdraw(wPCE.balanceOf(alice));
-        assertEq(pce.balanceOf(alice), INITIAL_BALANCE + REWARD_PER_BLOCK * 1000);
+        staking.withdraw(wPce.balanceOf(alice));
+        assertEq(pce.balanceOf(alice), initialBalance + rewardPerBlock * 1000);
     }
 }

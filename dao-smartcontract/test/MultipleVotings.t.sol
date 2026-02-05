@@ -39,8 +39,6 @@ contract MultipleVotingsTest is Test {
     GovernorAlpha public governor;
     Timelock public timelock;
 
-    uint256 public constant VotingPeriod = 100;
-
     address public admin = makeAddr("admin");
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
@@ -55,7 +53,7 @@ contract MultipleVotingsTest is Test {
 
     uint256 constant TIME_LOCK_DELAY = 10 minutes;
 
-    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
             description: "PEACECOIN DAO",
             website: "https://peacecoin.com",
@@ -86,7 +84,7 @@ contract MultipleVotingsTest is Test {
             PROPOSAL_THRESHOLD,
             QUORUM_VOTES,
             guardian,
-            SOCIAL_CONFIG
+            socialConfig
         );
 
         // Deploy MultipleVotings contract
@@ -124,7 +122,7 @@ contract MultipleVotingsTest is Test {
         options[2] = "Option 3";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId = multipleVotings.proposeMultipleChoice(
@@ -190,7 +188,7 @@ contract MultipleVotingsTest is Test {
         options[2] = "Option 3";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId = multipleVotings.proposeMultipleChoice(
@@ -213,7 +211,7 @@ contract MultipleVotingsTest is Test {
             MultipleVotings.ProposalState state,
             string memory description,
             bool hasVoted,
-            uint256 createdAt
+
         ) = multipleVotings.getProposal(proposalId);
 
         assertEq(id, 1);
@@ -237,7 +235,7 @@ contract MultipleVotingsTest is Test {
         }
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId = multipleVotings.proposeMultipleChoice(
@@ -257,7 +255,7 @@ contract MultipleVotingsTest is Test {
         options[0] = "Only Option";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         vm.expectRevert("Multiple_Votings: must have at least 2 options");
@@ -276,7 +274,7 @@ contract MultipleVotingsTest is Test {
         }
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         vm.expectRevert("Multiple_Votings: too many options");
@@ -294,7 +292,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         vm.expectRevert("Multiple_Votings: description required");
@@ -308,7 +306,7 @@ contract MultipleVotingsTest is Test {
         options[2] = "Option 3";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         vm.expectRevert("Multiple_Votings: empty option");
@@ -328,7 +326,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(lowPowerUser);
         vm.expectRevert("Multiple_Votings: proposer votes below proposal threshold");
@@ -346,7 +344,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId1 = multipleVotings.proposeMultipleChoice(
@@ -375,7 +373,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId1 = multipleVotings.proposeMultipleChoice(
@@ -395,7 +393,7 @@ contract MultipleVotingsTest is Test {
             options,
             "Proposal 2",
             block.timestamp,
-            block.timestamp + VotingPeriod
+            block.timestamp + VOTING_PERIOD
         );
         assertEq(proposalId2, 2);
     }
@@ -784,7 +782,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId1 = multipleVotings.proposeMultipleChoice(
@@ -811,7 +809,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         vm.expectEmit(true, true, false, false);
@@ -892,7 +890,7 @@ contract MultipleVotingsTest is Test {
         options[1] = "Option 2";
 
         uint256 startTimestamp = block.timestamp;
-        uint256 endTimestamp = startTimestamp + VotingPeriod;
+        uint256 endTimestamp = startTimestamp + VOTING_PERIOD;
 
         vm.prank(alice);
         uint256 proposalId = multipleVotings.proposeMultipleChoice(

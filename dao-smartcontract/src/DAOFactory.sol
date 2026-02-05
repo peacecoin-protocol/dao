@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {
+    AccessControlUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {INFTInterface} from "./interfaces/INFTInterface.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
@@ -40,7 +45,7 @@ contract DAOFactory is
     mapping(string => bool) public daoNames;
 
     /// @notice Mapping from DAO ID to its creator
-    mapping(bytes32 => DAOConfig) public daoConfigs;
+    mapping(bytes32 => DaoConfig) public daoConfigs;
 
     string public uri_;
 
@@ -68,20 +73,28 @@ contract DAOFactory is
     );
 
     // ============ Modifiers ============
-    modifier validDAO(bytes32 daoId) {
-        IDAOFactory.DAOConfig memory daoConfig = daoConfigs[daoId];
-        if (daoConfig.timelock == address(0)) revert IErrors.DAODoesNotExist();
+    modifier validateDao(bytes32 daoId) {
+        _validateDao(daoId);
         _;
     }
 
+    function _validateDao(bytes32 daoId) internal view {
+        IDAOFactory.DaoConfig memory daoConfig = daoConfigs[daoId];
+        if (daoConfig.timelock == address(0)) revert IErrors.DAODoesNotExist();
+    }
+
     modifier validImplementation() {
+        _validateImplementation();
+        _;
+    }
+
+    function _validateImplementation() internal view {
         if (timelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
         if (governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
         if (governanceTokenImplementation == address(0))
             revert IErrors.GovernanceTokenImplementationNotSet();
         if (sbtImplementation == address(0)) revert IErrors.InvalidAddress();
         if (nftImplementation == address(0)) revert IErrors.InvalidAddress();
-        _;
     }
 
     // ============ Initializer ============
@@ -145,12 +158,12 @@ contract DAOFactory is
 
     function setCampaignFactory(address _campaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
         campaignFactory = _campaignFactory;
-        grantRole(DEFAULT_ADMIN_ROLE, campaignFactory);
+        _grantRole(DEFAULT_ADMIN_ROLE, campaignFactory);
     }
 
     function removeCampaignFactory() external onlyRole(DEFAULT_ADMIN_ROLE) {
         campaignFactory = address(0);
-        revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
+        _revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
     }
 
     /**
@@ -165,7 +178,7 @@ contract DAOFactory is
      * @param timelockDelay Delay for timelock execution
      * @return daoId Unique identifier for the created DAO
      */
-    function createDAO(
+    function createDao(
         string memory daoName,
         SocialConfig memory socialConfig,
         address communityToken,
@@ -176,7 +189,7 @@ contract DAOFactory is
         uint256 quorumVotes
     ) external override nonReentrant whenNotPaused validImplementation returns (bytes32) {
         // Input validation
-        _validateCreateDAOInputs(
+        _validateCreateDaoInputs(
             daoName,
             communityToken,
             votingDelay,
@@ -202,8 +215,8 @@ contract DAOFactory is
         address timelockAddress = _deployTimelock(timelockDelay);
         address governanceTokenAddress = _deployGovernanceToken(_communityToken);
 
-        address sbtAddress = _deploySBT(msg.sender);
-        address nftAddress = _deployNFT(msg.sender);
+        address sbtAddress = _deploySbt(msg.sender);
+        address nftAddress = _deployNft(msg.sender);
         address governorAddress = _deployGovernor(
             _daoName,
             governanceTokenAddress,
@@ -218,9 +231,8 @@ contract DAOFactory is
             _socialConfig
         );
         address multipleVotingAddress = _deployMultipleVoting(governorAddress, msg.sender);
-        // Store DAO address
 
-        daoConfigs[daoId] = IDAOFactory.DAOConfig({
+        daoConfigs[daoId] = IDAOFactory.DaoConfig({
             timelock: timelockAddress,
             multipleVoting: multipleVotingAddress,
             sbt: sbtAddress,
@@ -233,7 +245,7 @@ contract DAOFactory is
 
         // Set up governance hierarchy
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
-        ICommunityGovernance(governorAddress).__acceptAdmin();
+        ICommunityGovernance(governorAddress)._acceptAdmin();
 
         // Grant DAO manager role
         _grantRole(DAO_MANAGER_ROLE, msg.sender);
@@ -261,7 +273,7 @@ contract DAOFactory is
 
     // ============ Internal Functions ============
 
-    function _validateCreateDAOInputs(
+    function _validateCreateDaoInputs(
         string memory daoName,
         address communityToken,
         uint256 votingDelay,
@@ -344,7 +356,7 @@ contract DAOFactory is
     /**
      * @notice Deploy SBT contract
      */
-    function _deploySBT(address owner) internal returns (address) {
+    function _deploySbt(address owner) internal returns (address) {
         address sbtAddress = sbtImplementation.clone();
         if (sbtAddress == address(0)) revert IErrors.ContractDeploymentFailed();
         INFTInterface(sbtAddress).initialize(uri_, address(this), owner, true);
@@ -355,7 +367,7 @@ contract DAOFactory is
     /**
      * @notice Deploy NFT contract
      */
-    function _deployNFT(address owner) internal returns (address) {
+    function _deployNft(address owner) internal returns (address) {
         address nftAddress = nftImplementation.clone();
         if (nftAddress == address(0)) revert IErrors.ContractDeploymentFailed();
         INFTInterface(nftAddress).initialize(uri_, address(this), owner, false);
@@ -417,7 +429,7 @@ interface ITimelock {
 }
 
 interface ICommunityGovernance {
-    function __acceptAdmin() external;
+    function _acceptAdmin() external;
     function initialize(
         string memory daoName,
         address _token,

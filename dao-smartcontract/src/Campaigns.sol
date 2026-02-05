@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
+import {
+    ERC1155HolderUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import {PEACECOINDAO_SBT} from "./Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "./Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
-import {ITokens} from "./interfaces/ITokens.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -61,7 +68,7 @@ contract Campaigns is
     uint256 public campaignId;
     address public daoFactory;
 
-    bytes32 public DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    bytes32 public constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
 
     mapping(uint256 => address[]) public campWinners;
     mapping(uint256 => Campaign) public campaigns;
@@ -88,11 +95,15 @@ contract Campaigns is
         address creator
     );
 
-    modifier onlyDAOManager() {
-        bytes32 _DAO_MANAGER_ROLE = IDAOFactory(daoFactory).DAO_MANAGER_ROLE();
-        if (!IAccessControl(daoFactory).hasRole(_DAO_MANAGER_ROLE, msg.sender))
-            revert PermissionDenied();
+    modifier onlyDaoManager() {
+        _onlyDaoManager();
         _;
+    }
+
+    function _onlyDaoManager() internal view {
+        bytes32 _daoManagerRole = IDAOFactory(daoFactory).DAO_MANAGER_ROLE();
+        if (!IAccessControl(daoFactory).hasRole(_daoManagerRole, msg.sender))
+            revert PermissionDenied();
     }
 
     /**
@@ -112,7 +123,7 @@ contract Campaigns is
      * @dev Only callable by the contract owner
      * @param _campaign Campaign configuration struct
      */
-    function createCampaign(Campaign memory _campaign) external onlyDAOManager {
+    function createCampaign(Campaign memory _campaign) external onlyDaoManager {
         (, , , address _nft, , , , address _creator) = IDAOFactory(daoFactory).daoConfigs(
             _campaign.daoId
         );
@@ -134,11 +145,12 @@ contract Campaigns is
         if (_campaign.tokenType == TokenType.NFT) {
             nft.mint(address(this), _campaign.sbtId, _campaign.totalAmount);
         } else if (_campaign.tokenType == TokenType.ERC20) {
-            ERC20Upgradeable(_campaign.token).transferFrom(
+            bool success = ERC20Upgradeable(_campaign.token).transferFrom(
                 msg.sender,
                 address(this),
                 _campaign.totalAmount
             );
+            require(success, "ERC20: transferFrom failed");
         }
 
         emit CampaignCreated(
@@ -277,7 +289,11 @@ contract Campaigns is
         } else if (campaign.tokenType == TokenType.SBT) {
             sbt.mint(msg.sender, campaign.sbtId, campaign.claimAmount);
         } else if (campaign.tokenType == TokenType.ERC20) {
-            ERC20Upgradeable(campaign.token).transfer(msg.sender, campaign.claimAmount);
+            bool success = ERC20Upgradeable(campaign.token).transfer(
+                msg.sender,
+                campaign.claimAmount
+            );
+            require(success, "ERC20: transfer failed");
         }
 
         // Update total claimed (unchecked for gas optimization)
@@ -373,7 +389,8 @@ contract Campaigns is
      * @param _token Token contract to recover
      */
     function recoverERC20(ERC20Upgradeable _token) external onlyOwner {
-        _token.transfer(msg.sender, _token.balanceOf(address(this)));
+        bool success = _token.transfer(msg.sender, _token.balanceOf(address(this)));
+        require(success, "ERC20: transfer failed");
     }
 
     /**

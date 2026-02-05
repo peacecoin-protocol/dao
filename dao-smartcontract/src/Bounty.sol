@@ -93,7 +93,8 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         unchecked {
             proposalBounties[_proposalId] += _amount;
         }
-        bountyToken.transferFrom(msg.sender, address(this), _amount);
+        bool success = bountyToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "ERC20: transferFrom failed");
 
         emit AddedProposalBounty(msg.sender, _proposalId, _amount);
     }
@@ -114,7 +115,8 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
             bounty.bountyAmount += _amount;
         }
 
-        bountyToken.transferFrom(msg.sender, address(this), _amount);
+        bool success = bountyToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "ERC20: transferFrom failed");
 
         emit AddedContributorBounty(msg.sender, _contributor, _amount);
     }
@@ -132,7 +134,8 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         unchecked {
             proposalBountyWithdrawn[msg.sender] += claimable;
         }
-        bountyToken.transfer(msg.sender, claimable);
+        bool success = bountyToken.transfer(msg.sender, claimable);
+        require(success, "ERC20: transfer failed");
 
         emit ClaimedBounty(msg.sender, claimable);
     }
@@ -150,7 +153,8 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         unchecked {
             bounty.withdrawn += claimable;
         }
-        bountyToken.transfer(msg.sender, claimable);
+        bool success = bountyToken.transfer(msg.sender, claimable);
+        require(success, "ERC20: transfer failed");
 
         emit ClaimedBounty(msg.sender, claimable);
     }
@@ -197,6 +201,7 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
      * @param token Token contract to recover
      */
     function recoverERC20(ERC20Upgradeable token) external onlyOwner {
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+        bool success = token.transfer(msg.sender, token.balanceOf(address(this)));
+        require(success, "ERC20: transfer failed");
     }
 }

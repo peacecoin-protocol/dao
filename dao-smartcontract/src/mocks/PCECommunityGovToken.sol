@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 
 contract PCECommunityGovToken is OwnableUpgradeable, ERC20VotesUpgradeable {
     ERC20Upgradeable public communityToken;
@@ -23,7 +23,8 @@ contract PCECommunityGovToken is OwnableUpgradeable, ERC20VotesUpgradeable {
     function deposit(uint256 _amount) external {
         require(_amount > 0, "Stake: can't stake 0");
 
-        communityToken.transferFrom(msg.sender, address(this), _amount);
+        bool success = communityToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "ERC20: transferFrom failed");
         _mint(msg.sender, _amount);
         emit Deposited(msg.sender, _amount);
     }
@@ -32,7 +33,8 @@ contract PCECommunityGovToken is OwnableUpgradeable, ERC20VotesUpgradeable {
         require(_amount > 0, "Amount should be greater then 0");
 
         _burn(msg.sender, _amount);
-        communityToken.transfer(msg.sender, _amount);
+        bool success = communityToken.transfer(msg.sender, _amount);
+        require(success, "ERC20: transfer failed");
         emit Withdrawn(msg.sender, _amount);
     }
 }

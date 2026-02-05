@@ -401,7 +401,7 @@ contract GovernorAlpha {
             return ProposalState.Succeeded;
         } else if (proposal.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+        } else if (block.timestamp >= add256(proposal.eta, timelock.gracePeriod())) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -491,20 +491,20 @@ contract GovernorAlpha {
         return socialConfig;
     }
 
-    function __acceptAdmin() public {
-        require(msg.sender == guardian, "Governor::__acceptAdmin: sender must be gov guardian");
+    function _acceptAdmin() public {
+        require(msg.sender == guardian, "Governor::_acceptAdmin: sender must be gov guardian");
         timelock.acceptAdmin();
     }
 
-    function __abdicate() public {
-        require(msg.sender == guardian, "Governor::__abdicate: sender must be gov guardian");
+    function _abdicate() public {
+        require(msg.sender == guardian, "Governor::_abdicate: sender must be gov guardian");
         guardian = address(0);
     }
 
-    function __queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
+    function _queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
-            "Governor::__queueSetTimelockPendingAdmin: sender must be gov guardian"
+            "Governor::_queueSetTimelockPendingAdmin: sender must be gov guardian"
         );
         timelock.queueTransaction(
             address(timelock),
@@ -515,10 +515,10 @@ contract GovernorAlpha {
         );
     }
 
-    function __executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
+    function _executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
-            "Governor::__executeSetTimelockPendingAdmin: sender must be gov guardian"
+            "Governor::_executeSetTimelockPendingAdmin: sender must be gov guardian"
         );
         timelock.executeTransaction(
             address(timelock),
@@ -558,7 +558,7 @@ contract GovernorAlpha {
 
 interface TimelockInterface {
     function delay() external view returns (uint256);
-    function GRACE_PERIOD() external view returns (uint256);
+    function gracePeriod() external view returns (uint256);
     function acceptAdmin() external;
     function queuedTransactions(bytes32 hash) external view returns (bool);
     function queueTransaction(

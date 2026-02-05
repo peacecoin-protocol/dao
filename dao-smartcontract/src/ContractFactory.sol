@@ -19,8 +19,12 @@ contract ContractFactory is IErrors {
 
     // ============ Modifiers ============
     modifier onlyOwner() {
-        if (msg.sender != owner) revert PermissionDenied();
+        _onlyOwner();
         _;
+    }
+
+    function _onlyOwner() internal view {
+        if (msg.sender != owner) revert PermissionDenied();
     }
 
     // ============ Constructor ============

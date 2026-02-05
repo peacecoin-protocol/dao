@@ -8,7 +8,6 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {ITokens} from "../src/interfaces/ITokens.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
@@ -114,7 +113,7 @@ contract CampaignsTest is Test {
     // ============ Configuration Objects ============
 
     /// @notice Social media configuration for DAO
-    IDAOFactory.SocialConfig SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig socialConfig =
         IDAOFactory.SocialConfig({
             description: "Test Description",
             website: "https://website.com",
@@ -161,9 +160,9 @@ contract CampaignsTest is Test {
         mockERC20.initialize();
 
         // Create a test DAO
-        daoId = factory.createDAO(
+        daoId = factory.createDao(
             DAO_NAME,
-            SOCIAL_CONFIG,
+            socialConfig,
             address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
