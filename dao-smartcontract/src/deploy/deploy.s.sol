@@ -5,26 +5,22 @@ import {Script} from "forge-std/Script.sol";
 import {Bounty} from "../Bounty.sol";
 import {ContractFactory} from "../ContractFactory.sol";
 import {Campaigns} from "../Campaigns.sol";
-import {DeployDAOFactory} from "../deploy/DeployDAOFactory.sol";
+import {DeployDAOFactory} from "../deploy/DeployDAOFactory.s.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
-import {
-    TransparentUpgradeableProxy
-} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {
-    ERC20Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {console} from "forge-std/console.sol";
 
 contract deploy is Script, DeployDAOFactory {
     // Metadata for SBT
 
-    string daoName = "PCE DAO";
-    uint256 _votingDelay = 1;
-    uint256 _votingPeriod = 50; // 3 blocks
-    uint256 _proposalThreshold = 30 ether;
-    uint256 _quorumVotes = 200 ether;
-    uint256 _bountyAmount = 0;
+    string public constant daoName = "PCE DAO";
+    uint256 public constant votingDelay = 1;
+    uint256 public constant votingPeriod = 50; // 3 blocks
+    uint256 public constant proposalThreshold = 30 ether;
+    uint256 public constant quorumVotes = 200 ether;
+    uint256 public constant bountyAmount = 0;
 
     IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
@@ -47,7 +43,11 @@ contract deploy is Script, DeployDAOFactory {
         vm.roll(block.number + 1);
 
         Bounty bounty = new Bounty(); // Deploy Bounty Contract
-        bounty.initialize(ERC20Upgradeable(pceToken), _bountyAmount, address(governorAddress));
+        bounty.initialize({
+            token: ERC20Upgradeable(pceToken),
+            initialBountyAmount: bountyAmount,
+            governanceAddress: address(governorAddress)
+        });
 
         ContractFactory contractFactory = new ContractFactory(deployerAddress);
 
@@ -60,6 +60,11 @@ contract deploy is Script, DeployDAOFactory {
         Campaigns(campaignsAddress).initialize(daoFactoryAddress);
         IDAOFactory(daoFactoryAddress).setCampaignFactory(campaignsAddress);
 
+        console.log("DAO Name: ", daoName);
+        console.log("Voting Delay: ", votingDelay);
+        console.log("Voting Period: ", votingPeriod);
+        console.log("Proposal Threshold: ", proposalThreshold);
+        console.log("Quorum Votes: ", quorumVotes);
         console.log("Campaigns deployed at", campaignsAddress);
         console.log("PCE Token: ", pceToken);
         console.log("Bounty: ", address(bounty));

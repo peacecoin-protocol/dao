@@ -2,12 +2,8 @@
 
 pragma solidity ^0.8.30;
 
-import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IWPCE} from "./interfaces/IWPCE.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
@@ -26,7 +22,8 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
     uint256 public rewardPerBlock;
     uint256 public totalPool;
 
-    event UnusedRewardPoolRevoked(address recipient, uint256 amount);
+    event RewardPerBlockUpdated(uint256 previousRewardPerBlock, uint256 newRewardPerBlock);
+    event UnusedRewardPoolRevoked(address indexed recipient, uint256 amount);
     event StakedPEACECOIN(uint256 amountPeacecoin, uint256 amountxPeacecoin, address indexed user);
     event WithdrawnPEACECOIN(
         uint256 amountPeacecoin,
@@ -52,103 +49,113 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
     /**
      * @notice Initialize the Staking contract
      * @dev Sets up the PCE and wPce contracts and initializes parent contracts
-     * @param _rewardPerBlock Reward amount per block
-     * @param _pce Address of the PCE token contract
-     * @param _wPce Address of the wPce token contract
+     * @param rewardPerBlockValue Reward amount per block
+     * @param pceAddress Address of the PCE token contract
+     * @param wPceAddress Address of the wPce token contract
      */
-    function initialize(uint256 _rewardPerBlock, address _pce, address _wPce) external initializer {
+    function initialize(
+        uint256 rewardPerBlockValue,
+        address pceAddress,
+        address wPceAddress
+    ) external initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
 
-        if (_pce == address(0)) revert InvalidAddress();
-        if (_wPce == address(0)) revert InvalidAddress();
-        if (_rewardPerBlock == 0) revert InvalidRewardPerBlock();
+        if (pceAddress == address(0)) revert InvalidAddress();
+        if (wPceAddress == address(0)) revert InvalidAddress();
+        if (rewardPerBlockValue == 0) revert InvalidRewardPerBlock();
 
         lastUpdateBlock = block.number;
-        rewardPerBlock = _rewardPerBlock;
+        rewardPerBlock = rewardPerBlockValue;
+        emit RewardPerBlockUpdated(0, rewardPerBlockValue);
 
-        pce = IERC20(_pce);
-        wPce = IWPCE(_wPce);
+        pce = IERC20(pceAddress);
+        wPce = IWPCE(wPceAddress);
     }
 
     /**
      * @notice Stake PCE tokens
      * @dev Stakes PCE tokens and mints wPce tokens in return
-     * @param _amountPeacecoin Amount of PCE tokens to stake
+     * @param amountPeacecoin Amount of PCE tokens to stake
      */
-    function stake(uint256 _amountPeacecoin) external updateRewardPool nonReentrant {
-        if (_amountPeacecoin == 0) revert ZeroAmount();
+    function stake(uint256 amountPeacecoin) external updateRewardPool nonReentrant {
+        if (amountPeacecoin == 0) revert ZeroAmount();
+
+        uint256 amountXPeacecoin = convertToWpeacecoin(amountPeacecoin);
+
+        unchecked {
+            totalPool += amountPeacecoin;
+        }
 
         uint256 balanceBefore = pce.balanceOf(address(this));
-        bool success = pce.transferFrom(_msgSender(), address(this), _amountPeacecoin);
+        bool success = pce.transferFrom(_msgSender(), address(this), amountPeacecoin);
         require(success, "ERC20: transferFrom failed");
 
         uint256 received = pce.balanceOf(address(this)) - balanceBefore;
-        require(received == _amountPeacecoin, "Staking: fee-on-transfer not supported");
+        require(
+            received >= amountPeacecoin && received <= amountPeacecoin,
+            "Staking: fee-on-transfer not supported"
+        );
 
-        uint256 amountxPeacecoin = _convertToWpeacecoin(received);
-
-        unchecked {
-            totalPool += received;
-        }
-
-        wPce.mint(_msgSender(), amountxPeacecoin);
-        emit StakedPEACECOIN(received, amountxPeacecoin, _msgSender());
+        wPce.mint(_msgSender(), amountXPeacecoin);
+        emit StakedPEACECOIN(received, amountXPeacecoin, _msgSender());
     }
 
     /**
      * @notice Withdraw staked PCE tokens
      * @dev Burns wPce tokens and returns PCE tokens
-     * @param _amountxPeacecoin Amount of wPce tokens to burn
+     * @param amountXPeacecoin Amount of wPce tokens to burn
      */
-    function withdraw(uint256 _amountxPeacecoin) external updateRewardPool nonReentrant {
-        if (wPce.balanceOf(_msgSender()) < _amountxPeacecoin) revert InsufficientBalance();
+    function withdraw(uint256 amountXPeacecoin) external updateRewardPool nonReentrant {
+        if (wPce.balanceOf(_msgSender()) < amountXPeacecoin) revert InsufficientBalance();
 
-        uint256 amountPeacecoin = _convertToPeacecoin(_amountxPeacecoin);
+        uint256 amountPeacecoin = convertToPeacecoin(amountXPeacecoin);
         if (amountPeacecoin == 0) revert ZeroAmount();
-
-        wPce.burn(_msgSender(), _amountxPeacecoin);
 
         // Unchecked subtraction for gas optimization (safe due to previous checks)
         unchecked {
             totalPool -= amountPeacecoin;
         }
 
+        wPce.burn(_msgSender(), amountXPeacecoin);
+
         if (pce.balanceOf(address(this)) < amountPeacecoin) revert InsufficientBalance();
         bool success = pce.transfer(_msgSender(), amountPeacecoin);
         require(success, "ERC20: transfer failed");
 
-        emit WithdrawnPEACECOIN(amountPeacecoin, _amountxPeacecoin, _msgSender());
+        emit WithdrawnPEACECOIN(amountPeacecoin, amountXPeacecoin, _msgSender());
     }
 
     /**
      * @notice Calculate staking reward for a given amount
      * @dev Returns the PCE equivalent for a given wPce amount
-     * @param _amount Amount of wPce tokens
+     * @param amount Amount of wPce tokens
      * @return PCE equivalent amount
      */
-    function stakingReward(uint256 _amount) public view returns (uint256) {
-        return _convertToPeacecoin(_amount);
+    function stakingReward(uint256 amount) public view returns (uint256) {
+        return convertToPeacecoin(amount);
     }
 
     /**
      * @notice Get staked PCE amount for an address
      * @dev Returns the PCE equivalent of staked tokens for an address
-     * @param _address Address to check
+     * @param account Address to check
      * @return Staked PCE amount
      */
-    function getStakedPeacecoin(address _address) public view returns (uint256) {
-        uint256 balance = wPce.balanceOf(_address);
-        return balance > 0 ? _convertToPeacecoin(balance) : 0;
+    function getStakedPeacecoin(address account) public view returns (uint256) {
+        uint256 balance = wPce.balanceOf(account);
+        return balance > 0 ? convertToPeacecoin(balance) : 0;
     }
 
     /**
      * @notice Set reward per block
      * @dev Only callable by the contract owner
-     * @param _amount New reward per block amount
+     * @param newRewardPerBlock New reward per block amount
      */
-    function setRewardPerBlock(uint256 _amount) external onlyOwner updateRewardPool {
-        rewardPerBlock = _amount;
+    function setRewardPerBlock(uint256 newRewardPerBlock) external onlyOwner updateRewardPool {
+        uint256 previousRewardPerBlock = rewardPerBlock;
+        rewardPerBlock = newRewardPerBlock;
+        emit RewardPerBlockUpdated(previousRewardPerBlock, newRewardPerBlock);
     }
 
     /**
@@ -162,25 +169,25 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
 
         uint256 unusedTokens = contractBalance - totalPool;
 
+        emit UnusedRewardPoolRevoked(msg.sender, unusedTokens);
         bool success = pce.transfer(msg.sender, unusedTokens);
         require(success, "ERC20: transfer failed");
-        emit UnusedRewardPoolRevoked(msg.sender, unusedTokens);
     }
 
-    function _convertToWpeacecoin(uint256 _amount) public view returns (uint256) {
+    function convertToWpeacecoin(uint256 amount) public view returns (uint256) {
         uint256 tSxPceToken = wPce.totalSupply();
         (uint256 outstandingReward, ) = _calculateReward();
         uint256 stakingPool = totalPool + outstandingReward;
 
         // Prevent division by zero
         if (stakingPool == 0 || tSxPceToken == 0) {
-            return _amount; // First staker gets 1:1 ratio
+            return amount; // First staker gets 1:1 ratio
         }
 
-        return (tSxPceToken * _amount) / stakingPool;
+        return (tSxPceToken * amount) / stakingPool;
     }
 
-    function _convertToPeacecoin(uint256 _amount) public view returns (uint256) {
+    function convertToPeacecoin(uint256 amount) public view returns (uint256) {
         uint256 tSxPceToken = wPce.totalSupply();
         (uint256 outstandingReward, ) = _calculateReward();
         uint256 stakingPool = totalPool + outstandingReward;
@@ -190,7 +197,7 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
             return 0;
         }
 
-        return (stakingPool * _amount) / tSxPceToken;
+        return (stakingPool * amount) / tSxPceToken;
     }
 
     function _calculateReward() internal view returns (uint256, uint256) {
@@ -217,7 +224,7 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
         return (rewardPerBlock * blocksPassed, updateBlock);
     }
 
-    function _calculateApr() public view returns (uint256) {
+    function calculateApr() public view returns (uint256) {
         (uint256 outstandingReward, uint256 newestBlockWithRewards) = _calculateReward();
 
         if (newestBlockWithRewards != block.number) {

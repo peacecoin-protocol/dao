@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 contract Timelock is Initializable {
     event NewAdmin(address indexed newAdmin);

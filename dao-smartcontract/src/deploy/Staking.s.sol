@@ -22,7 +22,11 @@ contract StakingScript is Script {
         Staking staking = new Staking();
         wpce.addMinter(address(staking));
 
-        staking.initialize(rewardPerBlock, pceTokenAddress, address(wpce));
+        staking.initialize({
+            rewardPerBlockValue: rewardPerBlock,
+            pceAddress: pceTokenAddress,
+            wPceAddress: address(wpce)
+        });
 
         console.log("Staking address:", address(staking));
         console.log("Deployer address:", deployerAddress);

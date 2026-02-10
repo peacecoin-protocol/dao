@@ -2,15 +2,9 @@
 pragma solidity ^0.8.30;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {
-    PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {INFTInterface} from "./interfaces/INFTInterface.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
@@ -31,7 +25,7 @@ contract DAOFactory is
     using Clones for address;
 
     // ============ Constants ============
-    bytes32 public constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    bytes32 public constant daoManagerRole = keccak256("DAO_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     // Maximum values for safety
@@ -113,6 +107,7 @@ contract DAOFactory is
      * @param _timelockImplementation Address of the timelock implementation
      * @param _governorImplementation Address of the governor implementation
      * @param _governanceTokenImplementation Address of the governance token implementation
+     * @param _multipleVotingImplementation Address of the multiple voting implementation
      * @param _sbtImplementation Address of the SBT implementation
      * @param _nftImplementation Address of the NFT implementation
      */
@@ -246,7 +241,7 @@ contract DAOFactory is
         ICommunityGovernance(governorAddress)._acceptAdmin();
 
         // Grant DAO manager role
-        _grantRole(DAO_MANAGER_ROLE, msg.sender);
+        _grantRole(daoManagerRole, msg.sender);
         // Emit events
         emit DAOCreated(daoId, _daoName, msg.sender);
 

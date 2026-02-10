@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
@@ -20,8 +20,8 @@ contract TimelockTest is Test {
     address bob = makeAddr("bob");
 
     MockGovToken governanceToken;
-    PEACECOINDAO_SBT sbt;
-    PEACECOINDAO_NFT nft;
+    PeaceCoinDaoSbt sbt;
+    PeaceCoinDaoNft nft;
     GovernorAlpha governor;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
@@ -73,8 +73,8 @@ contract TimelockTest is Test {
         governanceToken = new MockGovToken();
         governanceToken.initialize();
 
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        sbt = new PeaceCoinDaoSbt();
+        nft = new PeaceCoinDaoNft();
 
         sbt.initialize(URI, address(this), address(this), true);
         nft.initialize(URI, address(this), address(this), false);

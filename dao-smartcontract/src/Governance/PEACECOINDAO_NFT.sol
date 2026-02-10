@@ -3,17 +3,13 @@ pragma solidity ^0.8.30;
 
 import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {
-    ERC1155Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IErrors} from "../interfaces/IErrors.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 
-contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, IErrors {
+contract PeaceCoinDaoNft is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, IErrors {
     using Checkpoints for Checkpoints.Trace224;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -37,18 +33,18 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     mapping(uint256 => address) public creators;
 
     function initialize(
-        string memory _uri,
-        address _daoFactory,
-        address _owner,
-        bool _isSbt
+        string memory baseUri,
+        address daoFactoryAddress,
+        address owner,
+        bool isSbt
     ) external initializer {
         __AccessControl_init();
-        __ERC1155_init(_uri);
+        __ERC1155_init(baseUri);
 
-        uri_ = _uri;
-        daoFactory = _daoFactory;
+        uri_ = baseUri;
+        daoFactory = daoFactoryAddress;
 
-        if (_isSbt) {
+        if (isSbt) {
             name = "PEACECOIN DAO SBT";
             symbol = "PCE_SBT";
         } else {
@@ -56,8 +52,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
             symbol = "PCE_NFT";
         }
 
-        minters[_owner] = true;
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        minters[owner] = true;
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
     // Voting weight per token ID
@@ -104,30 +100,30 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
         }
     }
 
-    function uri(uint256 _id) public view override returns (string memory) {
-        return string(abi.encodePacked(uri_, tokenUrIs[_id]));
+    function uri(uint256 id) public view override returns (string memory) {
+        return string(abi.encodePacked(uri_, tokenUrIs[id]));
     }
 
     // ========== Admin ==========
-    function createToken(string memory _tokenUri, uint256 _votingPower) external onlyDefaultAdmin {
+    function createToken(string memory tokenUri, uint256 votingPower) external onlyDefaultAdmin {
         numberOfTokens++;
         uint256 id = numberOfTokens;
 
-        tokenUrIs[id] = _tokenUri;
-        votingPowerPerId[id] = _votingPower;
+        tokenUrIs[id] = tokenUri;
+        votingPowerPerId[id] = votingPower;
         creators[id] = msg.sender;
 
-        emit CreatedToken(id, _tokenUri, _votingPower);
+        emit CreatedToken(id, tokenUri, votingPower);
     }
 
     function setTokenURI(
         uint256 id,
-        string memory _tokenUri,
-        uint256 _votingPower
+        string memory tokenUri,
+        uint256 votingPower
     ) external onlyDefaultAdmin validTokenId(id) {
-        tokenUrIs[id] = _tokenUri;
-        votingPowerPerId[id] = _votingPower;
-        emit SetTokenURI(id, _tokenUri, _votingPower);
+        tokenUrIs[id] = tokenUri;
+        votingPowerPerId[id] = votingPower;
+        emit SetTokenURI(id, tokenUri, votingPower);
     }
 
     function mint(address to, uint256 id, uint256 amount) external onlyMinter validTokenId(id) {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import {PEACECOINDAO_NFT} from "./PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoNft} from "./PEACECOINDAO_NFT.sol";
 
-contract PEACECOINDAO_SBT is PEACECOINDAO_NFT {
+contract PeaceCoinDaoSbt is PeaceCoinDaoNft {
     /**
      * @dev Override to prevent transfers - SBTs are non-transferable
      * @notice This function always reverts as SBTs cannot be transferred

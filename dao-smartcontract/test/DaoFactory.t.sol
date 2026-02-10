@@ -9,8 +9,8 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 contract DaoFactoryTest is Test {
@@ -19,8 +19,8 @@ contract DaoFactoryTest is Test {
     GovernorAlpha public governor;
     MockERC20 public mockERC20;
     PCECommunityGovToken public governanceToken;
-    PEACECOINDAO_SBT public sbt;
-    PEACECOINDAO_NFT public nft;
+    PeaceCoinDaoSbt public sbt;
+    PeaceCoinDaoNft public nft;
     MultipleVotings public multipleVoting;
 
     uint256 public votingDelay = 10;
@@ -55,8 +55,8 @@ contract DaoFactoryTest is Test {
         timelock = new Timelock();
         governor = new GovernorAlpha();
         governanceToken = new PCECommunityGovToken();
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        sbt = new PeaceCoinDaoSbt();
+        nft = new PeaceCoinDaoNft();
         multipleVoting = new MultipleVotings();
         vm.stopPrank();
 

@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {Campaigns} from "../src/Campaigns.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {ITokens} from "../src/interfaces/ITokens.sol";
@@ -30,10 +30,10 @@ contract CampaignsTest is Test {
     Campaigns public campaigns;
 
     /// @notice NFT contract for campaign rewards
-    PEACECOINDAO_NFT public nft;
+    PeaceCoinDaoNft public nft;
 
     /// @notice SBT contract for DAO membership
-    PEACECOINDAO_SBT public sbt;
+    PeaceCoinDaoSbt public sbt;
 
     /// @notice Multiple voting contract for DAO governance
     MultipleVotings public multipleVoting;
@@ -135,8 +135,8 @@ contract CampaignsTest is Test {
         vm.startPrank(daoManager);
 
         // Deploy core governance contracts
-        PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
-        PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
+        PeaceCoinDaoSbt sbtImplementation = new PeaceCoinDaoSbt();
+        PeaceCoinDaoNft nftImplementation = new PeaceCoinDaoNft();
         MultipleVotings multipleVotingImplementation = new MultipleVotings();
         timelock = new Timelock();
         governor = new GovernorAlpha();
@@ -188,8 +188,8 @@ contract CampaignsTest is Test {
         });
 
         (, , address sbtAddress, address nftAddress, , , , ) = factory.daoConfigs(daoId);
-        sbt = PEACECOINDAO_SBT(sbtAddress);
-        nft = PEACECOINDAO_NFT(nftAddress);
+        sbt = PeaceCoinDaoSbt(sbtAddress);
+        nft = PeaceCoinDaoNft(nftAddress);
 
         // Deploy and initialize Campaigns contract
         campaigns = new Campaigns();

@@ -91,7 +91,7 @@ contract MultipleVotingsTest is Test {
         multipleVotings = new MultipleVotings();
 
         // Initialize the contract
-        multipleVotings.initialize(address(governor), admin);
+        multipleVotings.initialize({governorAddress: address(governor), adminAddress: admin});
 
         // Set up voting power for test accounts
         _setVotingPower(alice, 1000);
@@ -149,7 +149,7 @@ contract MultipleVotingsTest is Test {
 
     function test_initialize_Success() public {
         MultipleVotings newContract = new MultipleVotings();
-        newContract.initialize(address(governor), admin);
+        newContract.initialize({governorAddress: address(governor), adminAddress: admin});
 
         assertEq(newContract.proposalThreshold(), PROPOSAL_THRESHOLD);
         assertEq(newContract.admin(), admin);
@@ -159,18 +159,18 @@ contract MultipleVotingsTest is Test {
     function test_initialize_RevertsWhenGovernorAddressZero() public {
         MultipleVotings newContract = new MultipleVotings();
         vm.expectRevert("Multiple_Votings: invalid governor address");
-        newContract.initialize(address(0), admin);
+        newContract.initialize({governorAddress: address(0), adminAddress: admin});
     }
 
     function test_initialize_RevertsWhenAdminAddressZero() public {
         MultipleVotings newContract = new MultipleVotings();
         vm.expectRevert("Multiple_Votings: invalid admin address");
-        newContract.initialize(address(governor), address(0));
+        newContract.initialize({governorAddress: address(governor), adminAddress: address(0)});
     }
 
     function test_initialize_RevertsWhenAlreadyInitialized() public {
         vm.expectRevert();
-        multipleVotings.initialize(address(governor), admin);
+        multipleVotings.initialize({governorAddress: address(governor), adminAddress: admin});
     }
 
     // ============ Constants Tests ============

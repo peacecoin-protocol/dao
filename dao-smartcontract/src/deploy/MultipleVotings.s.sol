@@ -14,7 +14,7 @@ contract MultipleVotingsScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         MultipleVotings multipleVotings = new MultipleVotings();
-        multipleVotings.initialize(governor, admin);
+        multipleVotings.initialize({governorAddress: governor, adminAddress: admin});
 
         console.log("MultipleVotings deployed at", address(multipleVotings));
 

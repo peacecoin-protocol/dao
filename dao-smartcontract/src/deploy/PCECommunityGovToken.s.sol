@@ -11,7 +11,7 @@ contract PCECommunityGovTokenScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
-        pceCommunityGovToken.initialize(communityToken);
+        pceCommunityGovToken.initialize({communityTokenAddress: communityToken});
         vm.stopBroadcast();
     }
 }

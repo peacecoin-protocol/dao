@@ -23,7 +23,11 @@ contract StakingTest is Test {
 
         wPce.initialize();
         staking = new Staking();
-        staking.initialize(rewardPerBlock, address(pce), address(wPce));
+        staking.initialize({
+            rewardPerBlockValue: rewardPerBlock,
+            pceAddress: address(pce),
+            wPceAddress: address(wPce)
+        });
 
         wPce.addMinter(address(staking));
 

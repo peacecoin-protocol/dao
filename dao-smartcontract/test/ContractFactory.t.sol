@@ -18,7 +18,7 @@ contract ContractFactoryTest is Test {
     bytes bytecode = type(Example).creationCode;
     bytes _arguments = abi.encode(0x7D01D10d894B36dBA00E5ecc1e54ff32e83F84D5);
 
-    event ContractDeployed(address contractAddress);
+    event ContractDeployed(address indexed contractAddress);
 
     ContractFactory contractFactory;
 
@@ -48,7 +48,7 @@ contract ContractFactoryTest is Test {
         // Assert: Verify event was emitted with correct address
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 eventSignature = logs[0].topics[0];
-        address contractAddressFromLog = abi.decode(logs[0].data, (address));
+        address contractAddressFromLog = address(uint160(uint256(logs[0].topics[1])));
         assertEq(eventSignature, ContractDeployed.selector);
         assertEq(contractAddressFromLog, deployedAddress);
     }

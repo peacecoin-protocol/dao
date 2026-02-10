@@ -2,20 +2,20 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {Campaigns} from "../src/Campaigns.sol";
 /**
- * @title PEACECOINDAO_NFTTest
- * @notice Comprehensive test suite for the PEACECOINDAO_NFT contract
+ * @title PeaceCoinDaoNftTest
+ * @notice Comprehensive test suite for the PeaceCoinDaoNft contract
  * @dev Tests cover token creation, minting, delegation, revocation, batch operations, and voting power
  */
-contract PEACECOINDAO_NFTTest is Test {
+contract PeaceCoinDaoNftTest is Test {
     // ============ State Variables ============
 
     /// @notice NFT and SBT contracts
-    PEACECOINDAO_NFT public nft;
+    PeaceCoinDaoNft public nft;
     DAOFactory public daoFactory;
     Campaigns public campaigns;
 
@@ -42,7 +42,7 @@ contract PEACECOINDAO_NFTTest is Test {
         daoFactory.setCampaignFactory(address(campaigns));
 
         // Deploy core contracts
-        nft = new PEACECOINDAO_NFT();
+        nft = new PeaceCoinDaoNft();
         nft.initialize(BASE_URI, address(daoFactory), address(this), false);
         nft.setMinter(address(this));
     }
@@ -341,7 +341,7 @@ contract PEACECOINDAO_NFTTest is Test {
         _mintToken(alice, 1, 1);
 
         // Act & Assert: Should revert with blockNumber too larg
-        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.BlockNumberTooLarge.selector));
+        vm.expectRevert(abi.encodeWithSelector(PeaceCoinDaoNft.BlockNumberTooLarge.selector));
         nft.getPastVotes(alice, uint256(type(uint32).max) + 1);
     }
 
@@ -1001,7 +1001,7 @@ contract PEACECOINDAO_NFTTest is Test {
      * @dev Verifies name, symbol, and admin role when _isSBT is false
      */
     function test_initialize_NFT_Config() public {
-        PEACECOINDAO_NFT nftLocal = new PEACECOINDAO_NFT();
+        PeaceCoinDaoNft nftLocal = new PeaceCoinDaoNft();
         nftLocal.initialize(BASE_URI, address(daoFactory), alice, false);
 
         assertEq(nftLocal.name(), "PEACECOIN DAO NFT", "NFT name should match");
@@ -1014,7 +1014,7 @@ contract PEACECOINDAO_NFTTest is Test {
      * @dev Verifies name and symbol when _isSBT is true
      */
     function test_initialize_SBT_Config() public {
-        PEACECOINDAO_NFT nftLocal = new PEACECOINDAO_NFT();
+        PeaceCoinDaoNft nftLocal = new PeaceCoinDaoNft();
         nftLocal.initialize(BASE_URI, address(daoFactory), alice, true);
 
         assertEq(nftLocal.name(), "PEACECOIN DAO SBT", "SBT name should match");
@@ -1049,7 +1049,7 @@ contract PEACECOINDAO_NFTTest is Test {
         vm.prank(alice);
         nft.delegate(bob);
 
-        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteOverflow.selector));
+        vm.expectRevert(abi.encodeWithSelector(PeaceCoinDaoNft.VoteOverflow.selector));
         nft.mint(alice, 1, 1);
     }
 
@@ -1061,7 +1061,7 @@ contract PEACECOINDAO_NFTTest is Test {
         _createToken(1);
         nft.setTokenURI(1, TOKEN_URI, type(uint256).max);
 
-        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector));
+        vm.expectRevert(abi.encodeWithSelector(PeaceCoinDaoNft.VoteCalculationOverflow.selector));
         nft.mint(alice, 1, 2);
     }
 
@@ -1076,7 +1076,7 @@ contract PEACECOINDAO_NFTTest is Test {
         nft.mint(alice, 1, 1);
         nft.mint(alice, 1, 1);
 
-        vm.expectRevert(abi.encodeWithSelector(PEACECOINDAO_NFT.VoteCalculationOverflow.selector));
+        vm.expectRevert(abi.encodeWithSelector(PeaceCoinDaoNft.VoteCalculationOverflow.selector));
         nft.getTotalVotingPower(alice);
     }
 }

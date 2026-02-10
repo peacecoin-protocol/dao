@@ -50,7 +50,11 @@ contract BountyTest is Test {
 
         // Deploy and initialize Bounty contract
         bounty = new Bounty();
-        bounty.initialize(token, BOUNTY_AMOUNT, address(governance));
+        bounty.initialize({
+            token: token,
+            initialBountyAmount: BOUNTY_AMOUNT,
+            governanceAddress: address(governance)
+        });
 
         // Setup initial token balances
         token.mint(owner, INITIAL_BALANCE);

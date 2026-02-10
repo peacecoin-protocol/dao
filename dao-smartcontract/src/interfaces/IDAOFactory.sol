@@ -44,7 +44,7 @@ interface IDAOFactory {
 
     function campaignFactory() external view returns (address);
     function setCampaignFactory(address _campaignFactory) external;
-    function DAO_MANAGER_ROLE() external view returns (bytes32);
+    function daoManagerRole() external view returns (bytes32);
     function daoConfigs(
         bytes32 daoId
     )
