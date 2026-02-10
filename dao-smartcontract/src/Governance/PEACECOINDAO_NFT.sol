@@ -207,6 +207,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
 
     function getPastVotes(address who, uint256 blockNumber) external view returns (uint256) {
         if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
+        // casting to 'uint32' is safe because blockNumber is checked above to fit
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint32 blockNumber32 = uint32(blockNumber);
         return _checkpoints[who].upperLookup(blockNumber32);
     }
@@ -249,6 +251,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
 
         uint256 blockNumber = block.number;
         if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
+        // casting to 'uint32' is safe because blockNumber is checked above to fit
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint32 currentBlock = uint32(blockNumber);
 
         if (from != address(0)) {
@@ -256,6 +260,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
             if (oldFrom < amount) revert InsufficientVotesToMove();
             uint256 newFrom = oldFrom - amount;
             if (newFrom > type(uint224).max) revert VoteOverflow();
+            // casting to 'uint224' is safe because newFrom is checked above to fit
+            // forge-lint: disable-next-line(unsafe-typecast)
             _checkpoints[from].push(currentBlock, uint224(newFrom));
         }
 
@@ -263,6 +269,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
             uint256 oldTo = _checkpoints[to].latest();
             uint256 newTo = oldTo + amount;
             if (newTo > type(uint224).max) revert VoteOverflow();
+            // casting to 'uint224' is safe because newTo is checked above to fit
+            // forge-lint: disable-next-line(unsafe-typecast)
             _checkpoints[to].push(currentBlock, uint224(newTo));
         }
 

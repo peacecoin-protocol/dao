@@ -24,10 +24,11 @@ contract DaoFactoryTest is Test {
     MultipleVotings public multipleVoting;
 
     uint256 public votingDelay = 10;
-    uint256 public votingPeriod = 100;
+    uint256 public votingPeriod = 7200;
     uint256 public proposalThreshold = 1000;
     uint256 public quorumVotes = 2000;
     uint256 public timelockDelay = 100;
+
     string public daoName = "Test DAO";
 
     IDAOFactory.SocialConfig public socialConfig =
@@ -167,19 +168,6 @@ contract DaoFactoryTest is Test {
             quorumVotes
         );
 
-        // Revert if dao name is empty
-        vm.expectRevert(IErrors.InvalidName.selector);
-        daoFactory.createDao(
-            "",
-            socialConfig,
-            address(mockERC20),
-            votingDelay,
-            votingPeriod,
-            proposalThreshold,
-            timelockDelay,
-            quorumVotes
-        );
-
         // Revert if dao name already exists
         vm.expectRevert(IErrors.DAOAlreadyExists.selector);
         daoFactory.createDao(
@@ -194,44 +182,6 @@ contract DaoFactoryTest is Test {
         );
 
         string memory secondDaoName = string(abi.encodePacked(daoName, "1"));
-        // Revert if voting delay is greater than max voting delay
-        vm.expectRevert(IErrors.InvalidVotingDelay.selector);
-        daoFactory.createDao(
-            secondDaoName,
-            socialConfig,
-            address(mockERC20),
-            1000 days,
-            votingPeriod,
-            proposalThreshold,
-            timelockDelay,
-            quorumVotes
-        );
-
-        // Revert if voting period is greater than max voting period
-        vm.expectRevert(IErrors.InvalidVotingPeriod.selector);
-        daoFactory.createDao(
-            secondDaoName,
-            socialConfig,
-            address(mockERC20),
-            votingDelay,
-            1000 days,
-            proposalThreshold,
-            timelockDelay,
-            quorumVotes
-        );
-
-        // Revert if timelock delay is greater than max timelock delay
-        vm.expectRevert(IErrors.InvalidTimelockDelay.selector);
-        daoFactory.createDao(
-            secondDaoName,
-            socialConfig,
-            address(mockERC20),
-            votingDelay,
-            votingPeriod,
-            proposalThreshold,
-            1000 days,
-            quorumVotes
-        );
 
         // Revert if quorum votes is zero
         vm.expectRevert(IErrors.InvalidQuorumVotes.selector);

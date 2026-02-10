@@ -79,20 +79,21 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
     function stake(uint256 _amountPeacecoin) external updateRewardPool nonReentrant {
         if (_amountPeacecoin == 0) revert ZeroAmount();
 
-        // Transfer tokens first
+        uint256 balanceBefore = pce.balanceOf(address(this));
         bool success = pce.transferFrom(_msgSender(), address(this), _amountPeacecoin);
         require(success, "ERC20: transferFrom failed");
 
-        uint256 amountxPeacecoin = _convertToWpeacecoin(_amountPeacecoin);
+        uint256 received = pce.balanceOf(address(this)) - balanceBefore;
+        require(received == _amountPeacecoin, "Staking: fee-on-transfer not supported");
 
-        // Unchecked addition for gas optimization (safe due to previous checks)
+        uint256 amountxPeacecoin = _convertToWpeacecoin(received);
+
         unchecked {
-            totalPool += _amountPeacecoin;
+            totalPool += received;
         }
 
         wPce.mint(_msgSender(), amountxPeacecoin);
-
-        emit StakedPEACECOIN(_amountPeacecoin, amountxPeacecoin, _msgSender());
+        emit StakedPEACECOIN(received, amountxPeacecoin, _msgSender());
     }
 
     /**
@@ -201,8 +202,14 @@ contract Staking is OwnableUpgradeable, ReentrancyGuardUpgradeable, IErrors {
             return (0, updateBlock);
         }
 
-        uint256 blocksWithRewardFunding = (pce.balanceOf(address(this)) - totalPool) /
-            rewardPerBlock;
+        uint256 balance = pce.balanceOf(address(this));
+        if (balance <= totalPool) {
+            return (0, updateBlock);
+        }
+
+        uint256 available = balance - totalPool;
+        uint256 blocksWithRewardFunding = available / rewardPerBlock;
+
         if (blocksPassed > blocksWithRewardFunding) {
             blocksPassed = blocksWithRewardFunding;
             updateBlock = lastUpdateBlock + blocksWithRewardFunding;

@@ -231,9 +231,9 @@ contract Campaigns is
         PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
         PEACECOINDAO_SBT sbt = PEACECOINDAO_SBT(_sbt);
 
-        if (campaign.startDate >= block.timestamp) revert IErrors.CampaignNotStarted();
+        if (campaign.startDate > block.timestamp) revert IErrors.CampaignNotStarted();
         if (campaign.endDate <= block.timestamp) revert IErrors.CampaignEnded();
-        if (campaign.totalAmount <= totalClaimed[_campaignId] + campaign.claimAmount) {
+        if (campaign.totalAmount < totalClaimed[_campaignId] + campaign.claimAmount) {
             revert IErrors.CampaignFullyClaimed();
         }
         if (campWinnersClaimed[_campaignId][msg.sender]) revert IErrors.AlreadyClaimed();
@@ -245,6 +245,7 @@ contract Campaigns is
             // Check if gist is whitelisted
             bool isWhitelisted = false;
             uint256 gistsLength = campGists[_campaignId].length;
+
             for (uint256 i; i < gistsLength; ) {
                 if (campGists[_campaignId][i] == _gist) {
                     isWhitelisted = true;

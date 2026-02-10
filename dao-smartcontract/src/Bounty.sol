@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IGovernance, ProposalState} from "./interfaces/IGovernance.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 
@@ -149,7 +155,7 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         if (claimable == 0) revert NothingToWithdraw();
 
         BountyInfo storage bounty = contributorBounties[msg.sender];
-        // Unchecked addition for gas optimization (safe due to previous checks)
+
         unchecked {
             bounty.withdrawn += claimable;
         }
@@ -169,17 +175,23 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         uint256 _totalBounty;
         uint256 proposalCount = IGovernance(governance).proposalCount();
 
-        for (uint256 i; i < proposalCount; ) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
             address proposer = IGovernance(governance).proposer(i);
 
             if (proposer == _user) {
-                _totalBounty += proposalBounties[i] + bountyAmount;
-            }
-            unchecked {
-                ++i;
+                ProposalState state = IGovernance(governance).state(i);
+                if (state == ProposalState.Executed || state == ProposalState.Succeeded) {
+                    _totalBounty += proposalBounties[i] + bountyAmount;
+                }
             }
         }
-        return _totalBounty - proposalBountyWithdrawn[_user];
+
+        uint256 withdrawn = proposalBountyWithdrawn[_user];
+        if (_totalBounty <= withdrawn) {
+            return 0;
+        }
+
+        return _totalBounty - withdrawn;
     }
 
     /**
@@ -191,8 +203,12 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
     function claimableContributorAmount(address user) public view returns (uint256) {
         uint256 extraAmount = isContributor[user] ? bountyAmount : 0;
         BountyInfo storage bounty = contributorBounties[user];
-        uint256 claimable = bounty.bountyAmount + extraAmount - bounty.withdrawn;
-        return claimable;
+        uint256 total = bounty.bountyAmount + extraAmount;
+
+        if (total <= bounty.withdrawn) {
+            return 0;
+        }
+        return total - bounty.withdrawn;
     }
 
     /**

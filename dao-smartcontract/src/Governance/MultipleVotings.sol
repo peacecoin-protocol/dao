@@ -2,14 +2,16 @@
 pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 /// @title MultipleVotings
 /// @notice Contract for handling multiple choice voting proposals in the governance system
 /// @dev Supports up to 20 options per proposal, allows users to allocate voting power across options
 contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
-    /// @notice Maximum number of options allowed per proposa
+    /// @notice Maximum number of options allowed per proposal
     uint256 public constant MAX_OPTIONS = 20;
 
     /// @notice The address of the governor contract
@@ -117,8 +119,10 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
         require(options.length > 1, "Multiple_Votings: must have at least 2 options");
         require(options.length <= MAX_OPTIONS, "Multiple_Votings: too many options");
         require(bytes(description).length > 0, "Multiple_Votings: description required");
-
-        // Check proposer has enough voting power (using governor's threshold)
+        require(
+            endTimestamp > startTimestamp,
+            "Multiple_Votings: end timestamp must be greater than start timestamp"
+        );
         require(
             getPastVotes(msg.sender, block.number - 1) > proposalThreshold,
             "Multiple_Votings: proposer votes below proposal threshold"
@@ -308,5 +312,5 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
 }
 
 interface GovernorInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
+    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
 }

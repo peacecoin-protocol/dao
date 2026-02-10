@@ -97,7 +97,7 @@ contract CampaignsTest is Test {
 
     /// @notice Governance parameters
     uint256 private constant VOTING_DELAY = 1;
-    uint256 private constant VOTING_PERIOD = 1000;
+    uint256 private constant VOTING_PERIOD = 7200;
     uint256 private constant PROPOSAL_THRESHOLD = 1000;
     uint256 private constant QUORUM_VOTES = 1000;
     uint256 private constant TIMELOCK_DELAY = 1000;
@@ -146,6 +146,7 @@ contract CampaignsTest is Test {
         DAOFactory factory = new DAOFactory();
         factory.initialize();
         daoFactory = address(factory);
+
         factory.setImplementation(
             address(timelock),
             address(governor),

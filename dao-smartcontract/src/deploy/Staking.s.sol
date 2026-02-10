@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {Staking} from "../Staking.sol";
-import {WPCE} from "../Governance/WPCE.sol";
+import {WPCE} from "../mocks/WPCE.sol";
 import {console} from "forge-std/console.sol";
 
 contract StakingScript is Script {

@@ -23,6 +23,7 @@ contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable {
 
     function initialize() external initializer {
         __ERC20_init("WPCE", "WPCE");
+        __ERC20Votes_init();
         __Ownable_init(msg.sender);
     }
 

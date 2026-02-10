@@ -74,7 +74,7 @@ contract GovernorAlpha {
         /// @notice Whether or not the voter supports the proposal
         bool support;
         /// @notice The number of votes the voter had, which were cast
-        uint96 votes;
+        uint256 votes;
     }
 
     /// @notice Possible states that a proposal may be in
@@ -421,7 +421,8 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
-        uint96 votes = getPastVotes(voter, proposal.startBlock);
+
+        uint256 votes = getPastVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -446,13 +447,13 @@ contract GovernorAlpha {
             "Governor::updateVariables: only guardian or timelock can update variables"
         );
 
-        quorumVotes = quorumVotes_;
-        proposalThreshold = proposalThreshold_;
-        proposalMaxOperations = proposalMaxOperations_;
-
         emit QuorumVotesSet(quorumVotes, quorumVotes_);
         emit ProposalThresholdSet(proposalThreshold, proposalThreshold_);
         emit ProposalMaxOperationsSet(proposalMaxOperations, proposalMaxOperations_);
+
+        quorumVotes = quorumVotes_;
+        proposalThreshold = proposalThreshold_;
+        proposalMaxOperations = proposalMaxOperations_;
     }
 
     function updateSocialConfig(IDAOFactory.SocialConfig memory _socialConfig) public {
@@ -469,22 +470,6 @@ contract GovernorAlpha {
             _socialConfig.twitter,
             _socialConfig.telegram
         );
-    }
-
-    function updateSocialConfig(
-        string memory description,
-        string memory website,
-        string memory linkedin,
-        string memory twitter,
-        string memory telegram
-    ) public {
-        socialConfig.description = description;
-        socialConfig.website = website;
-        socialConfig.linkedin = linkedin;
-        socialConfig.twitter = twitter;
-        socialConfig.telegram = telegram;
-
-        emit SocialConfigUpdated(description, website, linkedin, twitter, telegram);
     }
 
     function getSocialConfig() public view returns (IDAOFactory.SocialConfig memory) {
@@ -529,7 +514,7 @@ contract GovernorAlpha {
         );
     }
 
-    function getPastVotes(address account, uint256 blockNumber) public view returns (uint96) {
+    function getPastVotes(address account, uint256 blockNumber) public view returns (uint256) {
         return
             token.getPastVotes(account, blockNumber) +
             sbt.getPastVotes(account, blockNumber) +
@@ -585,5 +570,5 @@ interface TimelockInterface {
 }
 
 interface GovernorTokenInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
+    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
 }

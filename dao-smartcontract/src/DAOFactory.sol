@@ -35,14 +35,12 @@ contract DAOFactory is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     // Maximum values for safety
-    uint256 public constant MAX_VOTING_DELAY = 30 days;
-    uint256 public constant MAX_VOTING_PERIOD = 30 days;
-    uint256 public constant MAX_TIMELOCK_DELAY = 30 days;
+    uint256 public constant MIN_TIMELOCK_DELAY = 1 minutes;
+    uint256 public constant MAX_TIMELOCK_DELAY = 30 hours;
+    uint256 public constant MIN_VOTING_PERIOD = 7200;
+    uint256 public constant MIN_VOTING_DELAY = 1;
 
     // ============ State Variables ============
-
-    /// @notice Mapping to track DAO names to prevent duplicates
-    mapping(string => bool) public daoNames;
 
     /// @notice Mapping from DAO ID to its creator
     mapping(bytes32 => DaoConfig) public daoConfigs;
@@ -157,13 +155,15 @@ contract DAOFactory is
     }
 
     function setCampaignFactory(address _campaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
+
         campaignFactory = _campaignFactory;
         _grantRole(DEFAULT_ADMIN_ROLE, campaignFactory);
     }
 
     function removeCampaignFactory() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        campaignFactory = address(0);
         _revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
+        campaignFactory = address(0);
     }
 
     /**
@@ -200,8 +200,6 @@ contract DAOFactory is
         );
         // Local variables for gas optimization
         string memory _daoName = daoName;
-        uint256 _votingDelay = votingDelay;
-        uint256 _votingPeriod = votingPeriod;
         uint256 _proposalThreshold = proposalThreshold;
         uint256 _quorumVotes = quorumVotes;
         address _communityToken = communityToken;
@@ -223,8 +221,8 @@ contract DAOFactory is
             sbtAddress,
             nftAddress,
             timelockAddress,
-            _votingDelay,
-            _votingPeriod,
+            votingDelay,
+            votingPeriod,
             _proposalThreshold,
             _quorumVotes,
             address(this),
@@ -282,9 +280,13 @@ contract DAOFactory is
         uint256 quorumVotes,
         address creator
     ) internal view {
-        _validateAddresses(communityToken, creator);
         _validateName(daoName);
+        _validateAddresses(communityToken, creator);
         _validateParameters(votingDelay, votingPeriod, timelockDelay, quorumVotes);
+    }
+
+    function _validateName(string memory daoName) internal pure {
+        if (bytes(daoName).length == 0) revert IErrors.InvalidName();
     }
 
     /**
@@ -296,14 +298,6 @@ contract DAOFactory is
     }
 
     /**
-     * @notice Validate DAO name
-     */
-    function _validateName(string memory daoName) internal view {
-        if (bytes(daoName).length == 0) revert IErrors.InvalidName();
-        if (daoNames[daoName]) revert IErrors.DAONameAlreadyExists();
-    }
-
-    /**
      * @notice Validate governance parameters
      */
     function _validateParameters(
@@ -312,8 +306,9 @@ contract DAOFactory is
         uint256 timelockDelay,
         uint256 quorumVotes
     ) internal pure {
-        if (votingDelay > MAX_VOTING_DELAY) revert IErrors.InvalidVotingDelay();
-        if (votingPeriod > MAX_VOTING_PERIOD) revert IErrors.InvalidVotingPeriod();
+        if (votingDelay < MIN_VOTING_DELAY) revert IErrors.InvalidVotingDelay();
+        if (votingPeriod < MIN_VOTING_PERIOD) revert IErrors.InvalidVotingPeriod();
+        if (timelockDelay < MIN_TIMELOCK_DELAY) revert IErrors.InvalidTimelockDelay();
         if (timelockDelay > MAX_TIMELOCK_DELAY) revert IErrors.InvalidTimelockDelay();
         if (quorumVotes == 0) revert IErrors.InvalidQuorumVotes();
     }

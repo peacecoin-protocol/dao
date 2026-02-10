@@ -384,16 +384,13 @@ contract MultipleVotingsTest is Test {
         );
         assertEq(proposalId1, 1);
 
-        // Advance past voting end
-        vm.warp(endTimestamp + 1);
-
         // Now should be able to create a new proposal
         vm.prank(alice);
         uint256 proposalId2 = multipleVotings.proposeMultipleChoice(
             options,
             "Proposal 2",
-            block.timestamp,
-            block.timestamp + VOTING_PERIOD
+            startTimestamp,
+            endTimestamp
         );
         assertEq(proposalId2, 2);
     }
