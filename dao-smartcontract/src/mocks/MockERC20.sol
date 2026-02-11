@@ -11,7 +11,7 @@ contract MockERC20 is OwnableUpgradeable, ERC20Upgradeable {
         __Ownable_init(msg.sender);
     }
 
-    function mint(address _to, uint256 _amount) external {
-        _mint(_to, _amount);
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
     }
 }

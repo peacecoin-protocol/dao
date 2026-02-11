@@ -23,19 +23,19 @@ contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable {
         __Ownable_init(msg.sender);
     }
 
-    function mint(address _to, uint256 _amount) external onlyMinter {
-        _mint(_to, _amount);
+    function mint(address to, uint256 amount) external onlyMinter {
+        _mint(to, amount);
     }
 
-    function burn(address _from, uint256 _amount) external onlyMinter {
-        _burn(_from, _amount);
+    function burn(address from, uint256 amount) external onlyMinter {
+        _burn(from, amount);
     }
 
-    function addMinter(address _minter) external onlyOwner {
-        isMinter[_minter] = true;
+    function addMinter(address minter) external onlyOwner {
+        isMinter[minter] = true;
     }
 
-    function removeMinter(address _minter) external onlyOwner {
-        isMinter[_minter] = false;
+    function removeMinter(address minter) external onlyOwner {
+        isMinter[minter] = false;
     }
 }

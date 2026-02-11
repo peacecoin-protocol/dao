@@ -23,12 +23,12 @@ interface IDAOFactory {
     }
 
     function setImplementation(
-        address _timelockImplementation,
-        address _governorImplementation,
-        address _governanceTokenImplementation,
-        address _multipleVotingImplementation,
-        address _sbtImplementation,
-        address _nftImplementation
+        address newTimelockImplementation,
+        address newGovernorImplementation,
+        address newGovernanceTokenImplementation,
+        address newMultipleVotingImplementation,
+        address newSbtImplementation,
+        address newNftImplementation
     ) external;
 
     function createDao(
@@ -43,7 +43,7 @@ interface IDAOFactory {
     ) external returns (bytes32);
 
     function campaignFactory() external view returns (address);
-    function setCampaignFactory(address _campaignFactory) external;
+    function setCampaignFactory(address newCampaignFactory) external;
     function daoManagerRole() external view returns (bytes32);
     function daoConfigs(
         bytes32 daoId
