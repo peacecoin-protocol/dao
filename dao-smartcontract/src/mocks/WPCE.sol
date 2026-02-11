@@ -2,10 +2,15 @@
 
 pragma solidity ^0.8.30;
 
-import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20VotesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IWPCE} from "../interfaces/IWPCE.sol";
 
-contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable {
+contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable, IWPCE {
     mapping(address => bool) public isMinter;
 
     modifier onlyMinter() {
@@ -23,11 +28,11 @@ contract WPCE is OwnableUpgradeable, ERC20VotesUpgradeable {
         __Ownable_init(msg.sender);
     }
 
-    function mint(address to, uint256 amount) external onlyMinter {
+    function mint(address to, uint256 amount) external override onlyMinter {
         _mint(to, amount);
     }
 
-    function burn(address from, uint256 amount) external onlyMinter {
+    function burn(address from, uint256 amount) external override onlyMinter {
         _burn(from, amount);
     }
 

@@ -97,8 +97,8 @@ contract GovernorAlpha {
 
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
-        uint256 id,
-        address proposer,
+        uint256 indexed id,
+        address indexed proposer,
         address[] targets,
         uint256[] values,
         string[] signatures,
@@ -486,10 +486,7 @@ contract GovernorAlpha {
         guardian = address(0);
     }
 
-    function queueSetTimelockPendingAdmin(
-        address newPendingAdmin,
-        uint256 eta
-    ) public {
+    function queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
             "Governor::queueSetTimelockPendingAdmin: sender must be gov guardian"
@@ -503,10 +500,7 @@ contract GovernorAlpha {
         );
     }
 
-    function executeSetTimelockPendingAdmin(
-        address newPendingAdmin,
-        uint256 eta
-    ) public {
+    function executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
             "Governor::executeSetTimelockPendingAdmin: sender must be gov guardian"
@@ -536,14 +530,6 @@ contract GovernorAlpha {
     function sub256(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b <= a, "subtraction underflow");
         return a - b;
-    }
-
-    function getChainId() internal view returns (uint256) {
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        return chainId;
     }
 }
 

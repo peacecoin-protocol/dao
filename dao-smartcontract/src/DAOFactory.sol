@@ -2,9 +2,15 @@
 pragma solidity ^0.8.30;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    AccessControlUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {INFTInterface} from "./interfaces/INFTInterface.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
@@ -56,24 +62,15 @@ contract DAOFactory is
     event DAOCreated(bytes32 indexed daoId, string daoName, address creator);
 
     event ImplementationUpdated(
-        address timelockImplementation,
-        address governorImplementation,
-        address governanceTokenImplementation,
+        address indexed timelockImplementation,
+        address indexed governorImplementation,
+        address indexed governanceTokenImplementation,
         address multipleVotingImplementation,
         address sbtImplementation,
         address nftImplementation
     );
 
     // ============ Modifiers ============
-    modifier validateDao(bytes32 daoId) {
-        _validateDao(daoId);
-        _;
-    }
-
-    function _validateDao(bytes32 daoId) internal view {
-        IDAOFactory.DaoConfig memory daoConfig = daoConfigs[daoId];
-        if (daoConfig.timelock == address(0)) revert IErrors.DAODoesNotExist();
-    }
 
     modifier validImplementation() {
         _validateImplementation();
@@ -149,9 +146,7 @@ contract DAOFactory is
         uri_ = uri;
     }
 
-    function setCampaignFactory(
-        address newCampaignFactory
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setCampaignFactory(address newCampaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
 
         campaignFactory = newCampaignFactory;
