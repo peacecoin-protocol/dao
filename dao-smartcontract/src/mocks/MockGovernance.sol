@@ -6,22 +6,22 @@ contract MockGovernance {
     mapping(uint256 => address) public proposers;
     uint256 public proposalCount;
 
-    function setProposalState(uint256 _proposalId, uint8 _state) external {
-        proposalStates[_proposalId] = _state;
-        if (_proposalId >= proposalCount) {
-            proposalCount = _proposalId + 1;
+    function setProposalState(uint256 proposalId, uint8 state) external {
+        proposalStates[proposalId] = state;
+        if (proposalId >= proposalCount) {
+            proposalCount = proposalId + 1;
         }
     }
 
-    function setProposer(uint256 _proposalId, address _proposer) external {
-        proposers[_proposalId] = _proposer;
+    function setProposer(uint256 proposalId, address proposer) external {
+        proposers[proposalId] = proposer;
     }
 
-    function state(uint256 _proposalId) external view returns (uint8) {
-        return proposalStates[_proposalId];
+    function state(uint256 proposalId) external view returns (uint8) {
+        return proposalStates[proposalId];
     }
 
-    function proposer(uint256 _proposalId) external view returns (address) {
-        return proposers[_proposalId];
+    function proposer(uint256 proposalId) external view returns (address) {
+        return proposers[proposalId];
     }
 }

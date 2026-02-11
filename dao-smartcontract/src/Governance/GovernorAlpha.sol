@@ -420,7 +420,7 @@ contract GovernorAlpha {
         require(state(proposalId) == ProposalState.Active, "Governor::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
-        require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
+        require(!receipt.hasVoted, "Governor::_castVote: voter already voted");
 
         uint256 votes = getPastVotes(voter, proposal.startBlock);
 

@@ -23,9 +23,7 @@ contract PCEGovToken is ERC20VotesUpgradeable, OwnableUpgradeable {
             "Community token not owned by sender"
         );
 
-        IPCEToken.LocalToken memory localToken = IPCEToken(pceToken).getLocalToken(
-            communityToken
-        );
+        IPCEToken.LocalToken memory localToken = IPCEToken(pceToken).getLocalToken(communityToken);
 
         isCommunityTokenClaimed[communityToken] = true;
 

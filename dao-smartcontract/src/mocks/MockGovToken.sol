@@ -2,8 +2,12 @@
 
 pragma solidity ^0.8.30;
 
-import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ERC20VotesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract MockGovToken is OwnableUpgradeable, ERC20VotesUpgradeable {
     function initialize() external initializer {
@@ -11,7 +15,7 @@ contract MockGovToken is OwnableUpgradeable, ERC20VotesUpgradeable {
         __Ownable_init(msg.sender);
     }
 
-    function mint(address _to, uint256 _amount) external {
-        _mint(_to, _amount);
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
     }
 }
