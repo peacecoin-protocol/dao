@@ -3,7 +3,7 @@
 pragma solidity ^0.8.30;
 
 interface IDAOFactory {
-    struct DAOConfig {
+    struct DaoConfig {
         address timelock;
         address multipleVoting;
         address sbt;
@@ -31,7 +31,7 @@ interface IDAOFactory {
         address _nftImplementation
     ) external;
 
-    function createDAO(
+    function createDao(
         string memory daoName,
         SocialConfig memory socialConfig,
         address communityToken,
@@ -44,9 +44,9 @@ interface IDAOFactory {
 
     function campaignFactory() external view returns (address);
     function setCampaignFactory(address _campaignFactory) external;
-    function DAO_MANAGER_ROLE() external view returns (bytes32);
+    function daoManagerRole() external view returns (bytes32);
     function daoConfigs(
-        bytes32 daoID
+        bytes32 daoId
     )
         external
         view

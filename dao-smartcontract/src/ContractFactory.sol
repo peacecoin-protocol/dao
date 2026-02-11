@@ -11,7 +11,7 @@ import {IErrors} from "./interfaces/IErrors.sol";
  */
 contract ContractFactory is IErrors {
     // ============ Events ============
-    event ContractDeployed(address contractAddress);
+    event ContractDeployed(address indexed contractAddress);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ============ State Variables ============
@@ -19,14 +19,18 @@ contract ContractFactory is IErrors {
 
     // ============ Modifiers ============
     modifier onlyOwner() {
-        if (msg.sender != owner) revert PermissionDenied();
+        _onlyOwner();
         _;
     }
 
+    function _onlyOwner() internal view {
+        if (msg.sender != owner) revert PermissionDenied();
+    }
+
     // ============ Constructor ============
-    constructor(address _owner) {
-        if (_owner == address(0)) revert InvalidAddress();
-        owner = _owner;
+    constructor(address ownerAddress) {
+        if (ownerAddress == address(0)) revert InvalidAddress();
+        owner = ownerAddress;
     }
 
     // ============ External Functions ============
@@ -42,6 +46,7 @@ contract ContractFactory is IErrors {
 
         // Create a new contract using assembly
         // solhint-disable-next-line no-inline-assembly
+        // slither-disable-next-line assembly
         assembly {
             // Create a new contract using the `create` opcode
             deployedAddress := create(0, add(bytecode, 0x20), mload(bytecode))
@@ -57,14 +62,14 @@ contract ContractFactory is IErrors {
     /**
      * @notice Transfer ownership of the contract
      * @dev Only callable by the current owner
-     * @param _owner Address of the new owner
+     * @param newOwner Address of the new owner
      */
-    function transferOwnership(address _owner) external onlyOwner {
-        if (_owner == address(0)) revert InvalidAddress();
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert InvalidAddress();
 
         address previousOwner = owner;
-        owner = _owner;
+        owner = newOwner;
 
-        emit OwnershipTransferred(previousOwner, _owner);
+        emit OwnershipTransferred(previousOwner, newOwner);
     }
 }

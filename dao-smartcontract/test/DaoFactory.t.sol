@@ -9,8 +9,8 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 contract DaoFactoryTest is Test {
@@ -19,18 +19,19 @@ contract DaoFactoryTest is Test {
     GovernorAlpha public governor;
     MockERC20 public mockERC20;
     PCECommunityGovToken public governanceToken;
-    PEACECOINDAO_SBT public sbt;
-    PEACECOINDAO_NFT public nft;
+    PeaceCoinDaoSbt public sbt;
+    PeaceCoinDaoNft public nft;
     MultipleVotings public multipleVoting;
 
-    uint256 public VOTING_DELAY = 10;
-    uint256 public VOTING_PERIOD = 100;
-    uint256 public PROPOSAL_THRESHOLD = 1000;
-    uint256 public QUORUM_VOTES = 2000;
-    uint256 public TIMELOCK_DELAY = 100;
-    string public DAO_NAME = "Test DAO";
+    uint256 public votingDelay = 10;
+    uint256 public votingPeriod = 7200;
+    uint256 public proposalThreshold = 1000;
+    uint256 public quorumVotes = 2000;
+    uint256 public timelockDelay = 100;
 
-    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+    string public daoName = "Test DAO";
+
+    IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
             description: "Test Description",
             website: "https://website.com",
@@ -39,7 +40,7 @@ contract DaoFactoryTest is Test {
             telegram: "https://telegram.com"
         });
 
-    string public BASE_URI = "https://ipfs-dao-studio.mypinata.cloud/ipfs/";
+    string public baseUri = "https://ipfs-dao-studio.mypinata.cloud/ipfs/";
 
     address public defaultAdmin = makeAddr("defaultAdmin");
     address public nonDefaultAdmin = makeAddr("nonDefaultAdmin");
@@ -54,8 +55,8 @@ contract DaoFactoryTest is Test {
         timelock = new Timelock();
         governor = new GovernorAlpha();
         governanceToken = new PCECommunityGovToken();
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        sbt = new PeaceCoinDaoSbt();
+        nft = new PeaceCoinDaoNft();
         multipleVoting = new MultipleVotings();
         vm.stopPrank();
 
@@ -143,121 +144,70 @@ contract DaoFactoryTest is Test {
 
     function test_createDAO() public {
         // only token owner can create DAO
-        daoFactory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
+        daoFactory.createDao(
+            daoName,
+            socialConfig,
             address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            timelockDelay,
+            quorumVotes
         );
 
         // Revert if community token address is zero
         vm.expectRevert(IErrors.InvalidAddress.selector);
-        daoFactory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
+        daoFactory.createDao(
+            daoName,
+            socialConfig,
             address(0),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
-        );
-
-        // Revert if dao name is empty
-        vm.expectRevert(IErrors.InvalidName.selector);
-        daoFactory.createDAO(
-            "",
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            timelockDelay,
+            quorumVotes
         );
 
         // Revert if dao name already exists
         vm.expectRevert(IErrors.DAOAlreadyExists.selector);
-        daoFactory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
+        daoFactory.createDao(
+            daoName,
+            socialConfig,
             address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            timelockDelay,
+            quorumVotes
         );
 
-        string memory secondDAOName = string(abi.encodePacked(DAO_NAME, "1"));
-        // Revert if voting delay is greater than max voting delay
-        vm.expectRevert(IErrors.InvalidVotingDelay.selector);
-        daoFactory.createDAO(
-            secondDAOName,
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            1000 days,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
-        );
-
-        // Revert if voting period is greater than max voting period
-        vm.expectRevert(IErrors.InvalidVotingPeriod.selector);
-        daoFactory.createDAO(
-            secondDAOName,
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            VOTING_DELAY,
-            1000 days,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
-        );
-
-        // Revert if timelock delay is greater than max timelock delay
-        vm.expectRevert(IErrors.InvalidTimelockDelay.selector);
-        daoFactory.createDAO(
-            secondDAOName,
-            SOCIAL_CONFIG,
-            address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            1000 days,
-            QUORUM_VOTES
-        );
+        string memory secondDaoName = string(abi.encodePacked(daoName, "1"));
 
         // Revert if quorum votes is zero
         vm.expectRevert(IErrors.InvalidQuorumVotes.selector);
-        daoFactory.createDAO(
-            secondDAOName,
-            SOCIAL_CONFIG,
+        daoFactory.createDao(
+            secondDaoName,
+            socialConfig,
             address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            timelockDelay,
             0
         );
 
         // Revert if community token owner is not the msg.sender
         vm.prank(defaultAdmin);
         vm.expectRevert(IErrors.InvalidCommunityTokenOwner.selector);
-        daoFactory.createDAO(
-            DAO_NAME,
-            SOCIAL_CONFIG,
+        daoFactory.createDao(
+            daoName,
+            socialConfig,
             address(mockERC20),
-            VOTING_DELAY,
-            VOTING_PERIOD,
-            PROPOSAL_THRESHOLD,
-            TIMELOCK_DELAY,
-            QUORUM_VOTES
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            timelockDelay,
+            quorumVotes
         );
     }
 

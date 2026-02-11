@@ -3,13 +3,17 @@ pragma solidity ^0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
+
+interface GovernorInterface {
+    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
+    function proposalThreshold() external view returns (uint256);
+}
 
 /// @title MultipleVotings
 /// @notice Contract for handling multiple choice voting proposals in the governance system
 /// @dev Supports up to 20 options per proposal, allows users to allocate voting power across options
-contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
-    /// @notice Maximum number of options allowed per proposa
+contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable, GovernorInterface {
+    /// @notice Maximum number of options allowed per proposal
     uint256 public constant MAX_OPTIONS = 20;
 
     /// @notice The address of the governor contract
@@ -75,29 +79,33 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
     event ProposalFinalized(uint256 indexed id, ProposalState state);
 
     /// @notice Initialize the contract
-    /// @param _governor Address of the governor contract
-    /// @param _admin The address of the admin
-    function initialize(address _governor, address _admin) external initializer {
-        require(_governor != address(0), "Multiple_Votings: invalid governor address");
-        require(_admin != address(0), "Multiple_Votings: invalid admin address");
+    /// @param governorAddress Address of the governor contract
+    /// @param adminAddress The address of the admin
+    function initialize(address governorAddress, address adminAddress) external initializer {
+        require(governorAddress != address(0), "Multiple_Votings: invalid governor address");
+        require(adminAddress != address(0), "Multiple_Votings: invalid admin address");
 
-        governor = _governor;
-        admin = _admin;
+        governor = governorAddress;
+        admin = adminAddress;
 
-        proposalThreshold = IGovernor(_governor).proposalThreshold();
+        proposalThreshold = GovernorInterface(governorAddress).proposalThreshold();
 
         __ReentrancyGuard_init();
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Multiple_Votings: only admin can call this function");
+        _onlyAdmin();
         _;
     }
 
+    function _onlyAdmin() internal view {
+        require(msg.sender == admin, "Multiple_Votings: only admin can call this function");
+    }
+
     /// @notice Set the admin address
-    /// @param _admin The new admin address
-    function setAdmin(address _admin) external onlyAdmin {
-        admin = _admin;
+    /// @param newAdmin The new admin address
+    function setAdmin(address newAdmin) external onlyAdmin {
+        admin = newAdmin;
     }
 
     /// @notice Create a new multiple choice proposal
@@ -113,8 +121,10 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
         require(options.length > 1, "Multiple_Votings: must have at least 2 options");
         require(options.length <= MAX_OPTIONS, "Multiple_Votings: too many options");
         require(bytes(description).length > 0, "Multiple_Votings: description required");
-
-        // Check proposer has enough voting power (using governor's threshold)
+        require(
+            endTimestamp > startTimestamp,
+            "Multiple_Votings: end timestamp must be greater than start timestamp"
+        );
         require(
             getPastVotes(msg.sender, block.number - 1) > proposalThreshold,
             "Multiple_Votings: proposer votes below proposal threshold"
@@ -266,7 +276,10 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
     /// @param account The account to check
     /// @param blockNumber The block number to check at
     /// @return votes The voting power
-    function getPastVotes(address account, uint256 blockNumber) public view returns (uint256) {
+    function getPastVotes(
+        address account,
+        uint256 blockNumber
+    ) public view override returns (uint256) {
         return uint256(GovernorInterface(governor).getPastVotes(account, blockNumber));
     }
 
@@ -301,8 +314,4 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable {
 
         return ProposalState.Ended;
     }
-}
-
-interface GovernorInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
 }

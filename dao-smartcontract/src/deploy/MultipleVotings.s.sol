@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {MultipleVotings} from "../Governance/MultipleVotings.sol";
+import {console} from "forge-std/console.sol";
 
 contract MultipleVotingsScript is Script {
     address public governor = 0xceA083fC0516461042bFA60F6Cb23BA6460619e8;
@@ -13,7 +14,7 @@ contract MultipleVotingsScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         MultipleVotings multipleVotings = new MultipleVotings();
-        multipleVotings.initialize(governor, admin);
+        multipleVotings.initialize({governorAddress: governor, adminAddress: admin});
 
         console.log("MultipleVotings deployed at", address(multipleVotings));
 

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../ContractFactory.sol";
+import {Script} from "forge-std/Script.sol";
+import {ContractFactory} from "../ContractFactory.sol";
+import {console} from "forge-std/console.sol";
 
 contract ContractFactoryScript is Script {
     function run() external {

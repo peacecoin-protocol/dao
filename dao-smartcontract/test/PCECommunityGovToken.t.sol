@@ -32,7 +32,7 @@ contract PCECommunityGovTokenTest is Test {
 
         erc20CommunityToken = new MockERC20();
         pceToken = new PCECommunityGovToken();
-        pceToken.initialize(address(erc20CommunityToken));
+        pceToken.initialize({communityTokenAddress: address(erc20CommunityToken)});
 
         // Mint tokens to user and approve spending
         erc20CommunityToken.mint(user, INITIAL_BALANCE);

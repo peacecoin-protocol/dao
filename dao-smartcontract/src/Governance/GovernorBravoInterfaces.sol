@@ -148,7 +148,7 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
         /// @notice Whether or not the voter supports the proposal or abstains
         uint8 support;
         /// @notice The number of votes the voter had, which were cast
-        uint96 votes;
+        uint256 votes;
     }
 
     /// @notice Possible states that a proposal may be in
@@ -174,7 +174,7 @@ contract GovernorBravoDelegateStorageV2 is GovernorBravoDelegateStorageV1 {
 
 interface TimelockInterface {
     function delay() external view returns (uint256);
-    function GRACE_PERIOD() external view returns (uint256);
+    function gracePeriod() external view returns (uint256);
     function acceptAdmin() external;
     function queuedTransactions(bytes32 hash) external view returns (bool);
     function queueTransaction(
@@ -201,7 +201,7 @@ interface TimelockInterface {
 }
 
 interface CompInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint96);
+    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
 }
 
 interface GovernorAlpha {

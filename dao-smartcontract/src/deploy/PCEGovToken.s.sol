@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../mocks/PCEGovToken.sol";
+import {Script} from "forge-std/Script.sol";
+import {PCEGovToken} from "../mocks/PCEGovToken.sol";
 
 contract PCEGovTokenScript is Script {
     function run() external {

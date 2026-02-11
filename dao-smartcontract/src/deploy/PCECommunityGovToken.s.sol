@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../mocks/PCECommunityGovToken.sol";
+import {Script} from "forge-std/Script.sol";
+import {PCECommunityGovToken} from "../mocks/PCECommunityGovToken.sol";
 
 contract PCECommunityGovTokenScript is Script {
     function run() external {
@@ -11,7 +11,7 @@ contract PCECommunityGovTokenScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         PCECommunityGovToken pceCommunityGovToken = new PCECommunityGovToken();
-        pceCommunityGovToken.initialize(communityToken);
+        pceCommunityGovToken.initialize({communityTokenAddress: communityToken});
         vm.stopBroadcast();
     }
 }

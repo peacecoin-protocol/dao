@@ -5,9 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
-import {console} from "forge-std/console.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {
@@ -21,8 +20,8 @@ contract TimelockTest is Test {
     address bob = makeAddr("bob");
 
     MockGovToken governanceToken;
-    PEACECOINDAO_SBT sbt;
-    PEACECOINDAO_NFT nft;
+    PeaceCoinDaoSbt sbt;
+    PeaceCoinDaoNft nft;
     GovernorAlpha governor;
     Timelock timelock;
     uint256 constant INITIAL_AMOUNT = 50000;
@@ -31,7 +30,7 @@ contract TimelockTest is Test {
     uint256 constant PROPOSAL_THRESHOLD = 100e18;
     uint256 constant QUORUM_VOTES = 1000e18;
     string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
-    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
             description: "PEACECOIN DAO",
             website: "https://peacecoin.com",
@@ -74,8 +73,8 @@ contract TimelockTest is Test {
         governanceToken = new MockGovToken();
         governanceToken.initialize();
 
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        sbt = new PeaceCoinDaoSbt();
+        nft = new PeaceCoinDaoNft();
 
         sbt.initialize(URI, address(this), address(this), true);
         nft.initialize(URI, address(this), address(this), false);
@@ -95,7 +94,7 @@ contract TimelockTest is Test {
             PROPOSAL_THRESHOLD,
             QUORUM_VOTES,
             address(this),
-            SOCIAL_CONFIG
+            socialConfig
         );
         governanceToken.mint(address(this), INITIAL_AMOUNT);
 
@@ -126,9 +125,9 @@ contract TimelockTest is Test {
         _timelock.initialize(alice, 2 hours);
         assertEq(_timelock.admin(), alice);
         assertEq(_timelock.delay(), 2 hours);
-        assertEq(_timelock.MINIMUM_DELAY(), 1 minutes);
-        assertEq(_timelock.MAXIMUM_DELAY(), 30 hours);
-        assertEq(_timelock.GRACE_PERIOD(), 14 days);
+        assertEq(_timelock.minimumDelay(), 1 minutes);
+        assertEq(_timelock.maximumDelay(), 30 hours);
+        assertEq(_timelock.gracePeriod(), 14 days);
     }
 
     function test_initialize_RevertsWhen_DelayIsInvalid() public {
@@ -258,7 +257,7 @@ contract TimelockTest is Test {
             bytes memory data,
             uint256 eta
         ) = _buildTransactionParams();
-        data = abi.encode(timelock.MAXIMUM_DELAY() - 1);
+        data = abi.encode(timelock.maximumDelay() - 1);
 
         vm.prank(bob);
         vm.expectRevert("Timelock::executeTransaction: Call must come from admin.");
@@ -284,7 +283,7 @@ contract TimelockTest is Test {
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
         timelock.executeTransaction(target, value, signature, data, eta);
         vm.assertEq(timelock.queuedTransactions(txHash), false);
-        vm.assertEq(timelock.delay(), timelock.MAXIMUM_DELAY() - 1);
+        vm.assertEq(timelock.delay(), timelock.maximumDelay() - 1);
     }
 
     function test__executeTransactionWithoutSignature() public {
@@ -296,7 +295,7 @@ contract TimelockTest is Test {
             uint256 eta
         ) = _buildTransactionParams();
         signature = "";
-        data = abi.encodeWithSignature("setDelay(uint256)", timelock.MAXIMUM_DELAY() - 1);
+        data = abi.encodeWithSignature("setDelay(uint256)", timelock.maximumDelay() - 1);
 
         // Queue Transaction
         vm.prank(alice);
@@ -313,7 +312,7 @@ contract TimelockTest is Test {
         timelock.executeTransaction(target, value, signature, data, eta);
 
         vm.assertEq(timelock.queuedTransactions(txHash), false);
-        vm.assertEq(timelock.delay(), timelock.MAXIMUM_DELAY() - 1);
+        vm.assertEq(timelock.delay(), timelock.maximumDelay() - 1);
     }
 
     function test__executeExpiredTransaction() public {
@@ -330,7 +329,7 @@ contract TimelockTest is Test {
         timelock.queueTransaction(target, value, signature, data, eta);
 
         // Warp to after grace period
-        vm.warp(eta + timelock.GRACE_PERIOD() + 1);
+        vm.warp(eta + timelock.gracePeriod() + 1);
 
         // Try to execute expired transaction
         vm.prank(alice);
@@ -402,9 +401,9 @@ contract TimelockTest is Test {
     }
 
     function test_updateVariables() public {
-        uint256 newGracePeriod = timelock.GRACE_PERIOD() + 2 days;
-        uint256 newMinDelay = timelock.MINIMUM_DELAY() + 1 minutes;
-        uint256 newMaxDelay = timelock.MAXIMUM_DELAY() - 1 hours;
+        uint256 newGracePeriod = timelock.gracePeriod() + 2 days;
+        uint256 newMinDelay = timelock.minimumDelay() + 1 minutes;
+        uint256 newMaxDelay = timelock.maximumDelay() - 1 hours;
 
         vm.expectRevert("Timelock::updateVariables: Call must come from Timelock.");
         timelock.updateVariables(newGracePeriod, newMinDelay, newMaxDelay);
@@ -417,9 +416,9 @@ contract TimelockTest is Test {
         timelock.updateVariables(newGracePeriod, newMinDelay, 31 hours);
 
         timelock.updateVariables(newGracePeriod, newMinDelay, newMaxDelay);
-        assertEq(timelock.GRACE_PERIOD(), newGracePeriod);
-        assertEq(timelock.MINIMUM_DELAY(), newMinDelay);
-        assertEq(timelock.MAXIMUM_DELAY(), newMaxDelay);
+        assertEq(timelock.gracePeriod(), newGracePeriod);
+        assertEq(timelock.minimumDelay(), newMinDelay);
+        assertEq(timelock.maximumDelay(), newMaxDelay);
         vm.stopPrank();
     }
 }

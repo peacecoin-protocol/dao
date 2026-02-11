@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {DAOFactory} from "../DAOFactory.sol";
-import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 import {PCECommunityGovToken} from "../mocks/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../Governance/GovernorAlpha.sol";
 import {Timelock} from "../Governance/Timelock.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {PEACECOINDAO_SBT} from "../Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../Governance/PEACECOINDAO_NFT.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
-    function deployDAOFactory() public returns (address, address, address) {
+    function deployDaoFactory() public returns (address, address, address) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
@@ -48,8 +47,8 @@ contract DeployDAOFactory is Script {
 
         address proxyAdminAddress = address(proxyAdmin);
 
-        PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
-        PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
+        PeaceCoinDaoSbt sbtImplementation = new PeaceCoinDaoSbt();
+        PeaceCoinDaoNft nftImplementation = new PeaceCoinDaoNft();
 
         MockERC20 mockERC20 = new MockERC20();
         mockERC20.initialize();

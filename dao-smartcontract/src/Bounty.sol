@@ -39,84 +39,86 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
     /**
      * @notice Initialize the Bounty contract
      * @dev Sets up the bounty token, amount, and governance contract
-     * @param _bountyToken Address of the bounty token contract
-     * @param _bountyAmount Default bounty amount
-     * @param _governance Address of the governance contract
+     * @param token Address of the bounty token contract
+     * @param initialBountyAmount Default bounty amount
+     * @param governanceAddress Address of the governance contract
      */
     function initialize(
-        ERC20Upgradeable _bountyToken,
-        uint256 _bountyAmount,
-        address _governance
+        ERC20Upgradeable token,
+        uint256 initialBountyAmount,
+        address governanceAddress
     ) public initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
 
-        if (address(_bountyToken) == address(0)) revert InvalidAddress();
-        if (_governance == address(0)) revert InvalidAddress();
+        if (address(token) == address(0)) revert InvalidAddress();
+        if (governanceAddress == address(0)) revert InvalidAddress();
 
-        bountyAmount = _bountyAmount;
-        bountyToken = _bountyToken;
-        governance = _governance;
+        bountyAmount = initialBountyAmount;
+        bountyToken = token;
+        governance = governanceAddress;
     }
 
-    function setBountyAmount(uint256 _bountyAmount) external onlyOwner {
-        bountyAmount = _bountyAmount;
-        emit UpdatedBountyAmount(_bountyAmount);
+    function setBountyAmount(uint256 newBountyAmount) external onlyOwner {
+        bountyAmount = newBountyAmount;
+        emit UpdatedBountyAmount(newBountyAmount);
     }
 
     /**
      * @notice Set contributor status
      * @dev Only callable by the contract owner
-     * @param _contributor Address of the contributor
+     * @param contributor Address of the contributor
      * @param status Contributor status
      */
-    function setContributor(address _contributor, bool status) external onlyOwner {
-        if (_contributor == address(0)) revert InvalidContributor();
-        isContributor[_contributor] = status;
+    function setContributor(address contributor, bool status) external onlyOwner {
+        if (contributor == address(0)) revert InvalidContributor();
+        isContributor[contributor] = status;
     }
 
     /**
      * @notice Add bounty to a proposal
      * @dev Adds bounty tokens to a successful proposal
-     * @param _proposalId ID of the proposal
-     * @param _amount Amount of bounty tokens to add
+     * @param proposalId ID of the proposal
+     * @param amount Amount of bounty tokens to add
      */
-    function addProposalBounty(uint256 _proposalId, uint256 _amount) external {
-        if (_amount == 0) revert ZeroAmount();
+    function addProposalBounty(uint256 proposalId, uint256 amount) external {
+        if (amount == 0) revert ZeroAmount();
 
-        ProposalState state = IGovernance(governance).state(_proposalId);
+        ProposalState state = IGovernance(governance).state(proposalId);
         if (state != ProposalState.Executed && state != ProposalState.Succeeded) {
             revert InvalidProposalState();
         }
 
         // Unchecked addition for gas optimization (safe due to previous checks)
         unchecked {
-            proposalBounties[_proposalId] += _amount;
+            proposalBounties[proposalId] += amount;
         }
-        bountyToken.transferFrom(msg.sender, address(this), _amount);
+        bool success = bountyToken.transferFrom(msg.sender, address(this), amount);
+        require(success, "ERC20: transferFrom failed");
 
-        emit AddedProposalBounty(msg.sender, _proposalId, _amount);
+        emit AddedProposalBounty(msg.sender, proposalId, amount);
     }
 
     /**
      * @notice Add bounty for a contributor
      * @dev Adds bounty tokens for a specific contributor
-     * @param _contributor Address of the contributor
-     * @param _amount Amount of bounty tokens to add
+     * @param contributor Address of the contributor
+     * @param amount Amount of bounty tokens to add
      */
-    function addContributorBounty(address _contributor, uint256 _amount) external {
-        if (_amount == 0) revert ZeroAmount();
-        if (_contributor == address(0)) revert InvalidContributor();
+    function addContributorBounty(address contributor, uint256 amount) external {
+        if (amount == 0) revert ZeroAmount();
+        if (contributor == address(0)) revert InvalidContributor();
 
-        BountyInfo storage bounty = contributorBounties[_contributor];
+        BountyInfo storage bounty = contributorBounties[contributor];
         // Unchecked addition for gas optimization (safe due to previous checks)
         unchecked {
-            bounty.bountyAmount += _amount;
+            bounty.bountyAmount += amount;
         }
 
-        bountyToken.transferFrom(msg.sender, address(this), _amount);
+        bool success = bountyToken.transferFrom(msg.sender, address(this), amount);
+        require(success, "ERC20: transferFrom failed");
 
-        emit AddedContributorBounty(msg.sender, _contributor, _amount);
+        emit AddedContributorBounty(msg.sender, contributor, amount);
     }
 
     /**
@@ -132,7 +134,8 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         unchecked {
             proposalBountyWithdrawn[msg.sender] += claimable;
         }
-        bountyToken.transfer(msg.sender, claimable);
+        bool success = bountyToken.transfer(msg.sender, claimable);
+        require(success, "ERC20: transfer failed");
 
         emit ClaimedBounty(msg.sender, claimable);
     }
@@ -146,11 +149,12 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         if (claimable == 0) revert NothingToWithdraw();
 
         BountyInfo storage bounty = contributorBounties[msg.sender];
-        // Unchecked addition for gas optimization (safe due to previous checks)
+
         unchecked {
             bounty.withdrawn += claimable;
         }
-        bountyToken.transfer(msg.sender, claimable);
+        bool success = bountyToken.transfer(msg.sender, claimable);
+        require(success, "ERC20: transfer failed");
 
         emit ClaimedBounty(msg.sender, claimable);
     }
@@ -158,24 +162,30 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
     /**
      * @notice Get claimable proposal bounty amount for a user
      * @dev Calculates total claimable proposal bounties for a user
-     * @param _user Address of the user
+     * @param user Address of the user
      * @return Claimable proposal bounty amount
      */
-    function claimableProposalAmount(address _user) public view returns (uint256) {
+    function claimableProposalAmount(address user) public view returns (uint256) {
         uint256 _totalBounty;
         uint256 proposalCount = IGovernance(governance).proposalCount();
 
-        for (uint256 i; i < proposalCount; ) {
+        for (uint256 i = 1; i <= proposalCount; i++) {
             address proposer = IGovernance(governance).proposer(i);
 
-            if (proposer == _user) {
-                _totalBounty += proposalBounties[i] + bountyAmount;
-            }
-            unchecked {
-                ++i;
+            if (proposer == user) {
+                ProposalState state = IGovernance(governance).state(i);
+                if (state == ProposalState.Executed || state == ProposalState.Succeeded) {
+                    _totalBounty += proposalBounties[i] + bountyAmount;
+                }
             }
         }
-        return _totalBounty - proposalBountyWithdrawn[_user];
+
+        uint256 withdrawn = proposalBountyWithdrawn[user];
+        if (_totalBounty <= withdrawn) {
+            return 0;
+        }
+
+        return _totalBounty - withdrawn;
     }
 
     /**
@@ -187,8 +197,12 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
     function claimableContributorAmount(address user) public view returns (uint256) {
         uint256 extraAmount = isContributor[user] ? bountyAmount : 0;
         BountyInfo storage bounty = contributorBounties[user];
-        uint256 claimable = bounty.bountyAmount + extraAmount - bounty.withdrawn;
-        return claimable;
+        uint256 total = bounty.bountyAmount + extraAmount;
+
+        if (total <= bounty.withdrawn) {
+            return 0;
+        }
+        return total - bounty.withdrawn;
     }
 
     /**
@@ -197,6 +211,7 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
      * @param token Token contract to recover
      */
     function recoverERC20(ERC20Upgradeable token) external onlyOwner {
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+        bool success = token.transfer(msg.sender, token.balanceOf(address(this)));
+        require(success, "ERC20: transfer failed");
     }
 }

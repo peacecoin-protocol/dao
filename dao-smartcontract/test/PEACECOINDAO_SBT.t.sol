@@ -2,17 +2,17 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 
 /**
- * @title PEACECOINDAO_SBTTest
- * @notice Comprehensive test suite for the PEACECOINDAO_SBT contract
+ * @title PeaceCoinDaoSbtTest
+ * @notice Comprehensive test suite for the PeaceCoinDaoSbt contract
  * @dev Tests cover non-transferability
  */
-contract PEACECOINDAO_SBTTest is Test {
+contract PeaceCoinDaoSbtTest is Test {
     /// @notice SBT contract
-    PEACECOINDAO_SBT public sbt;
+    PeaceCoinDaoSbt public sbt;
 
     /// @notice Test accounts
     address public alice = makeAddr("alice");
@@ -32,7 +32,7 @@ contract PEACECOINDAO_SBTTest is Test {
      */
     function setUp() public {
         // Deploy core contracts
-        sbt = new PEACECOINDAO_SBT();
+        sbt = new PeaceCoinDaoSbt();
 
         // Initialize SBT contract
         sbt.initialize(BASE_URI, address(this), address(this), true);

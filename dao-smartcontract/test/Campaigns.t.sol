@@ -5,10 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {Campaigns} from "../src/Campaigns.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {ITokens} from "../src/interfaces/ITokens.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
@@ -31,10 +30,10 @@ contract CampaignsTest is Test {
     Campaigns public campaigns;
 
     /// @notice NFT contract for campaign rewards
-    PEACECOINDAO_NFT public nft;
+    PeaceCoinDaoNft public nft;
 
     /// @notice SBT contract for DAO membership
-    PEACECOINDAO_SBT public sbt;
+    PeaceCoinDaoSbt public sbt;
 
     /// @notice Multiple voting contract for DAO governance
     MultipleVotings public multipleVoting;
@@ -98,7 +97,7 @@ contract CampaignsTest is Test {
 
     /// @notice Governance parameters
     uint256 private constant VOTING_DELAY = 1;
-    uint256 private constant VOTING_PERIOD = 1000;
+    uint256 private constant VOTING_PERIOD = 7200;
     uint256 private constant PROPOSAL_THRESHOLD = 1000;
     uint256 private constant QUORUM_VOTES = 1000;
     uint256 private constant TIMELOCK_DELAY = 1000;
@@ -114,7 +113,7 @@ contract CampaignsTest is Test {
     // ============ Configuration Objects ============
 
     /// @notice Social media configuration for DAO
-    IDAOFactory.SocialConfig SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig socialConfig =
         IDAOFactory.SocialConfig({
             description: "Test Description",
             website: "https://website.com",
@@ -136,8 +135,8 @@ contract CampaignsTest is Test {
         vm.startPrank(daoManager);
 
         // Deploy core governance contracts
-        PEACECOINDAO_SBT sbtImplementation = new PEACECOINDAO_SBT();
-        PEACECOINDAO_NFT nftImplementation = new PEACECOINDAO_NFT();
+        PeaceCoinDaoSbt sbtImplementation = new PeaceCoinDaoSbt();
+        PeaceCoinDaoNft nftImplementation = new PeaceCoinDaoNft();
         MultipleVotings multipleVotingImplementation = new MultipleVotings();
         timelock = new Timelock();
         governor = new GovernorAlpha();
@@ -147,6 +146,7 @@ contract CampaignsTest is Test {
         DAOFactory factory = new DAOFactory();
         factory.initialize();
         daoFactory = address(factory);
+
         factory.setImplementation(
             address(timelock),
             address(governor),
@@ -161,9 +161,9 @@ contract CampaignsTest is Test {
         mockERC20.initialize();
 
         // Create a test DAO
-        daoId = factory.createDAO(
+        daoId = factory.createDao(
             DAO_NAME,
-            SOCIAL_CONFIG,
+            socialConfig,
             address(mockERC20),
             VOTING_DELAY,
             VOTING_PERIOD,
@@ -188,8 +188,8 @@ contract CampaignsTest is Test {
         });
 
         (, , address sbtAddress, address nftAddress, , , , ) = factory.daoConfigs(daoId);
-        sbt = PEACECOINDAO_SBT(sbtAddress);
-        nft = PEACECOINDAO_NFT(nftAddress);
+        sbt = PeaceCoinDaoSbt(sbtAddress);
+        nft = PeaceCoinDaoNft(nftAddress);
 
         // Deploy and initialize Campaigns contract
         campaigns = new Campaigns();

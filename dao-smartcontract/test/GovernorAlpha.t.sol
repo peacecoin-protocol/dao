@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
-import {PEACECOINDAO_SBT} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract GovernorAlphaTest is Test {
@@ -15,7 +15,7 @@ contract GovernorAlphaTest is Test {
     address guardian = address(this);
 
     string constant URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
-    IDAOFactory.SocialConfig public SOCIAL_CONFIG =
+    IDAOFactory.SocialConfig public socialConfig =
         IDAOFactory.SocialConfig({
             description: "PEACECOIN DAO",
             website: "https://peacecoin.com",
@@ -24,8 +24,8 @@ contract GovernorAlphaTest is Test {
             telegram: "https://t.me/peacecoin"
         });
     MockGovToken governanceToken;
-    PEACECOINDAO_SBT sbt;
-    PEACECOINDAO_NFT nft;
+    PeaceCoinDaoSbt sbt;
+    PeaceCoinDaoNft nft;
 
     GovernorAlpha gov;
     Timelock timelock;
@@ -48,8 +48,8 @@ contract GovernorAlphaTest is Test {
         governanceToken = new MockGovToken();
         governanceToken.initialize();
 
-        sbt = new PEACECOINDAO_SBT();
-        nft = new PEACECOINDAO_NFT();
+        sbt = new PeaceCoinDaoSbt();
+        nft = new PeaceCoinDaoNft();
 
         sbt.initialize(URI, address(this), address(this), true);
         nft.initialize(URI, address(this), address(this), false);
@@ -70,7 +70,7 @@ contract GovernorAlphaTest is Test {
             PROPOSAL_THRESHOLD,
             QUORUM_VOTES,
             guardian,
-            SOCIAL_CONFIG
+            socialConfig
         );
 
         governanceToken.mint(guardian, INITIAL_BALANCE);
@@ -328,11 +328,11 @@ contract GovernorAlphaTest is Test {
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
-        vm.expectRevert("Governor::__acceptAdmin: sender must be gov guardian");
-        gov.__acceptAdmin();
+        vm.expectRevert("Governor::_acceptAdmin: sender must be gov guardian");
+        gov._acceptAdmin();
 
         vm.prank(guardian);
-        gov.__acceptAdmin();
+        gov._acceptAdmin();
         assertEq(timelock.admin(), address(gov));
     }
 
@@ -342,11 +342,11 @@ contract GovernorAlphaTest is Test {
      */
     function test_abdicate() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::__abdicate: sender must be gov guardian");
-        gov.__abdicate();
+        vm.expectRevert("Governor::_abdicate: sender must be gov guardian");
+        gov._abdicate();
 
         vm.prank(guardian);
-        gov.__abdicate();
+        gov._abdicate();
         assertEq(gov.guardian(), address(0));
     }
 
@@ -573,8 +573,8 @@ contract GovernorAlphaTest is Test {
      */
     function test_queueSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::__queueSetTimelockPendingAdmin: sender must be gov guardian");
-        gov.__queueSetTimelockPendingAdmin(alice, 0);
+        vm.expectRevert("Governor::_queueSetTimelockPendingAdmin: sender must be gov guardian");
+        gov._queueSetTimelockPendingAdmin(alice, 0);
     }
 
     /**
@@ -582,8 +582,8 @@ contract GovernorAlphaTest is Test {
      */
     function test_executeSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::__executeSetTimelockPendingAdmin: sender must be gov guardian");
-        gov.__executeSetTimelockPendingAdmin(alice, 0);
+        vm.expectRevert("Governor::_executeSetTimelockPendingAdmin: sender must be gov guardian");
+        gov._executeSetTimelockPendingAdmin(alice, 0);
     }
 
     /**

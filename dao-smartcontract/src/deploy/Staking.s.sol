@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
-import "../Staking.sol";
-import "../Governance/WPCE.sol";
-import "forge-std/console.sol";
+import {Script} from "forge-std/Script.sol";
+import {Staking} from "../Staking.sol";
+import {WPCE} from "../mocks/WPCE.sol";
+import {console} from "forge-std/console.sol";
 
 contract StakingScript is Script {
     function run() external {
@@ -22,7 +22,11 @@ contract StakingScript is Script {
         Staking staking = new Staking();
         wpce.addMinter(address(staking));
 
-        staking.initialize(rewardPerBlock, pceTokenAddress, address(wpce));
+        staking.initialize({
+            rewardPerBlockValue: rewardPerBlock,
+            pceAddress: pceTokenAddress,
+            wPceAddress: address(wpce)
+        });
 
         console.log("Staking address:", address(staking));
         console.log("Deployer address:", deployerAddress);

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IErrors} from "../interfaces/IErrors.sol";
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
 
-contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, IErrors {
+contract PeaceCoinDaoNft is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, IErrors {
     using Checkpoints for Checkpoints.Trace224;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -27,24 +27,24 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     address public daoFactory;
     uint256 public numberOfTokens;
 
-    mapping(uint256 => string) public tokenURIs;
+    mapping(uint256 => string) public tokenUrIs;
     mapping(address => bool) public minters;
     mapping(uint256 => bool) public isRevoked;
     mapping(uint256 => address) public creators;
 
     function initialize(
-        string memory _uri,
-        address _daoFactory,
-        address _owner,
-        bool _isSBT
+        string memory baseUri,
+        address daoFactoryAddress,
+        address owner,
+        bool isSbt
     ) external initializer {
         __AccessControl_init();
-        __ERC1155_init(_uri);
+        __ERC1155_init(baseUri);
 
-        uri_ = _uri;
-        daoFactory = _daoFactory;
+        uri_ = baseUri;
+        daoFactory = daoFactoryAddress;
 
-        if (_isSBT) {
+        if (isSbt) {
             name = "PEACECOIN DAO SBT";
             symbol = "PCE_SBT";
         } else {
@@ -52,8 +52,8 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
             symbol = "PCE_NFT";
         }
 
-        minters[_owner] = true;
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        minters[owner] = true;
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
     // Voting weight per token ID
@@ -70,48 +70,60 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     event SetTokenURI(uint256 indexed tokenId, string uri, uint256 weight);
 
     modifier onlyDefaultAdmin() {
-        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert PermissionDenied();
+        _onlyDefaultAdmin();
         _;
+    }
+
+    function _onlyDefaultAdmin() internal view {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert PermissionDenied();
     }
 
     modifier validTokenId(uint256 id) {
-        if (id == 0 || id > numberOfTokens) revert InvalidTokenId();
+        _validTokenId(id);
         _;
     }
 
+    function _validTokenId(uint256 id) internal view {
+        if (id == 0 || id > numberOfTokens) revert InvalidTokenId();
+    }
+
     modifier onlyMinter() {
+        _onlyMinter();
+        _;
+    }
+
+    function _onlyMinter() internal view {
         if (
             !minters[msg.sender] && address(IDAOFactory(daoFactory).campaignFactory()) != msg.sender
         ) {
             revert InvalidMinter();
         }
-        _;
     }
 
-    function uri(uint256 _id) public view override returns (string memory) {
-        return string(abi.encodePacked(uri_, tokenURIs[_id]));
+    function uri(uint256 id) public view override returns (string memory) {
+        return string(abi.encodePacked(uri_, tokenUrIs[id]));
     }
 
     // ========== Admin ==========
-    function createToken(string memory _tokenURI, uint256 _votingPower) external onlyDefaultAdmin {
+    function createToken(string memory tokenUri, uint256 votingPower) external onlyDefaultAdmin {
         numberOfTokens++;
         uint256 id = numberOfTokens;
 
-        tokenURIs[id] = _tokenURI;
-        votingPowerPerId[id] = _votingPower;
+        tokenUrIs[id] = tokenUri;
+        votingPowerPerId[id] = votingPower;
         creators[id] = msg.sender;
 
-        emit CreatedToken(id, _tokenURI, _votingPower);
+        emit CreatedToken(id, tokenUri, votingPower);
     }
 
     function setTokenURI(
         uint256 id,
-        string memory _tokenURI,
-        uint256 _votingPower
+        string memory tokenUri,
+        uint256 votingPower
     ) external onlyDefaultAdmin validTokenId(id) {
-        tokenURIs[id] = _tokenURI;
-        votingPowerPerId[id] = _votingPower;
-        emit SetTokenURI(id, _tokenURI, _votingPower);
+        tokenUrIs[id] = tokenUri;
+        votingPowerPerId[id] = votingPower;
+        emit SetTokenURI(id, tokenUri, votingPower);
     }
 
     function mint(address to, uint256 id, uint256 amount) external onlyMinter validTokenId(id) {
@@ -190,9 +202,11 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     }
 
     function getPastVotes(address who, uint256 blockNumber) external view returns (uint256) {
-        // Fix: Checkpoints.Trace224 expects uint32 for key
         if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
-        return _checkpoints[who].upperLookup(uint32(blockNumber));
+        // casting to 'uint32' is safe because blockNumber is checked above to fit
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint32 blockNumber32 = uint32(blockNumber);
+        return _checkpoints[who].upperLookup(blockNumber32);
     }
 
     function getTokenWeight(uint256 id) external view returns (uint256) {
@@ -231,19 +245,29 @@ contract PEACECOINDAO_NFT is Initializable, ERC1155Upgradeable, AccessControlUpg
     function _moveVotes(address from, address to, uint256 amount) internal {
         if (amount == 0) return;
 
-        uint32 currentBlock = uint32(block.number);
+        uint256 blockNumber = block.number;
+        if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
+        // casting to 'uint32' is safe because blockNumber is checked above to fit
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint32 currentBlock = uint32(blockNumber);
 
         if (from != address(0)) {
             uint256 oldFrom = _checkpoints[from].latest();
             if (oldFrom < amount) revert InsufficientVotesToMove();
-            _checkpoints[from].push(currentBlock, uint224(oldFrom - amount));
+            uint256 newFrom = oldFrom - amount;
+            if (newFrom > type(uint224).max) revert VoteOverflow();
+            // casting to 'uint224' is safe because newFrom is checked above to fit
+            // forge-lint: disable-next-line(unsafe-typecast)
+            _checkpoints[from].push(currentBlock, uint224(newFrom));
         }
 
         if (to != address(0)) {
             uint256 oldTo = _checkpoints[to].latest();
-            // Check for overflow: oldTo + amount <= type(uint224).max
-            if (oldTo + amount > type(uint224).max) revert VoteOverflow();
-            _checkpoints[to].push(currentBlock, uint224(oldTo + amount));
+            uint256 newTo = oldTo + amount;
+            if (newTo > type(uint224).max) revert VoteOverflow();
+            // casting to 'uint224' is safe because newTo is checked above to fit
+            // forge-lint: disable-next-line(unsafe-typecast)
+            _checkpoints[to].push(currentBlock, uint224(newTo));
         }
 
         emit VotesMoved(from, to, amount);

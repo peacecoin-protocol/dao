@@ -8,10 +8,9 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
-import {PEACECOINDAO_SBT} from "./Governance/PEACECOINDAO_SBT.sol";
-import {PEACECOINDAO_NFT} from "./Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "./Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoNft} from "./Governance/PEACECOINDAO_NFT.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
-import {ITokens} from "./interfaces/ITokens.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -61,7 +60,7 @@ contract Campaigns is
     uint256 public campaignId;
     address public daoFactory;
 
-    bytes32 public DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
+    bytes32 public constant DAO_MANAGER_ROLE = keccak256("DAO_MANAGER_ROLE");
 
     mapping(uint256 => address[]) public campWinners;
     mapping(uint256 => Campaign) public campaigns;
@@ -88,20 +87,24 @@ contract Campaigns is
         address creator
     );
 
-    modifier onlyDAOManager() {
-        bytes32 _DAO_MANAGER_ROLE = IDAOFactory(daoFactory).DAO_MANAGER_ROLE();
-        if (!IAccessControl(daoFactory).hasRole(_DAO_MANAGER_ROLE, msg.sender))
-            revert PermissionDenied();
+    modifier onlyDaoManager() {
+        _onlyDaoManager();
         _;
+    }
+
+    function _onlyDaoManager() internal view {
+        bytes32 _daoManagerRole = IDAOFactory(daoFactory).daoManagerRole();
+        if (!IAccessControl(daoFactory).hasRole(_daoManagerRole, msg.sender))
+            revert PermissionDenied();
     }
 
     /**
      * @notice Initialize the Campaigns contract
      * @dev Initializes parent contracts
-     * @param _daoFactory Address of the DAO factory contract
+     * @param daoFactoryAddress Address of the DAO factory contract
      */
-    function initialize(address _daoFactory) public initializer {
-        daoFactory = _daoFactory;
+    function initialize(address daoFactoryAddress) public initializer {
+        daoFactory = daoFactoryAddress;
 
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
@@ -110,50 +113,51 @@ contract Campaigns is
     /**
      * @notice Create a new campaign
      * @dev Only callable by the contract owner
-     * @param _campaign Campaign configuration struct
+     * @param campaign Campaign configuration struct
      */
-    function createCampaign(Campaign memory _campaign) external onlyDAOManager {
+    function createCampaign(Campaign memory campaign) external onlyDaoManager {
         (, , , address _nft, , , , address _creator) = IDAOFactory(daoFactory).daoConfigs(
-            _campaign.daoId
+            campaign.daoId
         );
         if (_creator != msg.sender) revert IErrors.InvalidCreator();
 
-        PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
+        PeaceCoinDaoNft nft = PeaceCoinDaoNft(_nft);
 
-        if (_campaign.startDate >= _campaign.endDate) revert IErrors.InvalidStartDate();
-        if (_campaign.totalAmount == 0) revert IErrors.InvalidAmount();
-        if (_campaign.claimAmount > _campaign.totalAmount) revert IErrors.InvalidClaimAmount();
+        if (campaign.startDate >= campaign.endDate) revert IErrors.InvalidStartDate();
+        if (campaign.totalAmount == 0) revert IErrors.InvalidAmount();
+        if (campaign.claimAmount > campaign.totalAmount) revert IErrors.InvalidClaimAmount();
 
         // Increment campaign ID (unchecked for gas optimization)
         unchecked {
             campaignId++;
         }
-        _campaign.creator = msg.sender;
-        campaigns[campaignId] = _campaign;
+        campaign.creator = msg.sender;
+        campaigns[campaignId] = campaign;
 
-        if (_campaign.tokenType == TokenType.NFT) {
-            nft.mint(address(this), _campaign.sbtId, _campaign.totalAmount);
-        } else if (_campaign.tokenType == TokenType.ERC20) {
-            ERC20Upgradeable(_campaign.token).transferFrom(
+        if (campaign.tokenType == TokenType.NFT) {
+            nft.mint(address(this), campaign.sbtId, campaign.totalAmount);
+        } else if (campaign.tokenType == TokenType.ERC20) {
+            bool success = ERC20Upgradeable(campaign.token).transferFrom(
                 msg.sender,
                 address(this),
-                _campaign.totalAmount
+                campaign.totalAmount
             );
+            require(success, "ERC20: transferFrom failed");
         }
 
         emit CampaignCreated(
             campaignId,
-            _campaign.daoId,
-            _campaign.sbtId,
-            _campaign.title,
-            _campaign.description,
-            _campaign.claimAmount,
-            _campaign.totalAmount,
-            _campaign.startDate,
-            _campaign.endDate,
-            _campaign.validateSignatures,
-            _campaign.tokenType,
-            _campaign.token,
+            campaign.daoId,
+            campaign.sbtId,
+            campaign.title,
+            campaign.description,
+            campaign.claimAmount,
+            campaign.totalAmount,
+            campaign.startDate,
+            campaign.endDate,
+            campaign.validateSignatures,
+            campaign.tokenType,
+            campaign.token,
             msg.sender
         );
     }
@@ -161,80 +165,81 @@ contract Campaigns is
     /**
      * @notice Add winners to a campaign
      * @dev Only callable by the contract owner
-     * @param _campaignId ID of the campaign
-     * @param _addresses Array of winner addresses (for non-signature campaigns)
-     * @param _gists Array of gist hashes (for signature campaigns)
+     * @param campaignId ID of the campaign
+     * @param winners Array of winner addresses (for non-signature campaigns)
+     * @param gists Array of gist hashes (for signature campaigns)
      */
     function addCampWinners(
-        uint256 _campaignId,
-        address[] memory _addresses,
-        bytes32[] memory _gists
+        uint256 campaignId,
+        address[] memory winners,
+        bytes32[] memory gists
     ) external {
-        if (msg.sender != getCreator(_campaignId)) revert IErrors.PermissionDenied();
+        if (msg.sender != getCreator(campaignId)) revert IErrors.PermissionDenied();
 
-        Campaign memory campaign = campaigns[_campaignId];
+        Campaign memory campaign = campaigns[campaignId];
         if (campaign.validateSignatures) {
-            if (_gists.length == 0) revert IErrors.InvalidGistsLength();
-            uint256 gistsLength = _gists.length;
+            if (gists.length == 0) revert IErrors.InvalidGistsLength();
+            uint256 gistsLength = gists.length;
             for (uint256 i; i < gistsLength; ) {
-                campGists[_campaignId].push(_gists[i]);
+                campGists[campaignId].push(gists[i]);
                 unchecked {
                     ++i;
                 }
             }
         } else {
-            if (_addresses.length == 0) revert IErrors.InvalidAddressesLength();
-            uint256 addressesLength = _addresses.length;
+            if (winners.length == 0) revert IErrors.InvalidAddressesLength();
+            uint256 addressesLength = winners.length;
             for (uint256 i; i < addressesLength; ) {
-                campWinners[_campaignId].push(_addresses[i]);
+                campWinners[campaignId].push(winners[i]);
                 unchecked {
                     ++i;
                 }
             }
         }
 
-        emit CampWinnersAdded(_campaignId, _addresses);
+        emit CampWinnersAdded(campaignId, winners);
     }
 
     /**
      * @notice Claim campaign rewards
      * @dev Claims rewards for eligible users with reentrancy protection
-     * @param _campaignId ID of the campaign
-     * @param _gist Gist hash for signature validation
-     * @param _message Message for signature verification
-     * @param _signature Signature for verification
+     * @param campaignId ID of the campaign
+     * @param gist Gist hash for signature validation
+     * @param message Message for signature verification
+     * @param signature Signature for verification
      */
     function claimCampaign(
-        uint256 _campaignId,
-        bytes32 _gist,
-        string memory _message,
-        bytes memory _signature
+        uint256 campaignId,
+        bytes32 gist,
+        string memory message,
+        bytes memory signature
     ) external nonReentrant {
-        Campaign memory campaign = campaigns[_campaignId];
+        Campaign memory campaign = campaigns[campaignId];
 
-        (, , address _sbt, address _nft, , , , ) = IDAOFactory(daoFactory).daoConfigs(
+        (, , address sbtAddress, address nftAddress, , , , ) = IDAOFactory(daoFactory).daoConfigs(
             campaign.daoId
         );
 
-        PEACECOINDAO_NFT nft = PEACECOINDAO_NFT(_nft);
-        PEACECOINDAO_SBT sbt = PEACECOINDAO_SBT(_sbt);
+        PeaceCoinDaoNft nft = PeaceCoinDaoNft(nftAddress);
+        PeaceCoinDaoSbt sbt = PeaceCoinDaoSbt(sbtAddress);
 
-        if (campaign.startDate >= block.timestamp) revert IErrors.CampaignNotStarted();
+        if (campaign.startDate > block.timestamp) revert IErrors.CampaignNotStarted();
         if (campaign.endDate <= block.timestamp) revert IErrors.CampaignEnded();
-        if (campaign.totalAmount <= totalClaimed[_campaignId] + campaign.claimAmount) {
+        if (campaign.totalAmount < totalClaimed[campaignId] + campaign.claimAmount) {
             revert IErrors.CampaignFullyClaimed();
         }
-        if (campWinnersClaimed[_campaignId][msg.sender]) revert IErrors.AlreadyClaimed();
+        if (campWinnersClaimed[campaignId][msg.sender]) revert IErrors.AlreadyClaimed();
 
         if (campaign.validateSignatures) {
-            if (!verify(msg.sender, _message, _signature)) revert IErrors.InvalidSignature();
-            if (campGistsClaimed[_campaignId][_gist]) revert IErrors.AlreadyClaimed();
+            if (!verify(msg.sender, message, signature)) revert IErrors.InvalidSignature();
+            if (campGistsClaimed[campaignId][gist]) revert IErrors.AlreadyClaimed();
 
             // Check if gist is whitelisted
             bool isWhitelisted = false;
-            uint256 gistsLength = campGists[_campaignId].length;
+            uint256 gistsLength = campGists[campaignId].length;
+
             for (uint256 i; i < gistsLength; ) {
-                if (campGists[_campaignId][i] == _gist) {
+                if (campGists[campaignId][i] == gist) {
                     isWhitelisted = true;
                     break;
                 }
@@ -244,25 +249,25 @@ contract Campaigns is
             }
             if (!isWhitelisted) revert IErrors.NotWhitelisted();
 
-            campGistsClaimed[_campaignId][_gist] = true;
-            campWinnersClaimed[_campaignId][msg.sender] = true;
+            campGistsClaimed[campaignId][gist] = true;
+            campWinnersClaimed[campaignId][msg.sender] = true;
         } else {
-            if (campWinners[_campaignId].length == 0) revert IErrors.NoWinners();
+            if (campWinners[campaignId].length == 0) revert IErrors.NoWinners();
 
             // Check if user is a winner
-            bool _isWinner = false;
-            uint256 winnersLength = campWinners[_campaignId].length;
+            bool isWinner = false;
+            uint256 winnersLength = campWinners[campaignId].length;
             for (uint256 i; i < winnersLength; ) {
-                if (campWinners[_campaignId][i] == msg.sender) {
-                    _isWinner = true;
+                if (campWinners[campaignId][i] == msg.sender) {
+                    isWinner = true;
                     break;
                 }
                 unchecked {
                     ++i;
                 }
             }
-            if (!_isWinner) revert IErrors.NotWhitelisted();
-            campWinnersClaimed[_campaignId][msg.sender] = true;
+            if (!isWinner) revert IErrors.NotWhitelisted();
+            campWinnersClaimed[campaignId][msg.sender] = true;
         }
 
         // Transfer rewards
@@ -277,32 +282,36 @@ contract Campaigns is
         } else if (campaign.tokenType == TokenType.SBT) {
             sbt.mint(msg.sender, campaign.sbtId, campaign.claimAmount);
         } else if (campaign.tokenType == TokenType.ERC20) {
-            ERC20Upgradeable(campaign.token).transfer(msg.sender, campaign.claimAmount);
+            bool success = ERC20Upgradeable(campaign.token).transfer(
+                msg.sender,
+                campaign.claimAmount
+            );
+            require(success, "ERC20: transfer failed");
         }
 
         // Update total claimed (unchecked for gas optimization)
         unchecked {
-            totalClaimed[_campaignId] += campaign.claimAmount;
+            totalClaimed[campaignId] += campaign.claimAmount;
         }
 
-        emit CampWinnersClaimed(_campaignId, msg.sender);
+        emit CampWinnersClaimed(campaignId, msg.sender);
     }
 
     /**
      * @notice Verify a signature
      * @dev Verifies that the signature was created by the signer for the given message
-     * @param _signer Address of the expected signer
-     * @param _message Message that was signed
-     * @param _sig Signature to verify
+     * @param signer Address of the expected signer
+     * @param message Message that was signed
+     * @param signature Signature to verify
      * @return True if signature is valid, false otherwise
      */
     function verify(
-        address _signer,
-        string memory _message,
-        bytes memory _sig
+        address signer,
+        string memory message,
+        bytes memory signature
     ) public pure returns (bool) {
-        bytes32 ethSignedMessageHash = getEthSignedMessageHash(_message);
-        return recoverSigner(ethSignedMessageHash, _sig) == _signer;
+        bytes32 ethSignedMessageHash = getEthSignedMessageHash(message);
+        return recoverSigner(ethSignedMessageHash, signature) == signer;
     }
 
     /**
@@ -328,16 +337,16 @@ contract Campaigns is
     /**
      * @notice Recover signer from signature
      * @dev Recovers the address that created the signature
-     * @param _ethSignedMessageHash Hash of the message
-     * @param _signature Signature to recover from
+     * @param ethSignedMessageHash Hash of the message
+     * @param signature Signature to recover from
      * @return Address of the signer
      */
     function recoverSigner(
-        bytes32 _ethSignedMessageHash,
-        bytes memory _signature
+        bytes32 ethSignedMessageHash,
+        bytes memory signature
     ) internal pure returns (address) {
-        (bytes32 r, bytes32 s, uint8 v) = splitSignature(_signature);
-        return ecrecover(_ethSignedMessageHash, v, r, s);
+        (bytes32 r, bytes32 s, uint8 v) = splitSignature(signature);
+        return ecrecover(ethSignedMessageHash, v, r, s);
     }
 
     /**
@@ -370,20 +379,21 @@ contract Campaigns is
     /**
      * @notice Recover ERC20 tokens from the contract
      * @dev Only callable by the contract owner
-     * @param _token Token contract to recover
+     * @param token Token contract to recover
      */
-    function recoverERC20(ERC20Upgradeable _token) external onlyOwner {
-        _token.transfer(msg.sender, _token.balanceOf(address(this)));
+    function recoverERC20(ERC20Upgradeable token) external onlyOwner {
+        bool success = token.transfer(msg.sender, token.balanceOf(address(this)));
+        require(success, "ERC20: transfer failed");
     }
 
     /**
      * @notice Get the status of a campaign
      * @dev Returns the current status based on timestamps
-     * @param _campaignId ID of the campaign
+     * @param campaignId ID of the campaign
      * @return Current status of the campaign
      */
-    function getStatus(uint256 _campaignId) external view returns (Status) {
-        Campaign memory campaign = campaigns[_campaignId];
+    function getStatus(uint256 campaignId) external view returns (Status) {
+        Campaign memory campaign = campaigns[campaignId];
         if (campaign.endDate <= block.timestamp) {
             return Status.Ended;
         } else if (campaign.startDate <= block.timestamp) {
@@ -395,14 +405,14 @@ contract Campaigns is
     /**
      * @notice Check if an address is a winner of a campaign
      * @dev Only works for non-signature campaigns
-     * @param _campaignId ID of the campaign
-     * @param _winner Address to check
+     * @param campaignId ID of the campaign
+     * @param winner Address to check
      * @return True if address is a winner, false otherwise
      */
-    function isWinner(uint256 _campaignId, address _winner) external view returns (bool) {
-        uint256 winnersLength = campWinners[_campaignId].length;
+    function isWinner(uint256 campaignId, address winner) external view returns (bool) {
+        uint256 winnersLength = campWinners[campaignId].length;
         for (uint256 i; i < winnersLength; ) {
-            if (campWinners[_campaignId][i] == _winner) {
+            if (campWinners[campaignId][i] == winner) {
                 return true;
             }
             unchecked {
@@ -415,11 +425,11 @@ contract Campaigns is
     /**
      * @notice Get the creator of a campaign
      * @dev Returns the creator of a campaign
-     * @param _campaignId ID of the campaign
+     * @param campaignId ID of the campaign
      * @return Creator of the campaign
      */
-    function getCreator(uint256 _campaignId) public view returns (address) {
-        return campaigns[_campaignId].creator;
+    function getCreator(uint256 campaignId) public view returns (address) {
+        return campaigns[campaignId].creator;
     }
 
     /**
