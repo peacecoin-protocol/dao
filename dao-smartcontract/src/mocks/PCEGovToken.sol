@@ -9,23 +9,23 @@ contract PCEGovToken is ERC20VotesUpgradeable, OwnableUpgradeable {
     address public pceToken;
     mapping(address => bool) public isCommunityTokenClaimed;
 
-    function initialize(address _owner, address _pceToken) public initializer {
-        pceToken = _pceToken;
+    function initialize(address owner, address pceTokenAddress) public initializer {
+        pceToken = pceTokenAddress;
         __ERC20_init("PEACE COIN Governance", "PCEGOV");
         __ERC20Votes_init();
-        __Ownable_init_unchained(_owner);
+        __Ownable_init_unchained(owner);
     }
 
-    function claimGovernanceTokens(address _communityToken) external {
-        require(!isCommunityTokenClaimed[_communityToken], "Community token already claimed");
+    function claimGovernanceTokens(address communityToken) external {
+        require(!isCommunityTokenClaimed[communityToken], "Community token already claimed");
         require(
-            IPCEToken(_communityToken).owner() == msg.sender,
+            IPCEToken(communityToken).owner() == msg.sender,
             "Community token not owned by sender"
         );
 
-        IPCEToken.LocalToken memory localToken = IPCEToken(pceToken).getLocalToken(_communityToken);
+        IPCEToken.LocalToken memory localToken = IPCEToken(pceToken).getLocalToken(communityToken);
 
-        isCommunityTokenClaimed[_communityToken] = true;
+        isCommunityTokenClaimed[communityToken] = true;
 
         _mint(msg.sender, localToken.depositedPceToken);
     }

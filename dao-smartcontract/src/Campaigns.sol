@@ -104,6 +104,7 @@ contract Campaigns is
      * @param daoFactoryAddress Address of the DAO factory contract
      */
     function initialize(address daoFactoryAddress) public initializer {
+        if (daoFactoryAddress == address(0)) revert IErrors.InvalidAddress();
         daoFactory = daoFactoryAddress;
 
         __Ownable_init(msg.sender);

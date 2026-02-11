@@ -81,7 +81,7 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
      * @param proposalId ID of the proposal
      * @param amount Amount of bounty tokens to add
      */
-    function addProposalBounty(uint256 proposalId, uint256 amount) external {
+    function addProposalBounty(uint256 proposalId, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
         ProposalState state = IGovernance(governance).state(proposalId);
@@ -93,10 +93,10 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         unchecked {
             proposalBounties[proposalId] += amount;
         }
+        emit AddedProposalBounty(msg.sender, proposalId, amount);
+
         bool success = bountyToken.transferFrom(msg.sender, address(this), amount);
         require(success, "ERC20: transferFrom failed");
-
-        emit AddedProposalBounty(msg.sender, proposalId, amount);
     }
 
     /**
@@ -105,7 +105,7 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
      * @param contributor Address of the contributor
      * @param amount Amount of bounty tokens to add
      */
-    function addContributorBounty(address contributor, uint256 amount) external {
+    function addContributorBounty(address contributor, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         if (contributor == address(0)) revert InvalidContributor();
 
@@ -115,10 +115,10 @@ contract Bounty is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
             bounty.bountyAmount += amount;
         }
 
+        emit AddedContributorBounty(msg.sender, contributor, amount);
+
         bool success = bountyToken.transferFrom(msg.sender, address(this), amount);
         require(success, "ERC20: transferFrom failed");
-
-        emit AddedContributorBounty(msg.sender, contributor, amount);
     }
 
     /**

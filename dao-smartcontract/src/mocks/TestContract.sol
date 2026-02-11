@@ -20,7 +20,7 @@ contract TestContract {
         owner = _owner;
     }
 
-    function transferOwnership(address _owner) external onlyOwner {
-        owner = _owner;
+    function transferOwnership(address newOwner) external onlyOwner {
+        owner = newOwner;
     }
 }

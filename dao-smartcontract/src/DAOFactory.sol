@@ -56,24 +56,15 @@ contract DAOFactory is
     event DAOCreated(bytes32 indexed daoId, string daoName, address creator);
 
     event ImplementationUpdated(
-        address timelockImplementation,
-        address governorImplementation,
-        address governanceTokenImplementation,
+        address indexed timelockImplementation,
+        address indexed governorImplementation,
+        address indexed governanceTokenImplementation,
         address multipleVotingImplementation,
         address sbtImplementation,
         address nftImplementation
     );
 
     // ============ Modifiers ============
-    modifier validateDao(bytes32 daoId) {
-        _validateDao(daoId);
-        _;
-    }
-
-    function _validateDao(bytes32 daoId) internal view {
-        IDAOFactory.DaoConfig memory daoConfig = daoConfigs[daoId];
-        if (daoConfig.timelock == address(0)) revert IErrors.DAODoesNotExist();
-    }
 
     modifier validImplementation() {
         _validateImplementation();
@@ -104,55 +95,55 @@ contract DAOFactory is
     /**
      * @notice Set implementation addresses for DAO components
      * @dev Only callable by the contract owner
-     * @param _timelockImplementation Address of the timelock implementation
-     * @param _governorImplementation Address of the governor implementation
-     * @param _governanceTokenImplementation Address of the governance token implementation
-     * @param _multipleVotingImplementation Address of the multiple voting implementation
-     * @param _sbtImplementation Address of the SBT implementation
-     * @param _nftImplementation Address of the NFT implementation
+     * @param newTimelockImplementation Address of the timelock implementation
+     * @param newGovernorImplementation Address of the governor implementation
+     * @param newGovernanceTokenImplementation Address of the governance token implementation
+     * @param newMultipleVotingImplementation Address of the multiple voting implementation
+     * @param newSbtImplementation Address of the SBT implementation
+     * @param newNftImplementation Address of the NFT implementation
      */
     function setImplementation(
-        address _timelockImplementation,
-        address _governorImplementation,
-        address _governanceTokenImplementation,
-        address _multipleVotingImplementation,
-        address _sbtImplementation,
-        address _nftImplementation
+        address newTimelockImplementation,
+        address newGovernorImplementation,
+        address newGovernanceTokenImplementation,
+        address newMultipleVotingImplementation,
+        address newSbtImplementation,
+        address newNftImplementation
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_timelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
-        if (_governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
-        if (_governanceTokenImplementation == address(0))
+        if (newTimelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
+        if (newGovernorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
+        if (newGovernanceTokenImplementation == address(0))
             revert IErrors.GovernanceTokenImplementationNotSet();
-        if (_multipleVotingImplementation == address(0))
+        if (newMultipleVotingImplementation == address(0))
             revert IErrors.MultipleVotingImplementationNotSet();
-        if (_sbtImplementation == address(0)) revert IErrors.InvalidAddress();
-        if (_nftImplementation == address(0)) revert IErrors.InvalidAddress();
+        if (newSbtImplementation == address(0)) revert IErrors.InvalidAddress();
+        if (newNftImplementation == address(0)) revert IErrors.InvalidAddress();
 
-        timelockImplementation = _timelockImplementation;
-        governorImplementation = _governorImplementation;
-        governanceTokenImplementation = _governanceTokenImplementation;
-        multipleVotingImplementation = _multipleVotingImplementation;
-        sbtImplementation = _sbtImplementation;
-        nftImplementation = _nftImplementation;
+        timelockImplementation = newTimelockImplementation;
+        governorImplementation = newGovernorImplementation;
+        governanceTokenImplementation = newGovernanceTokenImplementation;
+        multipleVotingImplementation = newMultipleVotingImplementation;
+        sbtImplementation = newSbtImplementation;
+        nftImplementation = newNftImplementation;
 
         emit ImplementationUpdated(
-            _timelockImplementation,
-            _governorImplementation,
-            _governanceTokenImplementation,
-            _multipleVotingImplementation,
-            _sbtImplementation,
-            _nftImplementation
+            newTimelockImplementation,
+            newGovernorImplementation,
+            newGovernanceTokenImplementation,
+            newMultipleVotingImplementation,
+            newSbtImplementation,
+            newNftImplementation
         );
     }
 
-    function setURI(string memory _uri) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uri_ = _uri;
+    function setURI(string memory uri) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uri_ = uri;
     }
 
-    function setCampaignFactory(address _campaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setCampaignFactory(address newCampaignFactory) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(DEFAULT_ADMIN_ROLE, campaignFactory);
 
-        campaignFactory = _campaignFactory;
+        campaignFactory = newCampaignFactory;
         _grantRole(DEFAULT_ADMIN_ROLE, campaignFactory);
     }
 
@@ -238,7 +229,7 @@ contract DAOFactory is
 
         // Set up governance hierarchy
         ITimelock(timelockAddress).setPendingAdmin(governorAddress);
-        ICommunityGovernance(governorAddress)._acceptAdmin();
+        ICommunityGovernance(governorAddress).acceptAdmin();
 
         // Grant DAO manager role
         _grantRole(daoManagerRole, msg.sender);
@@ -419,18 +410,18 @@ interface ITimelock {
 }
 
 interface ICommunityGovernance {
-    function _acceptAdmin() external;
+    function acceptAdmin() external;
     function initialize(
         string memory daoName,
-        address _token,
-        address _sbt,
-        address _nft,
-        address _timelock,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _proposalThreshold,
-        uint256 _quorumVotes,
-        address _guardian,
-        IDAOFactory.SocialConfig memory _socialConfig
+        address tokenAddress,
+        address sbtAddress,
+        address nftAddress,
+        address timelockAddress,
+        uint256 votingDelayBlocks,
+        uint256 votingPeriodBlocks,
+        uint256 proposalThresholdTokens,
+        uint256 quorumVotesAmount,
+        address guardianAddress,
+        IDAOFactory.SocialConfig memory socialConfig
     ) external;
 }

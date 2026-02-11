@@ -12,7 +12,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {console} from "forge-std/console.sol";
 
-contract deploy is Script, DeployDAOFactory {
+contract Deploy is Script, DeployDAOFactory {
     // Metadata for SBT
 
     string public constant daoName = "PCE DAO";
@@ -30,7 +30,7 @@ contract deploy is Script, DeployDAOFactory {
             twitter: "https://twitter.com/peacecoin",
             telegram: "https://t.me/peacecoin"
         });
-    address pceToken = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
+    address public constant PCE_TOKEN = 0x951E69b565924c0b846Ed0E779f190c53d29F62e;
 
     function run() external {
         (address daoFactoryAddress, , address governorAddress) = deployDaoFactory();
@@ -44,7 +44,7 @@ contract deploy is Script, DeployDAOFactory {
 
         Bounty bounty = new Bounty(); // Deploy Bounty Contract
         bounty.initialize({
-            token: ERC20Upgradeable(pceToken),
+            token: ERC20Upgradeable(PCE_TOKEN),
             initialBountyAmount: bountyAmount,
             governanceAddress: address(governorAddress)
         });
@@ -66,7 +66,7 @@ contract deploy is Script, DeployDAOFactory {
         console.log("Proposal Threshold: ", proposalThreshold);
         console.log("Quorum Votes: ", quorumVotes);
         console.log("Campaigns deployed at", campaignsAddress);
-        console.log("PCE Token: ", pceToken);
+        console.log("PCE Token: ", PCE_TOKEN);
         console.log("Bounty: ", address(bounty));
         console.log("ContractFactory: ", address(contractFactory));
         console.log("ProxyAdmin: ", proxyAdminAddress);

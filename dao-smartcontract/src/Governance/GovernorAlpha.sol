@@ -97,8 +97,8 @@ contract GovernorAlpha {
 
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
-        uint256 id,
-        address proposer,
+        uint256 indexed id,
+        address indexed proposer,
         address[] targets,
         uint256[] values,
         string[] signatures,
@@ -109,16 +109,16 @@ contract GovernorAlpha {
     );
 
     /// @notice An event emitted when a vote has been cast on a proposal
-    event VoteCast(address voter, uint256 proposalId, bool support, uint256 votes);
+    event VoteCast(address indexed voter, uint256 indexed proposalId, bool support, uint256 votes);
 
     /// @notice An event emitted when a proposal has been canceled
-    event ProposalCanceled(uint256 id);
+    event ProposalCanceled(uint256 indexed id);
 
     /// @notice An event emitted when a proposal has been queued in the Timelock
-    event ProposalQueued(uint256 id, uint256 eta);
+    event ProposalQueued(uint256 indexed id, uint256 eta);
 
     /// @notice An event emitted when a proposal has been executed in the Timelock
-    event ProposalExecuted(uint256 id);
+    event ProposalExecuted(uint256 indexed id);
 
     event ProposalThresholdSet(uint256 oldProposalThreshold, uint256 newProposalThreshold);
     event QuorumVotesSet(uint256 oldQuorumVotes, uint256 newQuorumVotes);
@@ -137,32 +137,32 @@ contract GovernorAlpha {
 
     function initialize(
         string memory daoName,
-        address _token,
-        address _sbt,
-        address _nft,
-        address _timelock,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _proposalThreshold,
-        uint256 _quorumVotes,
-        address _guardian,
-        IDAOFactory.SocialConfig memory _socialConfig
+        address tokenAddress,
+        address sbtAddress,
+        address nftAddress,
+        address timelockAddress,
+        uint256 votingDelayBlocks,
+        uint256 votingPeriodBlocks,
+        uint256 proposalThresholdTokens,
+        uint256 quorumVotesAmount,
+        address guardianAddress,
+        IDAOFactory.SocialConfig memory socialConfigInput
     ) external {
         require(!initialized, "Governor::initialize: already initialized");
         initialized = true;
 
         name = daoName;
-        token = GovernorTokenInterface(address(_token));
-        sbt = GovernorTokenInterface(_sbt);
-        nft = GovernorTokenInterface(_nft);
-        timelock = TimelockInterface(_timelock);
-        votingDelay = _votingDelay;
-        votingPeriod = _votingPeriod;
-        proposalThreshold = _proposalThreshold;
-        quorumVotes = _quorumVotes;
-        guardian = _guardian;
+        token = GovernorTokenInterface(address(tokenAddress));
+        sbt = GovernorTokenInterface(sbtAddress);
+        nft = GovernorTokenInterface(nftAddress);
+        timelock = TimelockInterface(timelockAddress);
+        votingDelay = votingDelayBlocks;
+        votingPeriod = votingPeriodBlocks;
+        proposalThreshold = proposalThresholdTokens;
+        quorumVotes = quorumVotesAmount;
+        guardian = guardianAddress;
         proposalMaxOperations = 10;
-        socialConfig = _socialConfig;
+        socialConfig = socialConfigInput;
     }
 
     function propose(
@@ -420,7 +420,7 @@ contract GovernorAlpha {
         require(state(proposalId) == ProposalState.Active, "Governor::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
-        require(receipt.hasVoted == false, "Governor::_castVote: voter already voted");
+        require(!receipt.hasVoted, "Governor::_castVote: voter already voted");
 
         uint256 votes = getPastVotes(voter, proposal.startBlock);
 
@@ -456,19 +456,19 @@ contract GovernorAlpha {
         proposalMaxOperations = proposalMaxOperations_;
     }
 
-    function updateSocialConfig(IDAOFactory.SocialConfig memory _socialConfig) public {
+    function updateSocialConfig(IDAOFactory.SocialConfig memory newSocialConfig) public {
         require(
             msg.sender == guardian || msg.sender == address(timelock),
             "Governor::updateSocialConfig: sender must be gov guardian or timelock"
         );
 
-        socialConfig = _socialConfig;
+        socialConfig = newSocialConfig;
         emit SocialConfigUpdated(
-            _socialConfig.description,
-            _socialConfig.website,
-            _socialConfig.linkedin,
-            _socialConfig.twitter,
-            _socialConfig.telegram
+            newSocialConfig.description,
+            newSocialConfig.website,
+            newSocialConfig.linkedin,
+            newSocialConfig.twitter,
+            newSocialConfig.telegram
         );
     }
 
@@ -476,20 +476,20 @@ contract GovernorAlpha {
         return socialConfig;
     }
 
-    function _acceptAdmin() public {
-        require(msg.sender == guardian, "Governor::_acceptAdmin: sender must be gov guardian");
+    function acceptAdmin() public {
+        require(msg.sender == guardian, "Governor::acceptAdmin: sender must be gov guardian");
         timelock.acceptAdmin();
     }
 
-    function _abdicate() public {
-        require(msg.sender == guardian, "Governor::_abdicate: sender must be gov guardian");
+    function abdicate() public {
+        require(msg.sender == guardian, "Governor::abdicate: sender must be gov guardian");
         guardian = address(0);
     }
 
-    function _queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
+    function queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
-            "Governor::_queueSetTimelockPendingAdmin: sender must be gov guardian"
+            "Governor::queueSetTimelockPendingAdmin: sender must be gov guardian"
         );
         timelock.queueTransaction(
             address(timelock),
@@ -500,10 +500,10 @@ contract GovernorAlpha {
         );
     }
 
-    function _executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
+    function executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
         require(
             msg.sender == guardian,
-            "Governor::_executeSetTimelockPendingAdmin: sender must be gov guardian"
+            "Governor::executeSetTimelockPendingAdmin: sender must be gov guardian"
         );
         timelock.executeTransaction(
             address(timelock),
@@ -530,14 +530,6 @@ contract GovernorAlpha {
     function sub256(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b <= a, "subtraction underflow");
         return a - b;
-    }
-
-    function getChainId() internal view returns (uint256) {
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        return chainId;
     }
 }
 

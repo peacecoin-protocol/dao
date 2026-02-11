@@ -328,11 +328,11 @@ contract GovernorAlphaTest is Test {
         timelock.setPendingAdmin(address(gov));
 
         vm.prank(alice);
-        vm.expectRevert("Governor::_acceptAdmin: sender must be gov guardian");
-        gov._acceptAdmin();
+        vm.expectRevert("Governor::acceptAdmin: sender must be gov guardian");
+        gov.acceptAdmin();
 
         vm.prank(guardian);
-        gov._acceptAdmin();
+        gov.acceptAdmin();
         assertEq(timelock.admin(), address(gov));
     }
 
@@ -342,11 +342,11 @@ contract GovernorAlphaTest is Test {
      */
     function test_abdicate() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::_abdicate: sender must be gov guardian");
-        gov._abdicate();
+        vm.expectRevert("Governor::abdicate: sender must be gov guardian");
+        gov.abdicate();
 
         vm.prank(guardian);
-        gov._abdicate();
+        gov.abdicate();
         assertEq(gov.guardian(), address(0));
     }
 
@@ -573,8 +573,8 @@ contract GovernorAlphaTest is Test {
      */
     function test_queueSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::_queueSetTimelockPendingAdmin: sender must be gov guardian");
-        gov._queueSetTimelockPendingAdmin(alice, 0);
+        vm.expectRevert("Governor::queueSetTimelockPendingAdmin: sender must be gov guardian");
+        gov.queueSetTimelockPendingAdmin(alice, 0);
     }
 
     /**
@@ -582,8 +582,8 @@ contract GovernorAlphaTest is Test {
      */
     function test_executeSetTimelockPendingAdmin_RevertsWhenNotGuardian() public {
         vm.prank(alice);
-        vm.expectRevert("Governor::_executeSetTimelockPendingAdmin: sender must be gov guardian");
-        gov._executeSetTimelockPendingAdmin(alice, 0);
+        vm.expectRevert("Governor::executeSetTimelockPendingAdmin: sender must be gov guardian");
+        gov.executeSetTimelockPendingAdmin(alice, 0);
     }
 
     /**

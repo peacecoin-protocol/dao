@@ -30,37 +30,40 @@ contract GovernorBravoEvents {
     );
 
     /// @notice An event emitted when a proposal has been canceled
-    event ProposalCanceled(uint256 id);
+    event ProposalCanceled(uint256 indexed id);
 
     /// @notice An event emitted when a proposal has been queued in the Timelock
-    event ProposalQueued(uint256 id, uint256 eta);
+    event ProposalQueued(uint256 indexed id, uint256 eta);
 
     /// @notice An event emitted when a proposal has been executed in the Timelock
-    event ProposalExecuted(uint256 id);
+    event ProposalExecuted(uint256 indexed id);
 
     /// @notice An event emitted when the voting delay is set
-    event VotingDelaySet(uint256 oldVotingDelay, uint256 newVotingDelay);
+    event VotingDelaySet(uint256 indexed oldVotingDelay, uint256 indexed newVotingDelay);
 
     /// @notice An event emitted when the voting period is set
-    event VotingPeriodSet(uint256 oldVotingPeriod, uint256 newVotingPeriod);
+    event VotingPeriodSet(uint256 indexed oldVotingPeriod, uint256 indexed newVotingPeriod);
 
     /// @notice Emitted when implementation is changed
-    event NewImplementation(address oldImplementation, address newImplementation);
+    event NewImplementation(address indexed oldImplementation, address indexed newImplementation);
 
     /// @notice Emitted when proposal threshold is set
-    event ProposalThresholdSet(uint256 oldProposalThreshold, uint256 newProposalThreshold);
+    event ProposalThresholdSet(
+        uint256 indexed oldProposalThreshold,
+        uint256 indexed newProposalThreshold
+    );
 
     /// @notice Emitted when pendingAdmin is changed
-    event NewPendingAdmin(address oldPendingAdmin, address newPendingAdmin);
+    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
 
     /// @notice Emitted when pendingAdmin is accepted, which means admin is updated
-    event NewAdmin(address oldAdmin, address newAdmin);
+    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     /// @notice Emitted when whitelist account expiration is set
-    event WhitelistAccountExpirationSet(address account, uint256 expiration);
+    event WhitelistAccountExpirationSet(address indexed account, uint256 indexed expiration);
 
     /// @notice Emitted when the whitelistGuardian is set
-    event WhitelistGuardianSet(address oldGuardian, address newGuardian);
+    event WhitelistGuardianSet(address indexed oldGuardian, address indexed newGuardian);
 }
 
 contract GovernorBravoDelegatorStorage {
