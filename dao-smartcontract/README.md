@@ -1,6 +1,4 @@
-# pce_dao
-
-**Peace Coin DAO**
+## Peace Coin DAO
 
 A modular DAO framework for the Peace Coin ecosystem. This repository contains the core on-chain components for creating DAOs, governing proposals with a timelock, issuing membership and governance tokens, running campaigns, distributing bounties, and staking PCE.
 
@@ -52,6 +50,24 @@ Foundry Book: https://book.getfoundry.sh/
 - `test/` Foundry tests.
 
 ## Development
+
+
+## Install Foundry Libraries
+
+To install (or update) Foundry and its standard libraries, run:
+
+```shell
+foundryup
+```
+
+This will install or update `forge`, `cast`, and related tools to the latest version.
+
+For contract libraries commonly used in Foundry projects (such as OpenZeppelin), you can add them as submodules, or install via `forge install`.
+
+```shell
+forge install
+```
+
 
 Build:
 
