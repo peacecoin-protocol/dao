@@ -8,8 +8,8 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC1155HolderUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
-import {PeaceCoinDaoSbt} from "./Governance/PEACECOINDAO_SBT.sol";
-import {PeaceCoinDaoNft} from "./Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "./Governance/PeaceCoinDaoSbt.sol";
+import {PeaceCoinDaoNft} from "./Governance/PeaceCoinDaoNft.sol";
 import {IDAOFactory} from "./interfaces/IDAOFactory.sol";
 import {IErrors} from "./interfaces/IErrors.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -94,8 +94,9 @@ contract Campaigns is
 
     function _onlyDaoManager() internal view {
         bytes32 _daoManagerRole = IDAOFactory(daoFactory).daoManagerRole();
-        if (!IAccessControl(daoFactory).hasRole(_daoManagerRole, msg.sender))
+        if (!IAccessControl(daoFactory).hasRole(_daoManagerRole, msg.sender)) {
             revert PermissionDenied();
+        }
     }
 
     /**
@@ -166,23 +167,23 @@ contract Campaigns is
     /**
      * @notice Add winners to a campaign
      * @dev Only callable by the contract owner
-     * @param campaignId ID of the campaign
+     * @param campaignId_ ID of the campaign
      * @param winners Array of winner addresses (for non-signature campaigns)
      * @param gists Array of gist hashes (for signature campaigns)
      */
     function addCampWinners(
-        uint256 campaignId,
+        uint256 campaignId_,
         address[] memory winners,
         bytes32[] memory gists
     ) external {
-        if (msg.sender != getCreator(campaignId)) revert IErrors.PermissionDenied();
+        if (msg.sender != getCreator(campaignId_)) revert IErrors.PermissionDenied();
 
-        Campaign memory campaign = campaigns[campaignId];
+        Campaign memory campaign = campaigns[campaignId_];
         if (campaign.validateSignatures) {
             if (gists.length == 0) revert IErrors.InvalidGistsLength();
             uint256 gistsLength = gists.length;
             for (uint256 i; i < gistsLength; ) {
-                campGists[campaignId].push(gists[i]);
+                campGists[campaignId_].push(gists[i]);
                 unchecked {
                     ++i;
                 }
@@ -191,31 +192,31 @@ contract Campaigns is
             if (winners.length == 0) revert IErrors.InvalidAddressesLength();
             uint256 addressesLength = winners.length;
             for (uint256 i; i < addressesLength; ) {
-                campWinners[campaignId].push(winners[i]);
+                campWinners[campaignId_].push(winners[i]);
                 unchecked {
                     ++i;
                 }
             }
         }
 
-        emit CampWinnersAdded(campaignId, winners);
+        emit CampWinnersAdded(campaignId_, winners);
     }
 
     /**
      * @notice Claim campaign rewards
      * @dev Claims rewards for eligible users with reentrancy protection
-     * @param campaignId ID of the campaign
+     * @param campaignId_ ID of the campaign
      * @param gist Gist hash for signature validation
      * @param message Message for signature verification
      * @param signature Signature for verification
      */
     function claimCampaign(
-        uint256 campaignId,
+        uint256 campaignId_,
         bytes32 gist,
         string memory message,
         bytes memory signature
     ) external nonReentrant {
-        Campaign memory campaign = campaigns[campaignId];
+        Campaign memory campaign = campaigns[campaignId_];
 
         (, , address sbtAddress, address nftAddress, , , , ) = IDAOFactory(daoFactory).daoConfigs(
             campaign.daoId
@@ -226,21 +227,21 @@ contract Campaigns is
 
         if (campaign.startDate > block.timestamp) revert IErrors.CampaignNotStarted();
         if (campaign.endDate <= block.timestamp) revert IErrors.CampaignEnded();
-        if (campaign.totalAmount < totalClaimed[campaignId] + campaign.claimAmount) {
+        if (campaign.totalAmount < totalClaimed[campaignId_] + campaign.claimAmount) {
             revert IErrors.CampaignFullyClaimed();
         }
-        if (campWinnersClaimed[campaignId][msg.sender]) revert IErrors.AlreadyClaimed();
+        if (campWinnersClaimed[campaignId_][msg.sender]) revert IErrors.AlreadyClaimed();
 
         if (campaign.validateSignatures) {
             if (!verify(msg.sender, message, signature)) revert IErrors.InvalidSignature();
-            if (campGistsClaimed[campaignId][gist]) revert IErrors.AlreadyClaimed();
+            if (campGistsClaimed[campaignId_][gist]) revert IErrors.AlreadyClaimed();
 
             // Check if gist is whitelisted
             bool isWhitelisted = false;
-            uint256 gistsLength = campGists[campaignId].length;
+            uint256 gistsLength = campGists[campaignId_].length;
 
             for (uint256 i; i < gistsLength; ) {
-                if (campGists[campaignId][i] == gist) {
+                if (campGists[campaignId_][i] == gist) {
                     isWhitelisted = true;
                     break;
                 }
@@ -250,25 +251,25 @@ contract Campaigns is
             }
             if (!isWhitelisted) revert IErrors.NotWhitelisted();
 
-            campGistsClaimed[campaignId][gist] = true;
-            campWinnersClaimed[campaignId][msg.sender] = true;
+            campGistsClaimed[campaignId_][gist] = true;
+            campWinnersClaimed[campaignId_][msg.sender] = true;
         } else {
-            if (campWinners[campaignId].length == 0) revert IErrors.NoWinners();
+            if (campWinners[campaignId_].length == 0) revert IErrors.NoWinners();
 
             // Check if user is a winner
-            bool isWinner = false;
-            uint256 winnersLength = campWinners[campaignId].length;
+            bool winnerFound = false;
+            uint256 winnersLength = campWinners[campaignId_].length;
             for (uint256 i; i < winnersLength; ) {
-                if (campWinners[campaignId][i] == msg.sender) {
-                    isWinner = true;
+                if (campWinners[campaignId_][i] == msg.sender) {
+                    winnerFound = true;
                     break;
                 }
                 unchecked {
                     ++i;
                 }
             }
-            if (!isWinner) revert IErrors.NotWhitelisted();
-            campWinnersClaimed[campaignId][msg.sender] = true;
+            if (!winnerFound) revert IErrors.NotWhitelisted();
+            campWinnersClaimed[campaignId_][msg.sender] = true;
         }
 
         // Transfer rewards
@@ -292,10 +293,10 @@ contract Campaigns is
 
         // Update total claimed (unchecked for gas optimization)
         unchecked {
-            totalClaimed[campaignId] += campaign.claimAmount;
+            totalClaimed[campaignId_] += campaign.claimAmount;
         }
 
-        emit CampWinnersClaimed(campaignId, msg.sender);
+        emit CampWinnersClaimed(campaignId_, msg.sender);
     }
 
     /**
@@ -390,11 +391,11 @@ contract Campaigns is
     /**
      * @notice Get the status of a campaign
      * @dev Returns the current status based on timestamps
-     * @param campaignId ID of the campaign
+     * @param campaignId_ ID of the campaign
      * @return Current status of the campaign
      */
-    function getStatus(uint256 campaignId) external view returns (Status) {
-        Campaign memory campaign = campaigns[campaignId];
+    function getStatus(uint256 campaignId_) external view returns (Status) {
+        Campaign memory campaign = campaigns[campaignId_];
         if (campaign.endDate <= block.timestamp) {
             return Status.Ended;
         } else if (campaign.startDate <= block.timestamp) {
@@ -406,14 +407,14 @@ contract Campaigns is
     /**
      * @notice Check if an address is a winner of a campaign
      * @dev Only works for non-signature campaigns
-     * @param campaignId ID of the campaign
+     * @param campaignId_ ID of the campaign
      * @param winner Address to check
      * @return True if address is a winner, false otherwise
      */
-    function isWinner(uint256 campaignId, address winner) external view returns (bool) {
-        uint256 winnersLength = campWinners[campaignId].length;
+    function isWinner(uint256 campaignId_, address winner) external view returns (bool) {
+        uint256 winnersLength = campWinners[campaignId_].length;
         for (uint256 i; i < winnersLength; ) {
-            if (campWinners[campaignId][i] == winner) {
+            if (campWinners[campaignId_][i] == winner) {
                 return true;
             }
             unchecked {
@@ -426,11 +427,11 @@ contract Campaigns is
     /**
      * @notice Get the creator of a campaign
      * @dev Returns the creator of a campaign
-     * @param campaignId ID of the campaign
+     * @param campaignId_ ID of the campaign
      * @return Creator of the campaign
      */
-    function getCreator(uint256 campaignId) public view returns (address) {
-        return campaigns[campaignId].creator;
+    function getCreator(uint256 campaignId_) public view returns (address) {
+        return campaigns[campaignId_].creator;
     }
 
     /**

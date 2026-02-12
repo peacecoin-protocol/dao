@@ -8,19 +8,19 @@ import {PCECommunityGovToken} from "../mocks/PCECommunityGovToken.sol";
 import {GovernorAlpha} from "../Governance/GovernorAlpha.sol";
 import {Timelock} from "../Governance/Timelock.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {PeaceCoinDaoSbt} from "../Governance/PEACECOINDAO_SBT.sol";
-import {PeaceCoinDaoNft} from "../Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../Governance/PeaceCoinDaoSbt.sol";
+import {PeaceCoinDaoNft} from "../Governance/PeaceCoinDaoNft.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
     function deployDaoFactory() public returns (address, address, address) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 
-        string memory URI = "https://ipfs-dao-studio.mypinata.cloud/ipfs/";
+        string memory URI = vm.envString("IPFS_URI");
 
         // Import OpenZeppelin's TransparentUpgradeableProxy (make sure you added import statement at the top if not present)
         address timelockImplementation = address(new Timelock());

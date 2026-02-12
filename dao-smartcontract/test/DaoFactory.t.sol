@@ -9,8 +9,8 @@ import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {PCECommunityGovToken} from "../src/mocks/PCECommunityGovToken.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
-import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PeaceCoinDaoSbt.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PeaceCoinDaoNft.sol";
 import {MultipleVotings} from "../src/Governance/MultipleVotings.sol";
 
 contract DaoFactoryTest is Test {

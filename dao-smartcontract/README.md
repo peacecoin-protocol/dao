@@ -1,169 +1,165 @@
 # pce_dao
 
-** Peace Coin DAO **
+**Peace Coin DAO**
+
+A modular DAO framework for the Peace Coin ecosystem. This repository contains the core on-chain components for creating DAOs, governing proposals with a timelock, issuing membership and governance tokens, running campaigns, distributing bounties, and staking PCE.
+
+## Overview
+
+This codebase provides:
+
+- A DAO factory that deploys governance infrastructure (timelock, governor, governance token, SBT/NFT, and multiple-choice voting).
+- Governance contracts for proposing, voting, and executing decisions through a timelock.
+- Campaigns with configurable rewards (ERC20, SBT, or NFT) and optional signature validation.
+- Bounty mechanics tied to proposal outcomes and contributors.
+- Staking for PCE with wPCE receipt tokens and configurable rewards.
+- A simple bytecode factory for owner-controlled deployments.
+
+## Core Contracts
+
+- `src/DAOFactory.sol` Factory that clones and configures DAO components, stores DAO config, and manages DAO roles.
+- `src/Governance/GovernorAlpha.sol` Governor contract that tracks proposals, votes, and timelock execution.
+- `src/Governance/Timelock.sol` Timelock used to queue and execute successful proposals with delay.
+- `src/Governance/MultipleVotings.sol` Multiple-choice voting module (up to 20 options).
+- `src/Governance/PEACECOINDAO_NFT.sol` ERC1155 NFT with per-ID voting weights and delegation.
+- `src/Governance/PEACECOINDAO_SBT.sol` Non-transferable SBT variant of the DAO NFT.
+- `src/Campaigns.sol` Campaigns with reward distribution (ERC20, SBT, or NFT) and optional signature gating.
+- `src/Bounty.sol` Proposal and contributor bounties, gated by governance outcomes.
+- `src/Staking.sol` PCE staking with wPCE receipts and reward-per-block emissions.
+- `src/ContractFactory.sol` Owner-only factory for deploying arbitrary bytecode.
+
+## Access Control Summary
+
+- `DAOFactory` uses `DEFAULT_ADMIN_ROLE` and `DAO_MANAGER_ROLE` for DAO lifecycle and campaign controls.
+- `Bounty` and `Staking` are `Ownable` and restrict admin actions to the owner.
+- `ContractFactory` is owner-restricted for deployments.
 
 ## Documentation
 
-https://book.getfoundry.sh/
+Foundry Book: https://book.getfoundry.sh/
 
-## Usage
+## Prerequisites
 
-### Build
+- Foundry installed and up to date.
+- A funded deployer wallet for the target network.
+- RPC endpoint for the target network (e.g., Polygon).
+- Polygonscan API key for verification (optional but recommended).
 
-```shell
-$ forge build
-```
+## Project Structure
 
-### Test
+- `src/` Solidity contracts.
+- `src/deploy/` Foundry deployment scripts.
+- `test/` Foundry tests.
 
-```shell
-$ forge test
-```
+## Development
 
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
+Build:
 
 ```shell
-$ forge snapshot
+forge build
 ```
 
-### Anvil
+Test:
 
 ```shell
-$ anvil
+forge test
 ```
 
-### Deploy
+Format:
 
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+forge fmt
 ```
 
-### Cast
+Gas snapshots:
 
 ```shell
-$ cast <subcommand>
+forge snapshot
 ```
 
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
-
-### Deployment
-
-```
-forge script 'src/deploy/DAOScript.sol':DAOScript --rpc-url $AMOY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --broadcast --verify
-```
-
-### Use the Pre-Funded Account:
-
-The account will have test ETH ready to interact with your local testnet. Use this ETH for deploying contracts or testing transactions.
-
-### Deploy Contracts
-
-```shell
-forge script 'src/deploy/DAOFactoryScript.sol:DAOFactoryScript' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
-```
-
-### Deploy Testnet
-
-```shell
-forge script 'src/deploy/PCECommunityGovTokenScript.sol:PCECommunityGovTokenScript' --fork-url $AMOY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --broadcast --verify --via-ir
-```
-
-### Start Anvil: Deploy Contracts on Local Testnet
-
-Open Terminal and run:
+Start local node:
 
 ```shell
 anvil
 ```
 
-### Deploy Contract on Anvil Local Testnet
+Cast helper:
 
 ```shell
-forge script 'src/script/script.s.sol:script' --fork-url http://127.0.0.1:8545 --broadcast --via-ir
+cast <subcommand>
 ```
 
-### Setting up a local Subgraph Environment
+Help:
 
-## Prquisites
-
-The following packeges and tools have to be installed for the setup to be working:
-
-### Docker
-
-https://docs.docker.com/get-started/#download-and-install-docker
-
-### IPFS
-
-https://github.com/ipfs/ipfs-desktop/releases
-
-### Graph CLI
-
-```
-# NPM
-npm install -g @graphprotocol/graph-cli
-
-# Yarn
-yarn global add @graphprotocol/graph-cli
+```shell
+forge --help
+anvil --help
+cast --help
 ```
 
-### Local Graph Node
+## Environment Setup
 
-Set up local Graph node with graph-cli.
+Create a `.env` file at the project root. Use `.env_example` as a template.
 
-In new Terminal navigate to the docker folder:
+Required variables:
 
-```
-cd graph-node/docker
-```
+- `PRIVATE_KEY` Deployer wallet private key.
+- `POLYGON_RPC_URL` RPC endpoint for Polygon.
 
-Then run:
+Optional variables:
 
-```
-./setup.sh
-```
+- `POLYSCAN_API_KEY` Polygonscan API key for contract verification.
 
-This adapts the local docker-compose file of the graph-node to link to the local chain, that we host with anvil.
+Example:
 
-```
-docker-compose up
-```
-
-Starts the graph-node that should link up to the local chain automatically.
-
-### Deploying Subgraph
-
-In new Terminal navigate to the subgraph folder:
-
-```
-cd PCEDaoSubgraph
+```shell
+PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+POLYGON_RPC_URL=https://polygon-rpc.com
+POLYSCAN_API_KEY=YOUR_POLYGONSCAN_KEY
 ```
 
-Create the subgraph via:
+Notes:
 
-```
-graph codegen && graph build
+- Never commit `.env` to version control.
+- Use a dedicated deployer wallet with limited funds.
+
+## Deployment (Polygon)
+
+1. Ensure all required environment variables are properly configured in your `.env` file, and that your deployer wallet contains sufficient MATIC for gas fees.
+
+2. ```shell
+   # Load environment variables for this shell session
+   source .env
+   ```
+3. Run the deployment script:
+
+```shell
+forge script 'src/deploy/deploy.s.sol' \
+  --fork-url $POLYGON_RPC_URL \
+  --broadcast \
+  --via-ir
 ```
 
-Register subgraph name in the graph-node:
+## Deployment + Verification (Polygon)
 
-```
-npm run create-local
+If you want automatic verification on Polygonscan:
+
+```shell
+forge script 'src/deploy/deploy.s.sol' \
+  --fork-url $POLYGON_RPC_URL \
+  --etherscan-api-key $POLYSCAN_API_KEY \
+  --broadcast \
+  --verify \
+  --via-ir
 ```
 
-Deploy the subgraph to the local graph-node:
+## Common Troubleshooting
 
-```
-npm run deploy-local
-```
+- `Invalid private key` Ensure `PRIVATE_KEY` is a hex string with `0x` prefix.
+- `insufficient funds for gas` Fund the deployer wallet with MATIC.
+- `unable to verify` Confirm `POLYSCAN_API_KEY` is valid and the network matches your RPC.
+
+## Notes
+
+- If you deploy to a different network, swap `POLYGON_RPC_URL` and the corresponding explorer API key.
+- For local deployments, use `anvil` and replace `--fork-url` with `--rpc-url http://127.0.0.1:8545`.

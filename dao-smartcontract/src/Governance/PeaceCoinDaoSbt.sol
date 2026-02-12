@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import {PeaceCoinDaoNft} from "./PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoNft} from "./PeaceCoinDaoNft.sol";
 
 contract PeaceCoinDaoSbt is PeaceCoinDaoNft {
     /**
