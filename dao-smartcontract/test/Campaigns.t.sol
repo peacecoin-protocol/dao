@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {Campaigns} from "../src/Campaigns.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PeaceCoinDaoSbt.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PeaceCoinDaoNft.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {ITokens} from "../src/interfaces/ITokens.sol";
@@ -226,17 +226,17 @@ contract CampaignsTest is Test {
     /**
      * @notice Adds winners to a campaign
      * @dev Helper function to add test winners to a campaign
-     * @param campaignId The ID of the campaign
+     * @param campaignId_ The ID of the campaign
      * @param winners Array of winner addresses
      * @param gists Array of gist hashes for signature validation
      */
     function _addCampaignWinners(
-        uint256 campaignId,
+        uint256 campaignId_,
         address[] memory winners,
         bytes32[] memory gists
     ) internal {
         vm.prank(daoManager);
-        campaigns.addCampWinners(campaignId, winners, gists);
+        campaigns.addCampWinners(campaignId_, winners, gists);
     }
 
     /**

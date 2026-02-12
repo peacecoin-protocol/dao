@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Timelock} from "../src/Governance/Timelock.sol";
 import {GovernorAlpha} from "../src/Governance/GovernorAlpha.sol";
 import {MockGovToken} from "../src/mocks/MockGovToken.sol";
-import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
-import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PeaceCoinDaoSbt.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PeaceCoinDaoNft.sol";
 import {IDAOFactory} from "../src/interfaces/IDAOFactory.sol";
 
 contract PublicTimelock is Timelock {

@@ -2,10 +2,11 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {PeaceCoinDaoNft} from "../src/Governance/PEACECOINDAO_NFT.sol";
+import {PeaceCoinDaoNft} from "../src/Governance/PeaceCoinDaoNft.sol";
 import {DAOFactory} from "../src/DAOFactory.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 import {Campaigns} from "../src/Campaigns.sol";
+
 /**
  * @title PeaceCoinDaoNftTest
  * @notice Comprehensive test suite for the PeaceCoinDaoNft contract

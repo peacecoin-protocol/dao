@@ -74,8 +74,9 @@ contract DAOFactory is
     function _validateImplementation() internal view {
         if (timelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
         if (governorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
-        if (governanceTokenImplementation == address(0))
+        if (governanceTokenImplementation == address(0)) {
             revert IErrors.GovernanceTokenImplementationNotSet();
+        }
         if (sbtImplementation == address(0)) revert IErrors.InvalidAddress();
         if (nftImplementation == address(0)) revert IErrors.InvalidAddress();
     }
@@ -110,12 +111,16 @@ contract DAOFactory is
         address newSbtImplementation,
         address newNftImplementation
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (newTimelockImplementation == address(0)) revert IErrors.TimelockImplementationNotSet();
+        if (newTimelockImplementation == address(0)) {
+            revert IErrors.TimelockImplementationNotSet();
+        }
         if (newGovernorImplementation == address(0)) revert IErrors.GovernorImplementationNotSet();
-        if (newGovernanceTokenImplementation == address(0))
+        if (newGovernanceTokenImplementation == address(0)) {
             revert IErrors.GovernanceTokenImplementationNotSet();
-        if (newMultipleVotingImplementation == address(0))
+        }
+        if (newMultipleVotingImplementation == address(0)) {
             revert IErrors.MultipleVotingImplementationNotSet();
+        }
         if (newSbtImplementation == address(0)) revert IErrors.InvalidAddress();
         if (newNftImplementation == address(0)) revert IErrors.InvalidAddress();
 

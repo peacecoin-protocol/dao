@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {PeaceCoinDaoSbt} from "../src/Governance/PEACECOINDAO_SBT.sol";
+import {PeaceCoinDaoSbt} from "../src/Governance/PeaceCoinDaoSbt.sol";
 import {IErrors} from "../src/interfaces/IErrors.sol";
 
 /**
@@ -24,6 +24,7 @@ contract PeaceCoinDaoSbtTest is Test {
     string private constant TOKEN_URI = "test-uri";
     uint256 private constant VOTING_POWER = 100;
     string private constant BASE_URI = "https://nftdata.parallelnft.com/api/parallel-alpha/ipfs/";
+
     // ============ Setup ============
 
     /**
