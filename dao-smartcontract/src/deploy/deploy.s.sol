@@ -15,7 +15,7 @@ contract Deploy is Script, DeployDAOFactory {
     function run() external {
         (address daoFactoryAddress, , ) = deployDaoFactory();
 
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         address proxyAdminAddress = address(new ProxyAdmin(deployerAddress));
         vm.startBroadcast(deployerPrivateKey);

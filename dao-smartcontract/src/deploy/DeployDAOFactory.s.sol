@@ -16,7 +16,7 @@ import {MultipleVotings} from "../Governance/MultipleVotings.sol";
 
 contract DeployDAOFactory is Script {
     function deployDaoFactory() public returns (address, address, address) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_TESTNET");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 

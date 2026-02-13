@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {IDAOFactory} from "../interfaces/IDAOFactory.sol";
+import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 
 contract GovernorAlpha {
     /// @notice The name of this contract
@@ -17,13 +18,13 @@ contract GovernorAlpha {
     TimelockInterface public timelock;
 
     /// @notice The address of the PCE governance token
-    GovernorTokenInterface public token;
+    IVotes public token;
 
     /// @notice The address of the SBT
-    GovernorTokenInterface public sbt;
+    IVotes public sbt;
 
     /// @notice The address of the NFT
-    GovernorTokenInterface public nft;
+    IVotes public nft;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
@@ -152,9 +153,9 @@ contract GovernorAlpha {
         initialized = true;
 
         name = daoName;
-        token = GovernorTokenInterface(address(tokenAddress));
-        sbt = GovernorTokenInterface(sbtAddress);
-        nft = GovernorTokenInterface(nftAddress);
+        token = IVotes(address(tokenAddress));
+        sbt = IVotes(sbtAddress);
+        nft = IVotes(nftAddress);
         timelock = TimelockInterface(timelockAddress);
         votingDelay = votingDelayBlocks;
         votingPeriod = votingPeriodBlocks;
@@ -173,7 +174,7 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint256) {
         require(
-            getPastVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold,
+            getVotes(msg.sender) > proposalThreshold,
             "Governor::propose: proposer votes below proposal threshold"
         );
         require(
@@ -344,8 +345,7 @@ contract GovernorAlpha {
 
         Proposal storage proposal = proposals[proposalId];
         require(
-            msg.sender == guardian ||
-                getPastVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold,
+            msg.sender == guardian || getVotes(proposal.proposer) < proposalThreshold,
             "Governor::cancel: proposer above threshold"
         );
 
@@ -422,7 +422,7 @@ contract GovernorAlpha {
         Receipt storage receipt = proposal.receipts[voter];
         require(!receipt.hasVoted, "Governor::_castVote: voter already voted");
 
-        uint256 votes = getPastVotes(voter, proposal.startBlock);
+        uint256 votes = getVotes(voter);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -514,11 +514,8 @@ contract GovernorAlpha {
         );
     }
 
-    function getPastVotes(address account, uint256 blockNumber) public view returns (uint256) {
-        return
-            token.getPastVotes(account, blockNumber) +
-            sbt.getPastVotes(account, blockNumber) +
-            nft.getPastVotes(account, blockNumber);
+    function getVotes(address account) public view returns (uint256) {
+        return token.getVotes(account) + sbt.getVotes(account) + nft.getVotes(account);
     }
 
     function add256(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -559,8 +556,4 @@ interface TimelockInterface {
         bytes calldata data,
         uint256 eta
     ) external payable returns (bytes memory);
-}
-
-interface GovernorTokenInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
 }

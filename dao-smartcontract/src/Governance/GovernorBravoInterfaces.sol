@@ -204,7 +204,7 @@ interface TimelockInterface {
 }
 
 interface CompInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
+    function getVotes(address account) external view returns (uint256);
 }
 
 interface GovernorAlpha {
