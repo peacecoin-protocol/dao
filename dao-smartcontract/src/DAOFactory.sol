@@ -31,7 +31,7 @@ contract DAOFactory is
     // Maximum values for safety
     uint256 public constant MIN_TIMELOCK_DELAY = 1 minutes;
     uint256 public constant MAX_TIMELOCK_DELAY = 30 hours;
-    uint256 public constant MIN_VOTING_PERIOD = 7200;
+    uint256 public constant MIN_VOTING_PERIOD = 50;
     uint256 public constant MIN_VOTING_DELAY = 1;
 
     // ============ State Variables ============

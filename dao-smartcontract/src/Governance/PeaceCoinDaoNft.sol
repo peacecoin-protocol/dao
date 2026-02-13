@@ -201,14 +201,6 @@ contract PeaceCoinDaoNft is Initializable, ERC1155Upgradeable, AccessControlUpgr
         return _checkpoints[who].latest();
     }
 
-    function getPastVotes(address who, uint256 blockNumber) external view returns (uint256) {
-        if (blockNumber > type(uint32).max) revert BlockNumberTooLarge();
-        // casting to 'uint32' is safe because blockNumber is checked above to fit
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint32 blockNumber32 = uint32(blockNumber);
-        return _checkpoints[who].upperLookup(blockNumber32);
-    }
-
     function getTokenWeight(uint256 id) external view returns (uint256) {
         return votingPowerPerId[id];
     }

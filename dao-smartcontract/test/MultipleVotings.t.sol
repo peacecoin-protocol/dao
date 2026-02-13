@@ -19,10 +19,7 @@ contract MockGovernorToken {
         pastVotes[account] = votes;
     }
 
-    function getPastVotes(
-        address account,
-        uint256 /* blockNumber */
-    ) external view returns (uint256) {
+    function getVotes(address account) public view returns (uint256) {
         return pastVotes[account];
     }
 }
@@ -644,13 +641,13 @@ contract MultipleVotingsTest is Test {
     // ============ GetPastVotes Tests ============
 
     function test_getPastVotes_Success() public view {
-        uint256 votes = multipleVotings.getPastVotes(alice, block.number - 1);
+        uint256 votes = multipleVotings.getVotes(alice);
         assertEq(votes, 3000); // 1000 token + 1000 sbt + 1000 nft
     }
 
     function test_getPastVotes_ZeroVotes() public {
         address noVotes = makeAddr("noVotes");
-        uint256 votes = multipleVotings.getPastVotes(noVotes, block.number - 1);
+        uint256 votes = multipleVotings.getVotes(noVotes);
         assertEq(votes, 0);
     }
 
@@ -659,7 +656,7 @@ contract MultipleVotingsTest is Test {
         sbt.setPastVotes(alice, 200);
         nft.setPastVotes(alice, 300);
 
-        uint256 votes = multipleVotings.getPastVotes(alice, block.number - 1);
+        uint256 votes = multipleVotings.getVotes(alice);
         assertEq(votes, 600);
     }
 

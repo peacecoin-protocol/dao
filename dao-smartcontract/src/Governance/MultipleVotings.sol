@@ -5,7 +5,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 interface GovernorInterface {
-    function getPastVotes(address account, uint256 blockNumber) external view returns (uint256);
+    function getVotes(address account) external view returns (uint256);
     function proposalThreshold() external view returns (uint256);
 }
 
@@ -126,7 +126,7 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable, GovernorI
             "Multiple_Votings: end timestamp must be greater than start timestamp"
         );
         require(
-            getPastVotes(msg.sender, block.number - 1) > proposalThreshold,
+            getVotes(msg.sender) > proposalThreshold,
             "Multiple_Votings: proposer votes below proposal threshold"
         );
 
@@ -182,7 +182,7 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable, GovernorI
         require(proposal.state != ProposalState.Canceled, "Multiple_Votings: proposal canceled");
 
         // Get voter's available voting power at proposal start block
-        uint256 availableVotes = getPastVotes(msg.sender, proposal.createdAt);
+        uint256 availableVotes = getVotes(msg.sender);
         require(availableVotes > 0, "Multiple_Votings: no voting power");
 
         // Allocate votes to the selected option
@@ -272,15 +272,11 @@ contract MultipleVotings is Initializable, ReentrancyGuardUpgradeable, GovernorI
         emit ProposalCanceled(proposalId);
     }
 
-    /// @notice Get past votes for an account at a specific block
+    /// @notice Get voting power for an account
     /// @param account The account to check
-    /// @param blockNumber The block number to check at
-    /// @return votes The voting power
-    function getPastVotes(
-        address account,
-        uint256 blockNumber
-    ) public view override returns (uint256) {
-        return uint256(GovernorInterface(governor).getPastVotes(account, blockNumber));
+    /// @return The voting power
+    function getVotes(address account) public view override returns (uint256) {
+        return uint256(GovernorInterface(governor).getVotes(account));
     }
 
     /// @notice Proposal state enum (matches Governor)

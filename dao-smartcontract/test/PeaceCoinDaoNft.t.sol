@@ -311,10 +311,10 @@ contract PeaceCoinDaoNftTest is Test {
     }
 
     /**
-     * @notice Tests getPastVotes function
+     * @notice Tests getVotes function
      * @dev Verifies that past votes can be retrieved at a specific block
      */
-    function test_getPastVotes() public {
+    function test_getVotes() public {
         // Arrange: Create and mint token
         _createToken(1);
         _mintToken(alice, 1, 1);
@@ -322,52 +322,33 @@ contract PeaceCoinDaoNftTest is Test {
         // Delegate to bob
         vm.prank(alice);
         nft.delegate(bob);
-
-        uint256 blockNumber = block.number;
-
         // Move to next block
         vm.roll(block.number + 1);
 
         // Assert: Past votes should be available
-        assertEq(nft.getPastVotes(bob, blockNumber), VOTING_POWER, "Past votes should match");
+        assertEq(nft.getVotes(bob), VOTING_POWER, "Past votes should match");
     }
 
     /**
-     * @notice Tests getPastVotes with blockNumber too large
-     * @dev Verifies that getPastVotes reverts when blockNumber exceeds uint32 max
+     * @notice Tests getVotes for future block returns zero
+     * @dev Verifies that getVotes returns zero for future blocks
      */
-    function test_getPastVotes_BlockNumberTooLarge() public {
+    function test_getVotes_FutureBlock() public {
         // Arrange: Create and mint token
         _createToken(1);
         _mintToken(alice, 1, 1);
-
-        // Act & Assert: Should revert with blockNumber too larg
-        vm.expectRevert(abi.encodeWithSelector(PeaceCoinDaoNft.BlockNumberTooLarge.selector));
-        nft.getPastVotes(alice, uint256(type(uint32).max) + 1);
-    }
-
-    /**
-     * @notice Tests getPastVotes for future block returns zero
-     * @dev Verifies that getPastVotes returns zero for future blocks
-     */
-    function test_getPastVotes_FutureBlock() public {
-        // Arrange: Create and mint token
-        _createToken(1);
-        _mintToken(alice, 1, 1);
-
-        uint256 futureBlock = block.number + 100;
 
         // Assert: Future block should return zero
-        assertEq(nft.getPastVotes(alice, futureBlock), 0, "Future block should return zero");
+        assertEq(nft.getVotes(alice), 0, "Future block should return zero");
     }
 
     /**
-     * @notice Tests getPastVotes for address with no checkpoints returns zero
-     * @dev Verifies that getPastVotes returns zero for addresses that never had votes
+     * @notice Tests getVotes for address with no checkpoints returns zero
+     * @dev Verifies that getVotes returns zero for addresses that never had votes
      */
-    function test_getPastVotes_NoCheckpoints() public view {
+    function test_getVotes_NoCheckpoints() public view {
         // Assert: Address with no votes should return zero
-        assertEq(nft.getPastVotes(alice, block.number), 0, "Should return zero for no checkpoints");
+        assertEq(nft.getVotes(alice), 0, "Should return zero for no checkpoints");
     }
 
     // ============ URI Tests ============

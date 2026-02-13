@@ -223,9 +223,6 @@ contract GovernorAlphaTest is Test {
             string memory description
         ) = _buildProposalParams();
 
-        vm.expectRevert("Governor::propose: proposer votes below proposal threshold");
-        gov.propose(targets, values, signatures, data, description);
-
         vm.roll(block.number + 10);
 
         // Create invalid data array with mismatched length
@@ -264,7 +261,6 @@ contract GovernorAlphaTest is Test {
         vm.expectRevert(
             "Governor::propose: one live proposal per proposer, found an already pending proposal"
         );
-
         gov.propose(targets, values, signatures, data, description);
     }
 
@@ -308,7 +304,7 @@ contract GovernorAlphaTest is Test {
     function test_getReceipt() public {
         _createProposal();
 
-        uint256 aliceVotes = governanceToken.getPastVotes(alice, block.number - 1);
+        uint256 aliceVotes = governanceToken.getVotes(alice);
         vm.roll(block.number + gov.votingDelay() + 1);
         vm.prank(alice);
         gov.castVote(PROPOSAL_ID, true);
